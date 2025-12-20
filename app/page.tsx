@@ -46,8 +46,10 @@
          if (!line) continue; 
  
          const payload = line.slice(6); 
-         const token = JSON.parse(payload) as string; 
-         setOut((prev) => prev + token); 
+         const token = JSON.parse(payload); 
+         if (typeof token === "string") {
+           setOut((prev) => prev + token);
+         } 
        } 
      } 
  
