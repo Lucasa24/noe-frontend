@@ -52,24 +52,26 @@
            const eventLine = lines.find((l) => l.startsWith("event:")); 
            if (eventLine && !lines.some((l) => l.startsWith("data:"))) continue; 
  
-           const dataLine = lines.find((l) => l.startsWith("data:")); 
+           const dataLine = lines.find((l) => l.startsWith("data: ")); 
            if (!dataLine) continue; 
  
-           const payload = dataLine.slice(5).trim(); 
+           // Remove "data: " (6 chars) e limpa CRLF 
+           const payload = dataLine.slice(6).replace(/\r/g, "").trim(); 
  
-           // IGNORA mensagens simples (o que está te quebrando) 
-           if (!payload || payload === "ok") continue; 
- 
-           // Alguns SSE mandam "[DONE]" etc. 
+           // Bloqueia qualquer coisa que não seja JSON de token 
+           if (!payload) continue; 
+           if (payload.toLowerCase() === "ok") continue; 
            if (payload === "[DONE]") continue; 
  
-           // Agora sim: token JSON 
+           // Se não começa com aspas ou { ou [, NÃO tenta parsear 
+           const first = payload[0]; 
+           if (first !== '"' && first !== "{" && first !== "[") continue; 
+ 
            try { 
              const token = JSON.parse(payload) as string; 
              setOut((prev) => prev + token); 
-           } catch (err: any) { 
+           } catch (err) { 
              console.error("CRASH EVITADO:", payload, err); 
-             setOut((prev) => prev + `\n[ERRO PARSE: "${payload}"]\n`); 
              continue; 
            } 
          } 
