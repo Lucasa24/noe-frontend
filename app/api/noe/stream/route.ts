@@ -11,9 +11,6 @@ export const runtime = "nodejs";
  
    const stream = new ReadableStream({ 
      async start(controller) { 
-       // evento inicial (opcional) 
-       controller.enqueue(encoder.encode(`event: ready\ndata: ok\n\n`)); 
- 
        // MVP: simulação de streaming (pra validar end-to-end) 
        const text = 
          `Nóe: entendi. Você disse: "${message}". ` + 
