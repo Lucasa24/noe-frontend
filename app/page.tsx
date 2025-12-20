@@ -39,16 +39,30 @@
        buf = parts.pop() || ""; 
  
        for (const part of parts) { 
-         const line = part 
-           .split("\n") 
-           .find((l) => l.startsWith("data: ")); 
+         const lines = part.split("\n").map((l) => l.trim()); 
  
-         if (!line) continue; 
+         // Se for um evento do tipo "event: done", ignore 
+         const eventLine = lines.find((l) => l.startsWith("event:")); 
+         if (eventLine && !lines.some((l) => l.startsWith("data:"))) continue; 
  
-         const payload = line.slice(6); 
-         const token = JSON.parse(payload); 
-         if (typeof token === "string") {
-           setOut((prev) => prev + token);
+         const dataLine = lines.find((l) => l.startsWith("data:")); 
+         if (!dataLine) continue; 
+ 
+         const payload = dataLine.slice(5).trim(); 
+ 
+         // IGNORA mensagens simples (o que está te quebrando) 
+         if (!payload || payload === "ok") continue; 
+ 
+         // Alguns SSE mandam "[DONE]" etc. 
+         if (payload === "[DONE]") continue; 
+ 
+         // Agora sim: token JSON 
+         try { 
+           const token = JSON.parse(payload) as string; 
+           setOut((prev) => prev + token); 
+         } catch { 
+           // Se vier lixo, ignora em vez de quebrar a UI 
+           continue; 
          } 
        } 
      } 
