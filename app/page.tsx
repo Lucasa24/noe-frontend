@@ -6,86 +6,59 @@
    const [input, setInput] = useState(""); 
    const [out, setOut] = useState(""); 
    const [loading, setLoading] = useState(false); 
-   const [debugInfo, setDebugInfo] = useState(""); 
  
    async function send() { 
      setLoading(true); 
      setOut(""); 
-     setDebugInfo(""); 
  
-     try { 
-       const res = await fetch("/api/noe/stream", { 
-         method: "POST", 
-         headers: { "Content-Type": "application/json" }, 
-         body: JSON.stringify({ message: input }), 
-       }); 
+     const res = await fetch("/api/noe/stream", { 
+       method: "POST", 
+       headers: { "Content-Type": "application/json" }, 
+       body: JSON.stringify({ message: input }), 
+     }); 
  
-       if (!res.body) { 
-         setOut("Erro: stream não veio."); 
-         setLoading(false); 
-         return; 
-       } 
+     if (!res.body) { 
+       setOut("Erro: stream não veio."); 
+       setLoading(false); 
+       return; 
+     } 
  
-       const reader = res.body.getReader(); 
-       const decoder = new TextDecoder(); 
+     const reader = res.body.getReader(); 
+     const decoder = new TextDecoder(); 
  
-       let buf = ""; 
+     let buf = ""; 
  
-       while (true) { 
-         const { value, done } = await reader.read(); 
-         if (done) break; 
+     while (true) { 
+       const { value, done } = await reader.read(); 
+       if (done) break; 
  
-         const chunk = decoder.decode(value, { stream: true }); 
-         buf += chunk; 
-         
-         // Debug: mostrar o que está chegando cru 
-         setDebugInfo((prev) => (prev + chunk).slice(-1000)); 
+       buf += decoder.decode(value, { stream: true }); 
  
-         // Eventos SSE são separados por "\n\n" 
-         const parts = buf.split("\n\n"); 
-         buf = parts.pop() || ""; 
+       // Eventos SSE são separados por "\n\n" 
+       const parts = buf.split("\n\n"); 
+       buf = parts.pop() || ""; 
  
-         for (const part of parts) { 
-           const lines = part.split("\n").map((l) => l.trim()); 
+       for (const part of parts) { 
+         const line = part 
+           .split("\n") 
+           .find((l) => l.startsWith("data: ")); 
  
-           // Se for um evento do tipo "event: done", ignore 
-           const eventLine = lines.find((l) => l.startsWith("event:")); 
-           if (eventLine && !lines.some((l) => l.startsWith("data:"))) continue; 
+         if (!line) continue; 
  
-           const dataLine = lines.find((l) => l.startsWith("data: ")); 
-           if (!dataLine) continue; 
- 
-           // Remove "data: " (6 chars) e limpa CRLF 
-           const payload = dataLine.slice(6).replace(/\r/g, "").trim(); 
- 
-           // Bloqueia qualquer coisa que não seja JSON de token 
-           if (!payload) continue; 
-           if (payload.toLowerCase() === "ok") continue; 
-           if (payload === "[DONE]") continue; 
- 
-           // Se não começa com aspas ou { ou [, NÃO tenta parsear 
-           const first = payload[0]; 
-           if (first !== '"' && first !== "{" && first !== "[") continue; 
- 
-           try { 
-             const token = JSON.parse(payload) as string; 
-             setOut((prev) => prev + token); 
-           } catch (err) { 
-             console.error("CRASH EVITADO:", payload, err); 
-             continue; 
-           } 
+         const payload = line.slice(6); 
+         const token = JSON.parse(payload); 
+         if (typeof token === "string") {
+           setOut((prev) => prev + token);
          } 
        } 
-     } catch (err: any) { 
-       setOut((prev) => prev + `\n[ERRO GERAL: ${err.message}]\n`); 
-     } finally { 
-       setLoading(false); 
      } 
+ 
+     setLoading(false); 
    } 
  
    return ( 
      <main style={{ padding: 24, fontFamily: "sans-serif", maxWidth: 800 }}> 
-       <h1>Nóe (teste streaming v2 - Debug)</h1> 
+       <h1>Nóe (teste streaming)</h1> 
  
        <div 
          style={{ 
@@ -97,14 +70,6 @@
          }} 
        > 
          {out || "Digite algo e clique em Enviar…"} 
-       </div> 
- 
-       {/* Área de Debug */} 
-       <div style={{ marginTop: 20, background: "#f0f0f0", padding: 10, borderRadius: 5 }}> 
-         <h3>Últimos dados recebidos (RAW):</h3> 
-         <pre style={{ whiteSpace: "pre-wrap", fontSize: 12, color: "#333" }}> 
-           {debugInfo || "Nenhum dado recebido ainda..."} 
-         </pre> 
        </div> 
  
        <div style={{ marginTop: 16, display: "flex", gap: 8 }}> 
