@@ -69,10 +69,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: `Falha ao baixar blob: ${res.status}` }, { status: 400 });
     }
     const txt = await res.text();
-    const emails = parseEmailsFromTxt(txt);
+const emails = parseEmailsFromTxt(txt);
 
-    const total = emails.length;
-    const slice = emails.slice(start, start + batchSize);
+// B) Filtrar suppression ANTES do slice
+const suppression = await loadSuppressionSet();
+const filteredAll = emails.filter((e) => !suppression.has(e.trim().toLowerCase()));
+
+const total = filteredAll.length;
+const slice = filteredAll.slice(start, start + batchSize);
 
     if (slice.length === 0) {
       return NextResponse.json({
@@ -129,6 +133,31 @@ export async function POST(req: Request) {
     const nextStart = start + slice.length;
     const done = nextStart >= total;
 
+function looksPermanentFailure(errMsg: string) {
+  const m = (errMsg || "").toLowerCase();
+  return (
+    m.includes("mailbox does not exist") ||
+    m.includes("user unknown") ||
+    m.includes("no such user") ||
+    m.includes("invalid recipient") ||
+    m.includes("address does not exist") ||
+    m.includes("unknown recipient") ||
+    m.includes("550") ||
+    m.includes("553")
+  );
+}
+
+const hardBounced: string[] = [];
+for (const e of errors) {
+  const to = (e?.to || "").trim().toLowerCase();
+  const msg = String(e?.error || "");
+  if (to && looksPermanentFailure(msg)) hardBounced.push(to);
+}
+
+if (hardBounced.length > 0) {
+  await addManyToSuppression(hardBounced);
+}
+    
     return NextResponse.json({
       ok: true,
       dryRun,
@@ -150,4 +179,5 @@ export async function POST(req: Request) {
     );
   }
 }
+
 
