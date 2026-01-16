@@ -51,9 +51,10 @@ async function saveSuppressionSet(set: Set<string>) {
       .join("\n") + "\n";
 
   const blob = await put(pathname, content, {
-    access: "public",
-    addRandomSuffix: false,
-  });
+  access: "public",
+  addRandomSuffix: false,
+  allowOverwrite: true,
+});
 
   return blob.url;
 }
@@ -105,3 +106,4 @@ export async function addManyToSuppression(emails: string[]) {
 
   return { ok: true, added, total: set.size, url: blob.url };
 }
+
