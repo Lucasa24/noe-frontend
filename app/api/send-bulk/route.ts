@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { loadSuppressionSet } from "@/lib/suppression";
+import { loadSuppressionSet, addManyToSuppression } from "@/lib/suppression";
 
 type Body = {
   blobUrl: string;        // blobDedupUrl que você recebeu do import
@@ -150,4 +151,3 @@ export async function POST(req: Request) {
     );
   }
 }
-
