@@ -77,3 +77,31 @@ export async function addToSuppression(email: string) {
     url,
   };
 }
+
+export async function addManyToSuppression(emails: string[]) {
+  const set = await loadSuppressionSet();
+
+  let added = 0;
+  for (const email of emails) {
+    const e = email.trim().toLowerCase();
+    if (!e) continue;
+    if (!set.has(e)) {
+      set.add(e);
+      added++;
+    }
+  }
+
+  if (added === 0) {
+    return { ok: true, added: 0, total: set.size, url: process.env.SUPPRESSION_BLOB_URL || null };
+  }
+
+  // Reaproveita o mesmo arquivo fixo
+  const pathname = process.env.SUPPRESSION_PATHNAME || "suppression/suppression.txt";
+  const content = Array.from(set).sort().join("\n") + "\n";
+
+  // salva no mesmo pathname fixo
+  const { put } = await import("@vercel/blob");
+  const blob = await put(pathname, content, { access: "public", addRandomSuffix: false });
+
+  return { ok: true, added, total: set.size, url: blob.url };
+}
