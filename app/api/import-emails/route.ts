@@ -1,21 +1,24 @@
+// app/api/import-emails/route.ts
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 
 function extractEmails(text: string) {
-  // pega emails, normaliza, remove duplicados
-  const matches = text.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) ?? [];
-  const cleaned = matches
-    .map((e) => e.trim().toLowerCase())
-    .filter((e) => e.length <= 254);
-
-  const unique = Array.from(new Set(cleaned));
-  return { total: matches.length, unique };
+  // pega emails em qualquer lugar do texto
+  const matches = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) ?? [];
+  return matches.map((e) => e.trim().toLowerCase());
 }
+
+function isValidEmail(e: string) {
+  // validação básica
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+}
+
+export const runtime = "nodejs"; // nodemailer/smtp precisa Node runtime
 
 export async function POST(req: Request) {
   try {
-    const form = await req.formData();
-    const file = form.get("file");
+    const formData = await req.formData();
+    const file = formData.get("file");
 
     if (!file || !(file instanceof File)) {
       return NextResponse.json(
@@ -24,34 +27,37 @@ export async function POST(req: Request) {
       );
     }
 
-    const text = await file.text();
-    const { total, unique } = extractEmails(text);
+    const rawText = await file.text();
+    const all = extractEmails(rawText);
 
-    // Salva o TXT ORIGINAL (opcional)
-    const originalUpload = await put(
-      `email-lists/${Date.now()}-${file.name || "emails"}.txt`,
-      text,
-      { access: "private", contentType: "text/plain; charset=utf-8" }
-    );
+    const valid = all.filter(isValidEmail);
+    const uniqueSet = new Set(valid);
+    const unique = Array.from(uniqueSet);
 
-    // Salva também a lista deduplicada em JSON (facilita envio)
-    const dedupUpload = await put(
-      `email-lists/${Date.now()}-dedup.json`,
-      JSON.stringify({ emails: unique }, null, 2),
-      { access: "private", contentType: "application/json; charset=utf-8" }
-    );
+    const dedupText = unique.join("\n") + "\n";
+
+    // salva no Vercel Blob
+    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    const key = `imports/emails-${ts}-dedup.txt`;
+
+    const blob = await put(key, dedupText, {
+      access: "private", // melhor prática
+      contentType: "text/plain; charset=utf-8",
+      addRandomSuffix: false,
+    });
 
     return NextResponse.json({
       ok: true,
-      totalEncontrados: total,
+      totalLinhas: rawText.split(/\r?\n/).filter(Boolean).length,
+      encontrados: all.length,
+      validos: valid.length,
       unicos: unique.length,
-      preview: unique.slice(0, 20),
-      blobOriginalUrl: originalUpload.url,
-      blobDedupUrl: dedupUpload.url,
+      blobDedupUrl: blob.url,
+      preview: unique.slice(0, 10),
     });
   } catch (err: any) {
     return NextResponse.json(
-      { ok: false, error: err?.message || "Erro ao importar lista" },
+      { ok: false, error: err?.message ?? "Erro desconhecido" },
       { status: 500 }
     );
   }
