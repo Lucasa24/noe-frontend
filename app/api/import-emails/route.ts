@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 
-export const runtime = "nodejs";
+function extractEmails(text: string) {
+  // pega emails, normaliza, remove duplicados
+  const matches = text.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) ?? [];
+  const cleaned = matches
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => e.length <= 254);
 
-// email regex simples (boa o suficiente pra filtrar lixo)
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
-
-function normalizeEmail(s: string) {
-  return s.trim().toLowerCase();
+  const unique = Array.from(new Set(cleaned));
+  return { total: matches.length, unique };
 }
 
 export async function POST(req: Request) {
@@ -17,49 +19,39 @@ export async function POST(req: Request) {
 
     if (!file || !(file instanceof File)) {
       return NextResponse.json(
-        { ok: false, error: "Envie um arquivo em form-data com o campo 'file'." },
+        { ok: false, error: "Envie um arquivo no campo 'file' (multipart/form-data)." },
         { status: 400 }
       );
     }
 
     const text = await file.text();
+    const { total, unique } = extractEmails(text);
 
-    // aceita: 1 email por linha (e ignora linhas vazias)
-    const lines = text.split(/\r?\n/g);
+    // Salva o TXT ORIGINAL (opcional)
+    const originalUpload = await put(
+      `email-lists/${Date.now()}-${file.name || "emails"}.txt`,
+      text,
+      { access: "private", contentType: "text/plain; charset=utf-8" }
+    );
 
-    const cleaned = lines
-      .map(normalizeEmail)
-      .filter(Boolean)
-      .filter((e) => EMAIL_RE.test(e));
-
-    // dedup
-    const unique = Array.from(new Set(cleaned));
-
-    if (unique.length === 0) {
-      return NextResponse.json({ ok: false, error: "Nenhum email válido encontrado." }, { status: 400 });
-    }
-
-    // monta conteúdo final (1 email por linha)
-    const out = unique.join("\n") + "\n";
-
-    // salva no Blob (PRIVATE por padrão)
-    const key = `lists/${Date.now()}-${Math.random().toString(16).slice(2)}.txt`;
-
-    const blob = await put(key, out, {
-      access: "private",
-      contentType: "text/plain; charset=utf-8",
-    });
+    // Salva também a lista deduplicada em JSON (facilita envio)
+    const dedupUpload = await put(
+      `email-lists/${Date.now()}-dedup.json`,
+      JSON.stringify({ emails: unique }, null, 2),
+      { access: "private", contentType: "application/json; charset=utf-8" }
+    );
 
     return NextResponse.json({
       ok: true,
-      listId: blob.pathname, // <<< ISSO é o que você guarda
-      total: cleaned.length,
-      unique: unique.length,
-      removedDuplicates: cleaned.length - unique.length,
+      totalEncontrados: total,
+      unicos: unique.length,
+      preview: unique.slice(0, 20),
+      blobOriginalUrl: originalUpload.url,
+      blobDedupUrl: dedupUpload.url,
     });
   } catch (err: any) {
     return NextResponse.json(
-      { ok: false, error: err?.message ?? "Erro interno" },
+      { ok: false, error: err?.message || "Erro ao importar lista" },
       { status: 500 }
     );
   }
