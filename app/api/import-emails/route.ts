@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     const key = `imports/emails-${ts}-dedup.txt`;
 
     const blob = await put(key, dedupText, {
-      access: "private", // melhor prática
+      access: "public", // melhor prática
       contentType: "text/plain; charset=utf-8",
       addRandomSuffix: false,
     });
@@ -62,3 +62,4 @@ export async function POST(req: Request) {
     );
   }
 }
+
