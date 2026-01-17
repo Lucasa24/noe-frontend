@@ -35,6 +35,8 @@ async function sendOneEmail(params: {
     // boa prática mínima
     headers: {
       "X-Entity-Ref-ID": "noe-frontend-bulk",
+      "List-Unsubscribe": `<https://emails.mentorxlab.com/api/unsubscribe?email=${encodeURIComponent(params.to)}>`,
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
     },
   });
 }
@@ -179,5 +181,6 @@ if (hardBounced.length > 0) {
     );
   }
 }
+
 
 
