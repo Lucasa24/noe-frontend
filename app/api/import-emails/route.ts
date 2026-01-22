@@ -55,9 +55,10 @@ export async function POST(req: Request) {
       blobDedupUrl: blob.url,
       preview: unique.slice(0, 10),
     });
-  } catch (err: any) {
+    } catch (err: any) {
     return NextResponse.json(
       { ok: false, error: err?.message ?? "Erro desconhecido" },
       { status: 500 }
     );
   }
+}
