@@ -106,4 +106,3 @@ export async function addManyToSuppression(emails: string[]) {
 
   return { ok: true, added, total: set.size, url: blob.url };
 }
-
