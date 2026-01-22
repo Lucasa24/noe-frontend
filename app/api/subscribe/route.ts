@@ -36,7 +36,7 @@ export async function POST(req: Request) {
     return json({ ok: false, error: "Erro interno" }, 500);
   }
 }
-=======
+
 import { NextResponse } from "next/server";
 
 function json(body: any, status = 200) {
