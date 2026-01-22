@@ -76,4 +76,3 @@ export async function POST(req: Request) {
     return json({ ok: false, error: "Erro interno" }, 500);
   }
 }
->>>>>>> 3a0dee0 (create supabase)
