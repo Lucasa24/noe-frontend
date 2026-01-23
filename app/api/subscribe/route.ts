@@ -72,24 +72,24 @@ export async function POST(req: Request) {
       }
 
       await client.query(
-        `insert into public.subscribers(email, status, token_hash, source)
-         values ($1,'pending',$2,$3)
-         on conflict (email) do update
-           set status='pending',
-               token_hash=excluded.token_hash,
-               source=excluded.source,
-               created_at=now(),
-               confirmed_at=null,
-               confirm_ip=null,
-               confirm_ua=null`,
-        [email, tokenHash, source]
-      );
+  `insert into public.subscribers(email, status, token_hash, source)
+   values ($1::text,'pending',$2::text,$3::text)
+   on conflict (email) do update
+     set status='pending',
+         token_hash=excluded.token_hash,
+         source=excluded.source,
+         created_at=now(),
+         confirmed_at=null,
+         confirm_ip=null,
+         confirm_ua=null`,
+  [email, tokenHash, source]
+);
 
       await client.query(
-        `insert into public.events(email, event_type, payload)
-         values ($1,'subscribe', jsonb_build_object('source',$2))`,
-        [email, source]
-      );
+  `insert into public.events(email, event_type, payload)
+   values ($1::text,'subscribe', jsonb_build_object('source',$2::text))`,
+  [email, source]
+);
 
       await client.query("COMMIT");
     } catch (e: any) {
