@@ -50,28 +50,41 @@ export async function POST(req: Request) {
     const token = crypto.randomBytes(32).toString("hex");
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
 
-    const confirmUrl = `${process.env.APP_URL}/confirm?token=${token}`;
+    const confirmUrl = new URL("/confirm/", process.env.APP_URL!);
+confirmUrl.searchParams.set("token", token);
 
 await resend.emails.send({
-  from: process.env.EMAIL_FROM!, // MentorXLab <no-reply@mentorxlab.com>
+  from: process.env.EMAIL_FROM!,
   to: email,
-  subject: "Confirme seu email – MentorXLab",
+  subject: "Confirme seu email - MentorXLab",
   html: `
-    <h2>Confirme seu email</h2>
-    <p>Clique no botão abaixo para confirmar seu cadastro:</p>
-    <p>
-      <a href="${confirmUrl}" style="
-        display:inline-block;
-        padding:12px 20px;
-        background:#000;
-        color:#fff;
-        text-decoration:none;
-        border-radius:6px;
-      ">
-        Confirmar email
-      </a>
-    </p>
-    <p>Se você não solicitou isso, ignore este email.</p>
+    <div style="font-family: Arial, sans-serif; max-width: 520px; margin: auto;">
+      <h2>Confirme seu email</h2>
+
+      <p>
+        Você solicitou acesso ao MentorXLab.
+        Clique no botão abaixo para confirmar seu email.
+      </p>
+
+      <p style="margin: 24px 0;">
+        <a href="${confirmUrl.toString()}"
+           style="
+             display:inline-block;
+             padding:12px 20px;
+             background:#000;
+             color:#fff;
+             text-decoration:none;
+             border-radius:6px;
+             font-weight:600;
+           ">
+          Confirmar email
+        </a>
+      </p>
+
+      <p style="font-size:12px; color:#666;">
+        Se você não solicitou esse acesso, pode ignorar este email.
+      </p>
+    </div>
   `,
 });
 
