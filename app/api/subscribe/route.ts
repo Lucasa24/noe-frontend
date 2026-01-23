@@ -101,7 +101,10 @@ export async function POST(req: Request) {
     }
 
     // debug_token só pra teste. Depois remove e manda por email.
-    return json({ ok: true, message: "Salvo como pending", debug_token: token }, 200);
+    return json(
+  { ok: true, message: "Salvo como pending" },
+  200
+);
   } catch (err: any) {
     console.error("SUBSCRIBE_ERROR_MESSAGE:", err?.message);
     console.error("SUBSCRIBE_ERROR_STACK:", err?.stack);
