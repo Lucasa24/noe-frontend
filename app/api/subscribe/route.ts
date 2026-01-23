@@ -41,6 +41,58 @@ export async function POST(req: Request) {
 
   const client = await pool.connect();
 
+  const ip = getClientIp(req);
+const rlKey = `ip:${ip}`;
+const windowStart = minuteWindowStart();
+const MAX_PER_MINUTE = 5;
+
+const rl = await client.query(
+  `
+  insert into public.rate_limits(key, window_start, count)
+  values ($1::text, $2::timestamptz, 1)
+  on conflict (key, window_start)
+  do update
+    set count = public.rate_limits.count + 1,
+        updated_at = now()
+  returning count;
+  `,
+  [rlKey, windowStart]
+);
+
+const currentCount = rl.rows?.[0]?.count ?? 1;
+
+if (currentCount > MAX_PER_MINUTE) {
+  await client.query(
+    `insert into public.events(email, event_type, payload)
+     values ($1::text,'rate_limited',
+       jsonb_build_object('ip',$2::text,'count',$3::int,'window',$4::text)
+     )`,
+    ["", String(ip), Number(currentCount), String(windowStart)]
+  );
+
+  await client.query("COMMIT");
+
+  return json(
+    { ok: true, message: "Se este email estiver apto, você receberá instruções." },
+    200
+  );
+}
+
+  function getClientIp(req: Request) {
+  const h = req.headers;
+  return (
+    h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    h.get("x-real-ip") ||
+    "unknown"
+  );
+}
+
+function minuteWindowStart() {
+  const d = new Date();
+  d.setSeconds(0, 0);
+  return d.toISOString();
+}
+
   try {
     const body = await req.json().catch(() => ({}));
     const email = String(body.email || "").trim().toLowerCase();
