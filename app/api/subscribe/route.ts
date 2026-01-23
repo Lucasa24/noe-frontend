@@ -28,6 +28,13 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: Request) {
+
+// 🔥 ALARME AQUI (primeira coisa)
+  if (!process.env.DATABASE_URL) {
+    console.error("DATABASE_URL is missing in env");
+    return json({ ok: false, error: "DATABASE_URL missing" }, 500);
+  }
+  
   try {
     const body = await req.json().catch(() => ({}));
     const email = String(body.email || "").trim().toLowerCase();
