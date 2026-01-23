@@ -47,9 +47,6 @@ export async function POST(req: Request) {
     const token = crypto.randomBytes(32).toString("hex");
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
 
-    // DEV ONLY — remover depois
-console.log("CONFIRM_TOKEN_DEBUG:", token);
-
     const client = await pool.connect();
 
     try {
@@ -105,7 +102,7 @@ console.log("CONFIRM_TOKEN_DEBUG:", token);
 
     // debug_token só pra teste. Depois remove e manda por email.
     return json(
-  { ok: true, message: "Salvo como pending" },
+  { ok: true, message: "Se este email estiver apto, você receberá instruções para confirmar." },
   200
 );
   } catch (err: any) {
