@@ -47,6 +47,9 @@ export async function POST(req: Request) {
     const token = crypto.randomBytes(32).toString("hex");
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
 
+    // DEV ONLY — remover depois
+console.log("CONFIRM_TOKEN_DEBUG:", token);
+
     const client = await pool.connect();
 
     try {
