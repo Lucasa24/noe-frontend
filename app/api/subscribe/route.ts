@@ -4,11 +4,6 @@ import { Pool } from "pg";
 
 export const runtime = "nodejs";
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
-
 function json(body: any, status = 200) {
   return new NextResponse(JSON.stringify(body), {
     status,
@@ -34,6 +29,11 @@ export async function POST(req: Request) {
     console.error("DATABASE_URL is missing in env");
     return json({ ok: false, error: "DATABASE_URL missing" }, 500);
   }
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+});
   
   try {
     const body = await req.json().catch(() => ({}));
@@ -99,7 +99,13 @@ export async function POST(req: Request) {
 
     // debug_token só pra teste. Depois a gente remove e manda por email.
     return json({ ok: true, message: "Salvo como pending", debug_token: token }, 200);
-  } catch {
-    return json({ ok: false, error: "Erro interno" }, 500);
-  }
+  } catch (err: any) {
+  console.error("SUBSCRIBE_ERROR_MESSAGE:", err?.message);
+  console.error("SUBSCRIBE_ERROR_STACK:", err?.stack);
+  console.error("SUBSCRIBE_ERROR_FULL:", err);
+
+  return json(
+    { ok: false, error: String(err?.message || err) },
+    500
+  );
 }
