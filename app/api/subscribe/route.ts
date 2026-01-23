@@ -3,8 +3,6 @@ import crypto from "crypto";
 import { Pool } from "pg";
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export const runtime = "nodejs";
 
 function json(body: any, status = 200) {
@@ -107,6 +105,8 @@ export async function POST(req: Request) {
     // 3) ENVIA EMAIL (APÓS COMMIT)
     if (!process.env.RESEND_API_KEY) throw new Error("RESEND_API_KEY missing");
     if (!process.env.EMAIL_FROM) throw new Error("EMAIL_FROM missing");
+
+    const resend = new Resend(process.env.RESEND_API_KEY);
 
     const sendResult = await resend.emails.send({
       from: process.env.EMAIL_FROM, // MentorXLab <no-reply@mentorxlab.com>
