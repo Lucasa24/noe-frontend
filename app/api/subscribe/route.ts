@@ -109,4 +109,3 @@ const pool = new Pool({
     500
   );
 }
-}
