@@ -50,6 +50,31 @@ export async function POST(req: Request) {
     const token = crypto.randomBytes(32).toString("hex");
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
 
+    const confirmUrl = `${process.env.APP_URL}/confirm?token=${token}`;
+
+await resend.emails.send({
+  from: process.env.EMAIL_FROM!, // MentorXLab <no-reply@mentorxlab.com>
+  to: email,
+  subject: "Confirme seu email – MentorXLab",
+  html: `
+    <h2>Confirme seu email</h2>
+    <p>Clique no botão abaixo para confirmar seu cadastro:</p>
+    <p>
+      <a href="${confirmUrl}" style="
+        display:inline-block;
+        padding:12px 20px;
+        background:#000;
+        color:#fff;
+        text-decoration:none;
+        border-radius:6px;
+      ">
+        Confirmar email
+      </a>
+    </p>
+    <p>Se você não solicitou isso, ignore este email.</p>
+  `,
+});
+
     const client = await pool.connect();
 
     try {
