@@ -164,11 +164,11 @@ function minuteWindowStart() {
       from: process.env.EMAIL_FROM, // MentorXLab <no-reply@mentorxlab.com>
       to: email,
       replyTo: "caixa@mentorxlab.com",
-      subject: "Confirme seu email - MentorXLab",
+      subject: "Confirme seu email - Caixa",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 520px; margin: auto;">
           <h2>Confirme seu email</h2>
-          <p>Você solicitou acesso ao MentorXLab. Clique no botão abaixo para confirmar.</p>
+          <p>Você solicitou acesso à Caixa. Clique no botão abaixo para confirmar.</p>
           <p style="margin: 24px 0;">
             <a href="${confirmUrl.toString()}"
                style="display:inline-block;padding:12px 20px;background:#000;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">
