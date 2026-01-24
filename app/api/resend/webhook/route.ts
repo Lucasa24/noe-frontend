@@ -95,21 +95,23 @@ export async function POST(req: Request) {
       [email || "", `resend_${eventType}`, JSON.stringify(event)]
     );
 
-    // Bounce/Complaint => SUPPRESSED
-    if (shouldSuppress && email) {
-      await client.query(
-        `update public.subscribers
-         set status = 'suppressed'
-         where email = $1::text`,
-        [email]
-      );
+    // Bounce/Complaint => SUPPRESSED (blindado)
+if (shouldSuppress && email) {
+  // UPSERT: se existe, vira suppressed; se não existe, cria suppressed
+  await client.query(
+    `insert into public.subscribers (email, status, source)
+     values ($1::text, 'suppressed', 'resend')
+     on conflict (email) do update
+       set status = 'suppressed'`,
+    [email]
+  );
 
-      await client.query(
-        `insert into public.events(email, event_type, payload)
-         values ($1::text, 'suppressed', jsonb_build_object('reason',$2::text,'provider','resend'))`,
-        [email, eventType]
-      );
-    }
+  await client.query(
+    `insert into public.events(email, event_type, payload)
+     values ($1::text, 'suppressed', jsonb_build_object('reason',$2::text,'provider','resend'))`,
+    [email, eventType]
+  );
+}
 
     await client.query("COMMIT");
 
