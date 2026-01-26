@@ -168,7 +168,7 @@ function minuteWindowStart() {
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 520px; margin: auto;">
           <h2>Confirme seu email</h2>
-          <p>Você solicitou acesso à Caixa. Clique no botão abaixo para confirmar.</p>
+          <p>Esse é o único passo que separa quem abre da caixa de quem só chegou até aqui.</p>
           <p style="margin: 24px 0;">
             <a href="${confirmUrl.toString()}"
                style="display:inline-block;padding:12px 20px;background:#000;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">
