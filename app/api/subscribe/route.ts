@@ -164,14 +164,18 @@ function minuteWindowStart() {
       from: process.env.EMAIL_FROM, // MentorXLab <no-reply@mentorxlab.com>
       to: email,
       replyTo: "caixa@mentorxlab.com",
-      subject: "A caixa te reconheceu",
+      subject: "A caixa reconheceu você",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 520px; margin: auto;">
-          <h2>Você pediu acesso à Caixa</h2>
-          <p>Ela não se abre sozinha.
-E não se abre para curiosos.
+          <h2>Você pediu a Caixa.</h2>
+          <p>Ela não se abre aqui.
+Ela não fica na tela.
+Ela não volta para a página.
 
-Para confirmar que é você, clique no link abaixo:</p>
+Agora isso vai com você.
+
+Confirme este e-mail para liberar o próximo acesso.
+Sem confirmação, nada é liberado:</p>
           <p style="margin: 24px 0;">
             <a href="${confirmUrl.toString()}"
                style="display:inline-block;padding:12px 20px;background:#000;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">
@@ -179,11 +183,8 @@ Para confirmar que é você, clique no link abaixo:</p>
             </a>
           </p>
           <p style="font-size:12px; color:#666;">
-            Depois disso, o acesso não volta para cá.
-Ele segue com você.
-
-Se esse e-mail não fizer sentido agora, basta ignorar.
-Nada acontece.
+            Não é um passo técnico.
+É a única forma de seguir.
           </p>
         </div>
       `,
