@@ -167,16 +167,23 @@ function minuteWindowStart() {
       subject: "A caixa te reconheceu",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 520px; margin: auto;">
-          <h2>Confirme seu email</h2>
-          <p>Esse é o único passo que separa quem abre da caixa de quem só chegou até aqui.</p>
+          <h2>Você pediu acesso à Caixa</h2>
+          <p>Ela não se abre sozinha.
+E não se abre para curiosos.
+
+Para confirmar que é você, clique no link abaixo:</p>
           <p style="margin: 24px 0;">
             <a href="${confirmUrl.toString()}"
                style="display:inline-block;padding:12px 20px;background:#000;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">
-              CONFIRMAR E CONTINUAR
+              → Confirmar acesso
             </a>
           </p>
           <p style="font-size:12px; color:#666;">
-            Se não confirmar, nada é liberado. Se você não solicitou esse acesso, ignore.
+            Depois disso, o acesso não volta para cá.
+Ele segue com você.
+
+Se esse e-mail não fizer sentido agora, basta ignorar.
+Nada acontece.
           </p>
         </div>
       `,
