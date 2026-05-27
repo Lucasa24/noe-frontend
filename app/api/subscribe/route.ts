@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import { Pool } from "pg";
-import { Resend } from "resend";
 
 export const runtime = "nodejs";
 
@@ -32,62 +30,7 @@ export async function OPTIONS() {
   });
 }
 
-export async function POST(req: Request) {
-  if (!process.env.DATABASE_URL) {
-    console.error("DATABASE_URL is missing in env");
-    return json({ ok: false, error: "DATABASE_URL missing" }, 500);
-  }
-
-  if (!process.env.APP_URL) {
-    console.error("APP_URL is missing in env");
-    return json({ ok: false, error: "APP_URL missing" }, 500);
-  }
-
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
-  });
-
-  const client = await pool.connect();
-
-  const ip = getClientIp(req);
-const rlKey = `ip:${ip}`;
-const windowStart = minuteWindowStart();
-const MAX_PER_MINUTE = 5;
-
-const rl = await client.query(
-  `
-  insert into public.rate_limits(key, window_start, count)
-  values ($1::text, $2::timestamptz, 1)
-  on conflict (key, window_start)
-  do update
-    set count = public.rate_limits.count + 1,
-        updated_at = now()
-  returning count;
-  `,
-  [rlKey, windowStart]
-);
-
-const currentCount = rl.rows?.[0]?.count ?? 1;
-
-if (currentCount > MAX_PER_MINUTE) {
-  await client.query(
-    `insert into public.events(email, event_type, payload)
-     values ($1::text,'rate_limited',
-       jsonb_build_object('ip',$2::text,'count',$3::int,'window',$4::text)
-     )`,
-    ["", String(ip), Number(currentCount), String(windowStart)]
-  );
-
-  await client.query("COMMIT");
-
-  return json(
-    { ok: true, message: "Se este email estiver apto, você receberá instruções." },
-    200
-  );
-}
-
-  function getClientIp(req: Request) {
+function getClientIp(req: Request) {
   const h = req.headers;
   return (
     h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
@@ -102,7 +45,65 @@ function minuteWindowStart() {
   return d.toISOString();
 }
 
+export async function POST(req: Request) {
+  let pool: any;
+  let client: any;
+
   try {
+    if (!process.env.DATABASE_URL) {
+      console.error("DATABASE_URL is missing in env");
+      return json({ ok: false, error: "DATABASE_URL missing" }, 500);
+    }
+
+    if (!process.env.APP_URL) {
+      console.error("APP_URL is missing in env");
+      return json({ ok: false, error: "APP_URL missing" }, 500);
+    }
+
+    const { Pool } = await import("pg");
+
+    pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false },
+    });
+
+    client = await pool.connect();
+
+    const ip = getClientIp(req);
+    const rlKey = `ip:${ip}`;
+    const windowStart = minuteWindowStart();
+    const MAX_PER_MINUTE = 5;
+
+    const rl = await client.query(
+      `
+      insert into public.rate_limits(key, window_start, count)
+      values ($1::text, $2::timestamptz, 1)
+      on conflict (key, window_start)
+      do update
+        set count = public.rate_limits.count + 1,
+            updated_at = now()
+      returning count;
+      `,
+      [rlKey, windowStart]
+    );
+
+    const currentCount = rl.rows?.[0]?.count ?? 1;
+
+    if (currentCount > MAX_PER_MINUTE) {
+      await client.query(
+        `insert into public.events(email, event_type, payload)
+         values ($1::text,'rate_limited',
+           jsonb_build_object('ip',$2::text,'count',$3::int,'window',$4::text)
+         )`,
+        ["", String(ip), Number(currentCount), String(windowStart)]
+      );
+
+      return json(
+        { ok: true, message: "Se este email estiver apto, você receberá instruções." },
+        200
+      );
+    }
+
     const body = await req.json().catch(() => ({}));
     const email = String(body.email || "").trim().toLowerCase();
     const source = String(body.source || "manual-test").slice(0, 120);
@@ -167,6 +168,7 @@ function minuteWindowStart() {
     if (!process.env.RESEND_API_KEY) throw new Error("RESEND_API_KEY missing");
     if (!process.env.EMAIL_FROM) throw new Error("EMAIL_FROM missing");
 
+    const { Resend } = await import("resend");
     const resend = new Resend(process.env.RESEND_API_KEY);
 
     const sendResult = await resend.emails.send({
@@ -207,7 +209,7 @@ Sem confirmação, nada é liberado:</p>
     );
   } catch (e: any) {
     try {
-      await client.query("ROLLBACK");
+      if (client) await client.query("ROLLBACK");
     } catch {}
 
     console.error("SUBSCRIBE_ERROR_MESSAGE:", e?.message);
@@ -216,7 +218,10 @@ Sem confirmação, nada é liberado:</p>
 
     return json({ ok: false, error: String(e?.message || e) }, 500);
   } finally {
-    client.release();
-    await pool.end().catch(() => {});
+    try {
+      client?.release?.();
+    } catch {}
+
+    if (pool) await pool.end().catch(() => {});
   }
 }
