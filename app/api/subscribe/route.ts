@@ -14,13 +14,12 @@ function corsHeaders() {
 }
 
 function json(body: any, status = 200) {
-  return new NextResponse(JSON.stringify(body), {
-    status,
-    headers: {
-      "Content-Type": "application/json",
-      ...corsHeaders(),
-    },
-  });
+  const res = NextResponse.json(body, { status });
+  const headers = corsHeaders();
+  for (const [k, v] of Object.entries(headers)) {
+    res.headers.set(k, v);
+  }
+  return res;
 }
 
 export async function OPTIONS() {
