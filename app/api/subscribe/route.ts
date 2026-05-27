@@ -44,6 +44,17 @@ function minuteWindowStart() {
   return d.toISOString();
 }
 
+function sanitizeDatabaseUrl(raw: string) {
+  try {
+    const u = new URL(raw);
+    u.searchParams.delete("sslmode");
+    u.searchParams.delete("sslrootcert");
+    return u.toString();
+  } catch {
+    return raw;
+  }
+}
+
 export async function POST(req: Request) {
   let pool: any;
   let client: any;
@@ -60,9 +71,10 @@ export async function POST(req: Request) {
     }
 
     const { Pool } = await import("pg");
+    const connectionString = sanitizeDatabaseUrl(process.env.DATABASE_URL);
 
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString,
       ssl: { rejectUnauthorized: false },
     });
 
