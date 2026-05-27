@@ -5,22 +5,31 @@ import { Resend } from "resend";
 
 export const runtime = "nodejs";
 
+const allowedOrigin = "https://mentorxlab.com";
+
+function corsHeaders() {
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+}
+
 function json(body: any, status = 200) {
   return new NextResponse(JSON.stringify(body), {
     status,
     headers: {
       "Content-Type": "application/json",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-      ...(process.env.WORDPRESS_ORIGIN
-        ? { "Access-Control-Allow-Origin": process.env.WORDPRESS_ORIGIN }
-        : {}),
+      ...corsHeaders(),
     },
   });
 }
 
 export async function OPTIONS() {
-  return json({ ok: true }, 200);
+  return new NextResponse(null, {
+    status: 204,
+    headers: corsHeaders(),
+  });
 }
 
 export async function POST(req: Request) {
