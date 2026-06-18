@@ -1,5 +1,6 @@
 const AUTH_CONFIG_KEY = "authConfig";
 const LOCK_STATE_KEY = "lockState";
+const LAST_ACTIVE_TAB_KEY = "lastActiveTabSnapshot";
 const SESSION_KEY = "browserSessionId";
 const DEFAULT_WEBHOOK_URL = "https://noe-frontend.vercel.app/api/send-code";
 const DEFAULT_WEBHOOK_TOKEN = "b4b7f9f9e7c64f3d9c1a8d2f6e3b7a91";
@@ -16,6 +17,8 @@ chrome.runtime.onStartup.addListener(() => {
 chrome.tabs.onCreated.addListener((tab) => {
   const tabUrl = tab.pendingUrl || tab.url || "";
 
+  void rememberTabSnapshot(tab);
+
   if (!tabUrl) {
     return;
   }
@@ -26,11 +29,27 @@ chrome.tabs.onCreated.addListener((tab) => {
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   const tabUrl = changeInfo.url || tab.pendingUrl || tab.url || "";
 
+  if (tab.active) {
+    void rememberTabSnapshot(tab);
+  }
+
   if (!tabUrl) {
     return;
   }
 
   void enforceLockedTab(tabId, tabUrl);
+});
+
+chrome.tabs.onActivated.addListener((activeInfo) => {
+  void rememberTabById(activeInfo.tabId);
+});
+
+chrome.windows.onFocusChanged.addListener((windowId) => {
+  if (windowId === chrome.windows.WINDOW_ID_NONE) {
+    return;
+  }
+
+  void rememberActiveTabFromWindow(windowId);
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -125,6 +144,15 @@ async function getLockState() {
 
 async function saveLockState(lockState) {
   await chrome.storage.local.set({ [LOCK_STATE_KEY]: lockState });
+}
+
+async function getLastActiveTabSnapshot() {
+  const data = await chrome.storage.local.get(LAST_ACTIVE_TAB_KEY);
+  return data[LAST_ACTIVE_TAB_KEY] || null;
+}
+
+async function saveLastActiveTabSnapshot(snapshot) {
+  await chrome.storage.local.set({ [LAST_ACTIVE_TAB_KEY]: snapshot });
 }
 
 async function getPublicLockState() {
@@ -410,6 +438,12 @@ async function findBlockedTab() {
 }
 
 async function getPreferredRestoreTabId(tabs, blockedTabId) {
+  const preferredFromSnapshot = await findPreferredTabFromSnapshot(tabs, blockedTabId);
+
+  if (typeof preferredFromSnapshot === "number") {
+    return preferredFromSnapshot;
+  }
+
   try {
     const lastFocusedWindow = await chrome.windows.getLastFocused({ populate: true });
     const focusedTab = Array.isArray(lastFocusedWindow?.tabs)
@@ -440,6 +474,109 @@ async function getPreferredRestoreTabId(tabs, blockedTabId) {
   });
 
   return typeof activeTab?.id === "number" ? activeTab.id : null;
+}
+
+async function findPreferredTabFromSnapshot(tabs, blockedTabId) {
+  const snapshot = await getLastActiveTabSnapshot();
+
+  if (!snapshot?.url) {
+    return null;
+  }
+
+  const candidates = tabs.filter((tab) => {
+    const url = String(tab.pendingUrl || tab.url || "").trim();
+    return typeof tab.id === "number"
+      && tab.id !== blockedTabId
+      && normalizeUrl(url) === normalizeUrl(snapshot.url)
+      && !isAllowedWhileLocked(url);
+  });
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  const rankedCandidates = [...candidates].sort((left, right) => {
+    return scoreRestoreCandidate(right, snapshot) - scoreRestoreCandidate(left, snapshot);
+  });
+
+  return rankedCandidates[0]?.id ?? null;
+}
+
+function scoreRestoreCandidate(tab, snapshot) {
+  let score = 0;
+
+  if ((tab.title || "") === (snapshot.title || "")) {
+    score += 100;
+  }
+
+  if (Boolean(tab.pinned) === Boolean(snapshot.pinned)) {
+    score += 10;
+  }
+
+  if (typeof tab.index === "number" && typeof snapshot.index === "number") {
+    score += Math.max(0, 5 - Math.min(5, Math.abs(tab.index - snapshot.index)));
+  }
+
+  if (tab.active) {
+    score += 1;
+  }
+
+  return score;
+}
+
+async function rememberTabById(tabId) {
+  if (typeof tabId !== "number") {
+    return;
+  }
+
+  const tab = await chrome.tabs.get(tabId).catch(() => null);
+
+  if (!tab) {
+    return;
+  }
+
+  await rememberTabSnapshot(tab);
+}
+
+async function rememberActiveTabFromWindow(windowId) {
+  if (typeof windowId !== "number") {
+    return;
+  }
+
+  const tabs = await chrome.tabs.query({ active: true, windowId }).catch(() => []);
+  const activeTab = Array.isArray(tabs) ? tabs[0] : null;
+
+  if (!activeTab) {
+    return;
+  }
+
+  await rememberTabSnapshot(activeTab);
+}
+
+async function rememberTabSnapshot(tab) {
+  const snapshot = buildTabSnapshot(tab);
+
+  if (!snapshot) {
+    return;
+  }
+
+  await saveLastActiveTabSnapshot(snapshot);
+}
+
+function buildTabSnapshot(tab) {
+  const url = String(tab?.pendingUrl || tab?.url || "").trim();
+
+  if (!url || isAllowedWhileLocked(url)) {
+    return null;
+  }
+
+  return {
+    url,
+    title: String(tab.title || ""),
+    pinned: Boolean(tab.pinned),
+    index: typeof tab.index === "number" ? tab.index : null,
+    recordedAt: Date.now()
+  };
 }
 
 function captureRestorableTabs(tabs, blockedTabId, preferredRestoreTabId) {
