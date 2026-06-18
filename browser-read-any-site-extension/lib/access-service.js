@@ -78,9 +78,9 @@ function buildEmailMessage({ code, extensionId, reason, expiresAt }) {
   const expiresAtIso = new Date(expiresAt).toISOString();
 
   return {
-    subject: `Codigo de acesso da extensao ${extensionId}`,
+    subject: `${code} - Codigo de acesso da extensao ${extensionId}`,
     text: [
-      "Seu codigo temporario de acesso foi gerado.",
+      `${code} - Seu codigo temporario de acesso foi gerado.`,
       "",
       `Codigo: ${code}`,
       `Extensao: ${extensionId}`,
@@ -90,6 +90,9 @@ function buildEmailMessage({ code, extensionId, reason, expiresAt }) {
       "Cole este codigo na tela de bloqueio do navegador para liberar a sessao."
     ].join("\n"),
     html: `
+      <div style="display: none; max-height: 0; overflow: hidden; opacity: 0;">
+        ${escapeHtml(code)} - Codigo temporario de acesso da extensao ${escapeHtml(extensionId)}
+      </div>
       <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
         <h2 style="margin-bottom: 16px;">Codigo temporario de acesso</h2>
         <p>Use o codigo abaixo para liberar o navegador nesta sessao.</p>
