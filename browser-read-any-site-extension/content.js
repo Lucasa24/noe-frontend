@@ -8,6 +8,7 @@
     overlay: null,
     statusText: null,
     input: null,
+    recipientPicker: null,
     stopEvents: null
   };
 
@@ -92,6 +93,27 @@
       color: #fbbf24;
       font-size: 14px;
     }
+
+    #bras-lock-recipient-picker {
+      display: none;
+      margin-top: 14px;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid #374151;
+      background: rgba(15, 23, 42, 0.9);
+    }
+
+    #bras-lock-recipient-picker p {
+      margin: 0 0 10px;
+      color: #e5e7eb;
+      font-size: 14px;
+    }
+
+    #bras-lock-recipient-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
   `;
   (document.head || document.documentElement).appendChild(style);
 
@@ -125,33 +147,33 @@
       <div id="bras-lock-card">
         <h1>Navegador bloqueado</h1>
         <p id="bras-lock-description">
-          Um codigo temporario foi enviado para o email configurado. Cole o codigo abaixo para liberar a navegacao nesta sessao.
+          Selecione um destinatario para enviar o codigo e depois cole o codigo recebido para liberar a navegacao nesta sessao.
         </p>
         <input id="bras-lock-input" type="password" inputmode="numeric" autocomplete="one-time-code" placeholder="Cole o codigo recebido" />
         <div id="bras-lock-actions">
           <button id="bras-lock-submit" class="bras-primary" type="button">Liberar acesso</button>
-          <button id="bras-lock-resend" class="bras-secondary" type="button">Reenviar codigo</button>
-          <button id="bras-lock-config" class="bras-secondary" type="button">Configurar email</button>
+          <button id="bras-lock-resend" class="bras-secondary" type="button">Enviar codigo</button>
         </div>
+        <div id="bras-lock-recipient-picker"></div>
         <div id="bras-lock-status"></div>
       </div>
     `;
 
-    overlay.querySelector("#bras-lock-submit").addEventListener("click", submitCode);
-    overlay.querySelector("#bras-lock-resend").addEventListener("click", resendCode);
-    overlay.querySelector("#bras-lock-config").addEventListener("click", openOptionsPage);
+    overlay.querySelector("#bras-lock-submit").addEventListener("click", handlePrimaryAction);
+    overlay.querySelector("#bras-lock-resend").addEventListener("click", requestCode);
 
     const input = overlay.querySelector("#bras-lock-input");
     input.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
         event.preventDefault();
-        void submitCode();
+        void handlePrimaryAction();
       }
     });
 
     state.overlay = overlay;
     state.statusText = overlay.querySelector("#bras-lock-status");
     state.input = input;
+    state.recipientPicker = overlay.querySelector("#bras-lock-recipient-picker");
     document.documentElement.appendChild(overlay);
     lockDocument();
   }
@@ -221,20 +243,37 @@
       return;
     }
 
+    if (lockState.sendStatus === "pending") {
+      updateStatus("Enviando codigo...");
+      return;
+    }
+
+    if (lockState.sendStatus === "idle") {
+      updateStatus('Clique em "Enviar codigo" para solicitar um novo codigo.');
+      return;
+    }
+
     if (lockState.sendStatus === "used") {
       updateStatus("Codigo aceito. Liberando acesso...");
       return;
     }
 
-    updateStatus("Aguardando o codigo temporario.");
+    updateStatus("Aguardando solicitacao do codigo.");
   }
 
-  async function submitCode() {
+  async function handlePrimaryAction() {
+    const code = String(state.input?.value || "").trim();
+
+    if (!code) {
+      await requestCode();
+      return;
+    }
+
     updateStatus("Validando codigo...");
 
     const response = await sendMessage({
       type: "lock:submitCode",
-      code: state.input?.value || ""
+      code
     });
 
     if (!response?.ok) {
@@ -246,14 +285,99 @@
     unlockDocument();
   }
 
-  async function resendCode() {
-    updateStatus("Gerando e reenviando um novo codigo...");
-    const response = await sendMessage({ type: "lock:resendCode" });
+  async function requestCode() {
+    const recipientKey = await chooseRecipient();
+
+    if (recipientKey === null) {
+      return;
+    }
+
+    updateStatus("Enviando codigo...");
+    const response = await sendMessage({
+      type: "lock:sendCode",
+      recipientKey
+    });
+
+    if (!response?.ok) {
+      updateStatus(response?.error || "Nao foi possivel enviar o codigo.");
+      return;
+    }
+
     applyLockState(response?.state || null);
+    state.input?.focus();
   }
 
-  async function openOptionsPage() {
-    await sendMessage({ type: "lock:openOptions" });
+  async function chooseRecipient() {
+    const picker = state.recipientPicker;
+
+    if (!picker) {
+      return "";
+    }
+
+    picker.style.display = "none";
+    picker.textContent = "";
+
+    updateStatus("Carregando destinatarios...");
+    const response = await sendMessage({ type: "lock:listRecipients" });
+
+    if (!response?.ok) {
+      updateStatus(response?.error || "Nao foi possivel carregar os destinatarios.");
+      return null;
+    }
+
+    const recipients = Array.isArray(response.recipients) ? response.recipients : [];
+
+    if (recipients.length === 0) {
+      return "";
+    }
+
+    if (recipients.length === 1) {
+      return String(recipients[0]?.key || "");
+    }
+
+    picker.innerHTML = `
+      <p>Escolha o destinatario:</p>
+      <div id="bras-lock-recipient-actions">
+        ${recipients.map((item) => `
+          <button class="bras-secondary" type="button" data-key="${escapeAttribute(item.key)}">
+            ${escapeHtml(item.label || item.key)}
+          </button>
+        `).join("")}
+        <button class="bras-secondary" type="button" data-cancel="true">Cancelar</button>
+      </div>
+    `;
+    picker.style.display = "block";
+
+    return new Promise((resolve) => {
+      const onClick = (event) => {
+        const target = event.target;
+
+        if (!(target instanceof HTMLElement)) {
+          return;
+        }
+
+        const cancel = target.getAttribute("data-cancel");
+        const key = target.getAttribute("data-key");
+
+        if (!cancel && !key) {
+          return;
+        }
+
+        picker.removeEventListener("click", onClick);
+        picker.style.display = "none";
+        picker.textContent = "";
+
+        if (cancel) {
+          updateStatus("Envio cancelado.");
+          resolve(null);
+          return;
+        }
+
+        resolve(String(key || ""));
+      };
+
+      picker.addEventListener("click", onClick);
+    });
   }
 
   function updateStatus(text) {
@@ -277,5 +401,18 @@
         resolve(response);
       });
     });
+  }
+
+  function escapeHtml(value) {
+    return String(value || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  function escapeAttribute(value) {
+    return escapeHtml(value).replaceAll("`", "&#96;");
   }
 })();
