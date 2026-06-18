@@ -2,7 +2,6 @@
   const elements = {
     input: document.querySelector("#code-input"),
     primaryButton: document.querySelector("#primary-action"),
-    optionsButton: document.querySelector("#options-action"),
     recipientPicker: document.querySelector("#recipient-picker"),
     status: document.querySelector("#status"),
     postUnlock: document.querySelector("#post-unlock")
@@ -22,10 +21,6 @@
 
   elements.primaryButton?.addEventListener("click", () => {
     void handlePrimaryAction();
-  });
-
-  elements.optionsButton?.addEventListener("click", () => {
-    void sendMessage({ type: "lock:openOptions" });
   });
 
   elements.input?.addEventListener("keydown", (event) => {
