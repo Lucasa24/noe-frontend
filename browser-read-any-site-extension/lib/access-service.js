@@ -28,12 +28,36 @@ function createAccessChallenge({ extensionId, recipientEmail, reason }) {
   };
 }
 
-function resolveRecipientEmail({ extensionId, fallbackEmail }) {
+function resolveRecipientEmail({ extensionId, fallbackEmail, recipientKey }) {
   const mapping = getExtensionEmailMap();
   const normalizedExtensionId = String(extensionId || "").trim();
+  const entry = mapping[normalizedExtensionId];
 
-  if (mapping[normalizedExtensionId]) {
-    return String(mapping[normalizedExtensionId]).trim().toLowerCase();
+  if (entry) {
+    if (typeof entry === "string") {
+      return String(entry).trim().toLowerCase();
+    }
+
+    if (typeof entry === "object" && !Array.isArray(entry)) {
+      const normalizedRecipientKey = String(recipientKey || "").trim();
+      const keys = Object.keys(entry).filter((key) => typeof entry[key] === "string" && String(entry[key]).trim());
+
+      if (normalizedRecipientKey) {
+        if (entry[normalizedRecipientKey]) {
+          return String(entry[normalizedRecipientKey]).trim().toLowerCase();
+        }
+
+        throw createError("recipient_not_found", 400);
+      }
+
+      if (keys.length === 1) {
+        return String(entry[keys[0]]).trim().toLowerCase();
+      }
+
+      throw createError("recipient_not_selected", 400);
+    }
+
+    throw createError("invalid_extension_email_map", 500);
   }
 
   const normalizedFallback = String(fallbackEmail || "").trim().toLowerCase();
@@ -43,6 +67,30 @@ function resolveRecipientEmail({ extensionId, fallbackEmail }) {
   }
 
   throw createError("extension_email_not_configured", 400);
+}
+
+function listRecipientsForExtension(extensionId) {
+  const normalizedExtensionId = String(extensionId || "").trim();
+  assertAllowedExtension(normalizedExtensionId);
+
+  const mapping = getExtensionEmailMap();
+  const entry = mapping[normalizedExtensionId];
+
+  if (!entry) {
+    throw createError("extension_email_not_configured", 400);
+  }
+
+  if (typeof entry === "string") {
+    return [];
+  }
+
+  if (typeof entry === "object" && !Array.isArray(entry)) {
+    return Object.keys(entry)
+      .filter((key) => typeof entry[key] === "string" && String(entry[key]).trim())
+      .map((key) => ({ key, label: key }));
+  }
+
+  throw createError("invalid_extension_email_map", 500);
 }
 
 function verifyAccessChallenge({ challengeToken, code, extensionId }) {
@@ -240,6 +288,7 @@ function base64UrlEncode(value) {
 module.exports = {
   buildEmailMessage,
   createAccessChallenge,
+  listRecipientsForExtension,
   resolveRecipientEmail,
   verifyAccessChallenge
 };
