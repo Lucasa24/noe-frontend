@@ -6,10 +6,13 @@
     href: location.href,
     locked: true,
     overlay: null,
+    descriptionText: null,
     statusText: null,
     input: null,
+    submitButton: null,
     recipientPicker: null,
-    stopEvents: null
+    stopEvents: null,
+    permissionPollId: null
   };
 
   window.__BROWSER_READ_ANY_SITE__ = state;
@@ -187,8 +190,10 @@
     });
 
     state.overlay = overlay;
+    state.descriptionText = overlay.querySelector("#bras-lock-description");
     state.statusText = overlay.querySelector("#bras-lock-status");
     state.input = input;
+    state.submitButton = overlay.querySelector("#bras-lock-submit");
     state.recipientPicker = overlay.querySelector("#bras-lock-recipient-picker");
     document.documentElement.appendChild(overlay);
     lockDocument();
@@ -238,12 +243,25 @@
   }
 
   function applyLockState(lockState) {
+    const siteAccessGranted = lockState?.siteAccessGranted !== false;
+
     if (lockState?.unlocked) {
+      stopPermissionPolling();
       unlockDocument();
       return;
     }
 
     ensureOverlay();
+
+    setInteractionMode(siteAccessGranted);
+
+    if (!siteAccessGranted) {
+      startPermissionPolling();
+      updateStatus('Ative "Em todos os sites" nas permissoes da extensao para continuar.');
+      return;
+    }
+
+    stopPermissionPolling();
 
     if (!lockState?.configured) {
       updateStatus("Configure o webhook e o token. O email de destino fica vinculado ao ID da extensao no servidor.");
@@ -280,6 +298,10 @@
   }
 
   async function handlePrimaryAction() {
+    if (state.submitButton?.disabled) {
+      return;
+    }
+
     const code = String(state.input?.value || "").trim();
 
     if (!code) {
@@ -404,6 +426,23 @@
     }
   }
 
+  function setInteractionMode(siteAccessGranted) {
+    if (state.input) {
+      state.input.disabled = !siteAccessGranted;
+    }
+
+    if (state.submitButton) {
+      state.submitButton.disabled = !siteAccessGranted;
+      state.submitButton.textContent = siteAccessGranted ? "Liberar acesso" : "Permissao necessaria";
+    }
+
+    if (state.descriptionText) {
+      state.descriptionText.textContent = siteAccessGranted
+        ? 'Clique em "Liberar acesso" para escolher um destinatario e enviar o codigo. Depois cole o codigo recebido para liberar a navegacao nesta sessao.'
+        : 'Ative "Em todos os sites" nas permissoes da extensao para liberar o envio e a validacao do codigo nesta sessao.';
+    }
+  }
+
   function formatExpiration(expiresAt) {
     if (!expiresAt) {
       return "";
@@ -419,6 +458,29 @@
         resolve(response);
       });
     });
+  }
+
+  function startPermissionPolling() {
+    if (state.permissionPollId !== null) {
+      return;
+    }
+
+    state.permissionPollId = globalThis.setInterval(async () => {
+      const response = await sendMessage({ type: "lock:getState" });
+
+      if (response?.siteAccessGranted !== false) {
+        applyLockState(response);
+      }
+    }, 2000);
+  }
+
+  function stopPermissionPolling() {
+    if (state.permissionPollId === null) {
+      return;
+    }
+
+    globalThis.clearInterval(state.permissionPollId);
+    state.permissionPollId = null;
   }
 
   function escapeHtml(value) {
