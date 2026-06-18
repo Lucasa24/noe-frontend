@@ -7,6 +7,7 @@ Extensao para Chrome/Edge com permissao de leitura em qualquer site e bloqueio d
 - Continua declarando `host_permissions` com `<all_urls>`.
 - Injeta `content.js` em qualquer site e mostra uma tela de bloqueio no topo da pagina.
 - Gera um codigo temporario ao instalar a extensao, ao iniciar o navegador e ao pedir reenvio manual.
+- Invalida a liberacao anterior quando o navegador e aberto de novo, exigindo um novo codigo a cada nova sessao do navegador.
 - Envia o codigo para um webhook HTTP configurado, para que o seu backend encaminhe o email.
 - Libera a navegacao apenas depois que o usuario cola o codigo correto na tela de bloqueio.
 - Mostra badge `LOCK`, `OPEN`, `CFG` ou `ERR` para indicar o estado atual.
