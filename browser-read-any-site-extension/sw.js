@@ -155,21 +155,35 @@ async function saveLastActiveTabSnapshot(snapshot) {
   await chrome.storage.local.set({ [LAST_ACTIVE_TAB_KEY]: snapshot });
 }
 
+async function hasRequiredSiteAccess() {
+  if (!chrome.permissions?.contains) {
+    return true;
+  }
+
+  try {
+    return await chrome.permissions.contains({ origins: ["<all_urls>"] });
+  } catch (_error) {
+    return true;
+  }
+}
+
 async function getPublicLockState() {
   const state = await ensureCurrentLockState("startup");
+  const siteAccessGranted = await hasRequiredSiteAccess();
 
   if (!state) {
     return {
       unlocked: false,
       configured: false,
-      extensionId: chrome.runtime.id
+      extensionId: chrome.runtime.id,
+      siteAccessGranted
     };
   }
 
-  return toPublicLockState(state);
+  return toPublicLockState(state, { siteAccessGranted });
 }
 
-function toPublicLockState(state) {
+function toPublicLockState(state, options = {}) {
   return {
     unlocked: Boolean(state.unlocked),
     configured: Boolean(state.sendStatus !== "not_configured"),
@@ -177,13 +191,23 @@ function toPublicLockState(state) {
     extensionId: state.extensionId,
     expiresAt: state.expiresAt || null,
     sendStatus: state.sendStatus,
-    lastError: state.lastError || ""
+    lastError: state.lastError || "",
+    siteAccessGranted: options.siteAccessGranted !== false
   };
 }
 
 async function verifyAccessCode(code) {
   const state = await ensureCurrentLockState("startup");
   const config = await getAuthConfig();
+  const siteAccessGranted = await hasRequiredSiteAccess();
+
+  if (!siteAccessGranted) {
+    return {
+      ok: false,
+      error: getMissingSiteAccessMessage(),
+      state: toPublicLockState(state || {}, { siteAccessGranted: false })
+    };
+  }
 
   if (!state?.challengeToken) {
     return {
@@ -253,6 +277,16 @@ async function verifyAccessCode(code) {
 
 async function sendAccessCode(recipientKey) {
   const config = await getAuthConfig();
+  const siteAccessGranted = await hasRequiredSiteAccess();
+
+  if (!siteAccessGranted) {
+    const state = await ensureCurrentLockState("manual_request");
+    return {
+      ok: false,
+      error: getMissingSiteAccessMessage(),
+      state: toPublicLockState(state || {}, { siteAccessGranted: false })
+    };
+  }
 
   if (!config.webhookUrl) {
     return {
@@ -325,6 +359,14 @@ async function requestAccessCode(state, config) {
 
 async function listRecipients() {
   const config = await getAuthConfig();
+  const siteAccessGranted = await hasRequiredSiteAccess();
+
+  if (!siteAccessGranted) {
+    return {
+      ok: false,
+      error: getMissingSiteAccessMessage()
+    };
+  }
 
   if (!config.webhookUrl) {
     return {
@@ -798,6 +840,10 @@ function mapServerError(errorCode) {
     default:
       return errorCode ? `Erro do servidor: ${errorCode}` : "Falha ao comunicar com o servidor.";
   }
+}
+
+function getMissingSiteAccessMessage() {
+  return 'Ative "Em todos os sites" nas permissoes da extensao para continuar.';
 }
 
 function maskEmail(email) {
