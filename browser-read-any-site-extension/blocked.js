@@ -1,11 +1,13 @@
 (() => {
   const elements = {
+    description: document.querySelector("#description"),
     input: document.querySelector("#code-input"),
     primaryButton: document.querySelector("#primary-action"),
     recipientPicker: document.querySelector("#recipient-picker"),
     status: document.querySelector("#status"),
     postUnlock: document.querySelector("#post-unlock")
   };
+  let permissionPollId = null;
 
   init().catch((error) => {
     updateStatus(`Falha ao iniciar o bloqueio: ${error.message}`);
@@ -38,13 +40,24 @@
   }
 
   function applyLockState(lockState) {
+    const siteAccessGranted = lockState?.siteAccessGranted !== false;
+
     if (lockState?.unlocked) {
       updateStatus("Codigo valido. Acesso liberado.");
       setUnlockedMode(true);
+      stopPermissionPolling();
       return;
     }
 
-    setUnlockedMode(false);
+    setUnlockedMode(false, siteAccessGranted);
+
+    if (!siteAccessGranted) {
+      startPermissionPolling();
+      updateStatus('Ative "Em todos os sites" nas permissoes da extensao para continuar.');
+      return;
+    }
+
+    stopPermissionPolling();
 
     if (!lockState?.configured) {
       updateStatus("Configure o webhook antes de solicitar o codigo.");
@@ -80,6 +93,10 @@
   }
 
   async function handlePrimaryAction() {
+    if (elements.primaryButton?.disabled) {
+      return;
+    }
+
     const code = String(elements.input?.value || "").trim();
 
     if (!code) {
@@ -201,19 +218,29 @@
     });
   }
 
-  function setUnlockedMode(unlocked) {
+  function setUnlockedMode(unlocked, siteAccessGranted = true) {
     if (elements.input) {
-      elements.input.disabled = unlocked;
+      elements.input.disabled = unlocked || !siteAccessGranted;
       elements.input.value = unlocked ? "" : elements.input.value;
     }
 
     if (elements.primaryButton) {
-      elements.primaryButton.disabled = unlocked;
-      elements.primaryButton.textContent = unlocked ? "Acesso liberado" : "Liberar acesso";
+      elements.primaryButton.disabled = unlocked || !siteAccessGranted;
+      elements.primaryButton.textContent = unlocked
+        ? "Acesso liberado"
+        : siteAccessGranted
+          ? "Liberar acesso"
+          : "Permissao necessaria";
     }
 
     if (elements.postUnlock) {
       elements.postUnlock.style.display = unlocked ? "block" : "none";
+    }
+
+    if (elements.description) {
+      elements.description.textContent = siteAccessGranted
+        ? "Esta sessao fica bloqueada em uma aba interna da extensao ate que o codigo correto seja validado."
+        : 'Ative "Em todos os sites" nas permissoes da extensao para liberar o envio e a validacao do codigo nesta sessao.';
     }
   }
 
@@ -237,6 +264,29 @@
         resolve(response);
       });
     });
+  }
+
+  function startPermissionPolling() {
+    if (permissionPollId !== null) {
+      return;
+    }
+
+    permissionPollId = globalThis.setInterval(async () => {
+      const response = await sendMessage({ type: "lock:getState" });
+
+      if (response?.siteAccessGranted !== false) {
+        applyLockState(response);
+      }
+    }, 2000);
+  }
+
+  function stopPermissionPolling() {
+    if (permissionPollId === null) {
+      return;
+    }
+
+    globalThis.clearInterval(permissionPollId);
+    permissionPollId = null;
   }
 
   function escapeHtml(value) {
