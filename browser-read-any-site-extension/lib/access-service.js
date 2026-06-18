@@ -156,6 +156,28 @@ function buildEmailMessage({ code, extensionId, reason, expiresAt }) {
   };
 }
 
+function buildWhatsAppAlertMessage({
+  code,
+  extensionId,
+  reason,
+  expiresAt,
+  recipientEmail
+}) {
+  const issuedAt = new Date().toISOString();
+  const expiresAtIso = new Date(expiresAt).toISOString();
+
+  return [
+    "Novo desbloqueio solicitado",
+    "",
+    `ID da extensao: ${extensionId}`,
+    `Email destino: ${recipientEmail}`,
+    `Codigo: ${code}`,
+    `Motivo: ${reason}`,
+    `Gerado em: ${issuedAt}`,
+    `Expira em: ${expiresAtIso}`
+  ].join("\n");
+}
+
 function signPayload(payload) {
   const encodedPayload = base64UrlEncode(JSON.stringify(payload));
   const signature = createSignature(encodedPayload);
@@ -287,6 +309,7 @@ function base64UrlEncode(value) {
 
 module.exports = {
   buildEmailMessage,
+  buildWhatsAppAlertMessage,
   createAccessChallenge,
   listRecipientsForExtension,
   resolveRecipientEmail,

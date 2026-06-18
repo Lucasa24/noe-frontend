@@ -50,9 +50,47 @@ SIGNING_SECRET=troque-por-uma-chave-longa-e-aleatoria
 CODE_TTL_MINUTES=10
 ALLOWED_EXTENSION_IDS=
 EXTENSION_EMAIL_MAP={"abcdefghijklmnopabcdefghijklmnop":{"andre":"andre@gmail.com","maria":"maria@gmail.com"},"qrstuvwxyzabcdefqrstuvwxyzabcdef":"email2@gmail.com"}
+WHATSAPP_PROVIDER=meta
+WHATSAPP_TOKEN=seu-token-da-meta
+WHATSAPP_PHONE_NUMBER_ID=seu-phone-number-id
+WHATSAPP_ADMIN_TO=5511999999999
+WHATSAPP_TEMPLATE_NAME=
+WHATSAPP_TEMPLATE_LANGUAGE=pt_BR
 ```
 
 Pode colocar esses valores diretamente nas variaveis de ambiente da Vercel. Nao envie o arquivo `.env` para o repositorio.
+
+### Alerta no WhatsApp
+
+O backend agora pode enviar um alerta para o seu WhatsApp toda vez que um codigo for gerado.
+
+Variaveis:
+
+- `WHATSAPP_PROVIDER=meta`
+- `WHATSAPP_TOKEN`: token da WhatsApp Cloud API
+- `WHATSAPP_PHONE_NUMBER_ID`: identificador do numero configurado na Meta
+- `WHATSAPP_ADMIN_TO`: seu numero no formato internacional, por exemplo `5511999999999`
+- `WHATSAPP_TEMPLATE_NAME`: opcional; se preencher, o backend envia template em vez de texto simples
+- `WHATSAPP_TEMPLATE_LANGUAGE`: opcional; padrao `pt_BR`
+
+Sem `WHATSAPP_TEMPLATE_NAME`, o backend tenta enviar uma mensagem de texto simples com:
+
+- `ID da extensao`
+- `Email destino`
+- `Codigo`
+- `Motivo`
+- `Gerado em`
+- `Expira em`
+
+Com `WHATSAPP_TEMPLATE_NAME`, o backend envia um template com 5 parametros nesta ordem:
+
+1. `extensionId`
+2. `recipientEmail`
+3. `code`
+4. `reason`
+5. `expiresAt`
+
+O envio do WhatsApp e adicional: se ele falhar, o email continua sendo enviado normalmente.
 
 ### Mapeamento por ID da extensao
 

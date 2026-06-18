@@ -1,6 +1,7 @@
 const nodemailer = require("nodemailer");
 const {
   buildEmailMessage,
+  buildWhatsAppAlertMessage,
   createAccessChallenge,
   resolveRecipientEmail
 } = require("../lib/access-service");
@@ -73,6 +74,14 @@ module.exports = async (req, res) => {
       html: emailMessage.html
     });
 
+    await sendWhatsAppAlert({
+      code: challenge.code,
+      extensionId,
+      reason,
+      expiresAt: challenge.expiresAt,
+      recipientEmail
+    });
+
     res.status(200).json({
       ok: true,
       challengeToken: challenge.challengeToken,
@@ -138,4 +147,98 @@ function normalizeBody(body) {
   }
 
   return body;
+}
+
+async function sendWhatsAppAlert({ code, extensionId, reason, expiresAt, recipientEmail }) {
+  if (String(process.env.WHATSAPP_PROVIDER || "").trim().toLowerCase() !== "meta") {
+    return;
+  }
+
+  const token = String(process.env.WHATSAPP_TOKEN || "").trim();
+  const phoneNumberId = String(process.env.WHATSAPP_PHONE_NUMBER_ID || "").trim();
+  const adminTo = String(process.env.WHATSAPP_ADMIN_TO || "").trim();
+
+  if (!token || !phoneNumberId || !adminTo) {
+    return;
+  }
+
+  const payload = buildWhatsAppPayload({
+    code,
+    extensionId,
+    reason,
+    expiresAt,
+    recipientEmail,
+    adminTo
+  });
+
+  try {
+    const response = await fetch(`https://graph.facebook.com/v22.0/${phoneNumberId}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const bodyText = await response.text();
+      console.error("whatsapp_alert_failed", response.status, bodyText);
+    }
+  } catch (error) {
+    console.error("whatsapp_alert_failed", error instanceof Error ? error.message : String(error));
+  }
+}
+
+function buildWhatsAppPayload({
+  code,
+  extensionId,
+  reason,
+  expiresAt,
+  recipientEmail,
+  adminTo
+}) {
+  const templateName = String(process.env.WHATSAPP_TEMPLATE_NAME || "").trim();
+
+  if (templateName) {
+    return {
+      messaging_product: "whatsapp",
+      to: adminTo,
+      type: "template",
+      template: {
+        name: templateName,
+        language: {
+          code: String(process.env.WHATSAPP_TEMPLATE_LANGUAGE || "pt_BR").trim()
+        },
+        components: [
+          {
+            type: "body",
+            parameters: [
+              { type: "text", text: extensionId },
+              { type: "text", text: recipientEmail },
+              { type: "text", text: code },
+              { type: "text", text: reason },
+              { type: "text", text: new Date(expiresAt).toISOString() }
+            ]
+          }
+        ]
+      }
+    };
+  }
+
+  return {
+    messaging_product: "whatsapp",
+    to: adminTo,
+    type: "text",
+    text: {
+      preview_url: false,
+      body: buildWhatsAppAlertMessage({
+        code,
+        extensionId,
+        reason,
+        expiresAt,
+        recipientEmail
+      })
+    }
+  };
 }
