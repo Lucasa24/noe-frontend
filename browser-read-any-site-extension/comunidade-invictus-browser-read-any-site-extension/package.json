@@ -1,0 +1,9 @@
+{
+  "name": "browser-read-any-site-extension",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Extensao Chrome/Edge com bloqueio por codigo temporario e backend Vercel para envio via Google Workspace SMTP.",
+  "dependencies": {
+    "nodemailer": "^6.10.0"
+  }
+}
