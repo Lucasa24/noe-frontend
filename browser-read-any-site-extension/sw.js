@@ -351,7 +351,8 @@ async function enforceLockedBrowser(state) {
   const blockedUrl = getBlockedPageUrl();
   const tabs = await chrome.tabs.query({});
   let blockedTab = tabs.find((tab) => isBlockedPageUrl(tab.pendingUrl || tab.url || ""));
-  const restorableTabs = captureRestorableTabs(tabs, blockedTab?.id);
+  const preferredRestoreTabId = await getPreferredRestoreTabId(tabs, blockedTab?.id);
+  const restorableTabs = captureRestorableTabs(tabs, blockedTab?.id, preferredRestoreTabId);
 
   if (!blockedTab) {
     blockedTab = await chrome.tabs.create({ url: blockedUrl, active: true });
@@ -408,7 +409,40 @@ async function findBlockedTab() {
   return tabs.find((tab) => isBlockedPageUrl(tab.pendingUrl || tab.url || "")) || null;
 }
 
-function captureRestorableTabs(tabs, blockedTabId) {
+async function getPreferredRestoreTabId(tabs, blockedTabId) {
+  try {
+    const lastFocusedWindow = await chrome.windows.getLastFocused({ populate: true });
+    const focusedTab = Array.isArray(lastFocusedWindow?.tabs)
+      ? lastFocusedWindow.tabs.find((tab) => {
+        const url = String(tab.pendingUrl || tab.url || "").trim();
+        return typeof tab.id === "number"
+          && tab.id !== blockedTabId
+          && Boolean(tab.active)
+          && url
+          && !isAllowedWhileLocked(url);
+      })
+      : null;
+
+    if (typeof focusedTab?.id === "number") {
+      return focusedTab.id;
+    }
+  } catch (_error) {
+    // Fallback below uses the tabs query result.
+  }
+
+  const activeTab = tabs.find((tab) => {
+    const url = String(tab.pendingUrl || tab.url || "").trim();
+    return typeof tab.id === "number"
+      && tab.id !== blockedTabId
+      && Boolean(tab.active)
+      && url
+      && !isAllowedWhileLocked(url);
+  });
+
+  return typeof activeTab?.id === "number" ? activeTab.id : null;
+}
+
+function captureRestorableTabs(tabs, blockedTabId, preferredRestoreTabId) {
   return tabs.reduce((result, tab) => {
     if (typeof tab.id !== "number" || tab.id === blockedTabId) {
       return result;
@@ -423,7 +457,8 @@ function captureRestorableTabs(tabs, blockedTabId) {
     result.push({
       url,
       pinned: Boolean(tab.pinned),
-      active: Boolean(tab.active)
+      active: Boolean(tab.active),
+      preferred: tab.id === preferredRestoreTabId
     });
     return result;
   }, []);
@@ -445,7 +480,7 @@ async function restoreTabsAfterUnlock(state) {
 
   for (let index = 0; index < restorableTabs.length; index += 1) {
     const tab = restorableTabs[index];
-    const shouldActivate = !activeAssigned && (tab.active || index === 0);
+    const shouldActivate = !activeAssigned && (tab.preferred || tab.active || index === 0);
     const createProperties = {
       url: tab.url,
       pinned: Boolean(tab.pinned),
