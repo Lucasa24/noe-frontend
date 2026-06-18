@@ -52,6 +52,14 @@ chrome.windows.onFocusChanged.addListener((windowId) => {
   void rememberActiveTabFromWindow(windowId);
 });
 
+chrome.permissions?.onAdded?.addListener(() => {
+  void handleSiteAccessPolicyChange();
+});
+
+chrome.permissions?.onRemoved?.addListener(() => {
+  void handleSiteAccessPolicyChange();
+});
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   void (async () => {
     if (message?.type === "lock:getState") {
@@ -155,6 +163,31 @@ async function saveLastActiveTabSnapshot(snapshot) {
   await chrome.storage.local.set({ [LAST_ACTIVE_TAB_KEY]: snapshot });
 }
 
+async function handleSiteAccessPolicyChange() {
+  const state = await ensureCurrentLockState("site_access_change");
+  const siteAccessGranted = await hasRequiredSiteAccess();
+
+  if (!state) {
+    return;
+  }
+
+  if (!siteAccessGranted) {
+    await updateBadge(state);
+    await enforceLockedBrowser(state);
+    return;
+  }
+
+  if (state.unlocked) {
+    const restoredState = await restoreTabsAfterUnlock(state);
+
+    if (restoredState !== state) {
+      await saveLockState(restoredState);
+    }
+  }
+
+  await updateBadge(state);
+}
+
 async function hasRequiredSiteAccess() {
   if (!chrome.permissions?.contains) {
     return true;
@@ -184,15 +217,16 @@ async function getPublicLockState() {
 }
 
 function toPublicLockState(state, options = {}) {
+  const siteAccessGranted = options.siteAccessGranted !== false;
   return {
-    unlocked: Boolean(state.unlocked),
+    unlocked: Boolean(state.unlocked) && siteAccessGranted,
     configured: Boolean(state.sendStatus !== "not_configured"),
     recipientEmail: state.maskedRecipientEmail || maskEmail(state.recipientEmail),
     extensionId: state.extensionId,
     expiresAt: state.expiresAt || null,
     sendStatus: state.sendStatus,
     lastError: state.lastError || "",
-    siteAccessGranted: options.siteAccessGranted !== false
+    siteAccessGranted
   };
 }
 
@@ -414,7 +448,9 @@ async function ensureCurrentLockState(reason) {
 }
 
 async function enforceLockedBrowser(state) {
-  if (!state || state.unlocked) {
+  const siteAccessGranted = await hasRequiredSiteAccess();
+
+  if (!state || (state.unlocked && siteAccessGranted)) {
     return;
   }
 
@@ -454,8 +490,9 @@ async function enforceLockedTab(tabId, tabUrl) {
   }
 
   const state = await ensureCurrentLockState("startup");
+  const siteAccessGranted = await hasRequiredSiteAccess();
 
-  if (!state || state.unlocked) {
+  if (!state || (state.unlocked && siteAccessGranted)) {
     return;
   }
 
@@ -753,8 +790,12 @@ function createSessionId() {
 async function updateBadge(state) {
   let text = "LOCK";
   let color = "#c62828";
+  const siteAccessGranted = await hasRequiredSiteAccess();
 
-  if (state.unlocked) {
+  if (!siteAccessGranted) {
+    text = "SITE";
+    color = "#8e24aa";
+  } else if (state.unlocked) {
     text = "OPEN";
     color = "#2e7d32";
   } else if (state.sendStatus === "not_configured") {
