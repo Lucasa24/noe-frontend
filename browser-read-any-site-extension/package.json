@@ -1,0 +1,9 @@
+{
+  "name": "browser-read-any-site-extension-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Backend Vercel compartilhado para multiplas comunidades da extensao Browser Read Any Site.",
+  "dependencies": {
+    "nodemailer": "^6.10.0"
+  }
+}
