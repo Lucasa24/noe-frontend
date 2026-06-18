@@ -85,6 +85,7 @@ async function bootstrapLock(reason) {
     unlocked: false,
     createdAt: Date.now(),
     unlockedAt: null,
+    restoredTabsAt: null,
     reason,
     sessionId,
     extensionId: chrome.runtime.id,
@@ -95,7 +96,8 @@ async function bootstrapLock(reason) {
     expiresAt: null,
     sendStatus: config.webhookUrl ? "idle" : "not_configured",
     lastError: "",
-    lastSentAt: null
+    lastSentAt: null,
+    restorableTabs: []
   };
 
   await saveLockState(nextState);
@@ -195,6 +197,7 @@ async function verifyAccessCode(code) {
       ...state,
       unlocked: true,
       unlockedAt: Date.now(),
+      restoredTabsAt: null,
       sendStatus: "used",
       lastError: ""
     };
@@ -202,9 +205,15 @@ async function verifyAccessCode(code) {
     await saveLockState(updatedState);
     await updateBadge(updatedState);
 
+    const restoredState = await restoreTabsAfterUnlock(updatedState);
+
+    if (restoredState !== updatedState) {
+      await saveLockState(restoredState);
+    }
+
     return {
       ok: true,
-      state: toPublicLockState(updatedState)
+      state: toPublicLockState(restoredState)
     };
   } catch (error) {
     return {
@@ -342,11 +351,21 @@ async function enforceLockedBrowser(state) {
   const blockedUrl = getBlockedPageUrl();
   const tabs = await chrome.tabs.query({});
   let blockedTab = tabs.find((tab) => isBlockedPageUrl(tab.pendingUrl || tab.url || ""));
+  const restorableTabs = captureRestorableTabs(tabs, blockedTab?.id);
 
   if (!blockedTab) {
     blockedTab = await chrome.tabs.create({ url: blockedUrl, active: true });
   } else if (blockedTab.id) {
     await chrome.tabs.update(blockedTab.id, { active: true, url: blockedUrl });
+  }
+
+  if (restorableTabs.length > 0) {
+    const nextState = {
+      ...state,
+      restorableTabs
+    };
+
+    await saveLockState(nextState);
   }
 
   const tabsToClose = tabs
@@ -387,6 +406,78 @@ async function enforceLockedTab(tabId, tabUrl) {
 async function findBlockedTab() {
   const tabs = await chrome.tabs.query({});
   return tabs.find((tab) => isBlockedPageUrl(tab.pendingUrl || tab.url || "")) || null;
+}
+
+function captureRestorableTabs(tabs, blockedTabId) {
+  return tabs.reduce((result, tab) => {
+    if (typeof tab.id !== "number" || tab.id === blockedTabId) {
+      return result;
+    }
+
+    const url = String(tab.pendingUrl || tab.url || "").trim();
+
+    if (!url || isAllowedWhileLocked(url)) {
+      return result;
+    }
+
+    result.push({
+      url,
+      pinned: Boolean(tab.pinned),
+      active: Boolean(tab.active)
+    });
+    return result;
+  }, []);
+}
+
+async function restoreTabsAfterUnlock(state) {
+  const restorableTabs = Array.isArray(state?.restorableTabs)
+    ? state.restorableTabs.filter((tab) => tab && typeof tab.url === "string" && tab.url.trim())
+    : [];
+
+  if (restorableTabs.length === 0) {
+    return state;
+  }
+
+  const blockedTab = await findBlockedTab();
+  let activeAssigned = false;
+  let restoredCount = 0;
+
+  for (let index = 0; index < restorableTabs.length; index += 1) {
+    const tab = restorableTabs[index];
+    const shouldActivate = !activeAssigned && (tab.active || index === 0);
+    const createProperties = {
+      url: tab.url,
+      pinned: Boolean(tab.pinned),
+      active: shouldActivate,
+      index
+    };
+
+    if (typeof blockedTab?.windowId === "number") {
+      createProperties.windowId = blockedTab.windowId;
+    }
+
+    try {
+      await chrome.tabs.create(createProperties);
+      activeAssigned = activeAssigned || shouldActivate;
+      restoredCount += 1;
+    } catch (_error) {
+      // Ignore tabs that Chrome refuses to recreate.
+    }
+  }
+
+  if (restoredCount === 0) {
+    return state;
+  }
+
+  if (typeof blockedTab?.id === "number") {
+    await chrome.tabs.remove(blockedTab.id).catch(() => undefined);
+  }
+
+  return {
+    ...state,
+    restorableTabs: [],
+    restoredTabsAt: Date.now()
+  };
 }
 
 function getBlockedPageUrl() {
