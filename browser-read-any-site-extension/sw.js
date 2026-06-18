@@ -1,5 +1,6 @@
 const AUTH_CONFIG_KEY = "authConfig";
 const LOCK_STATE_KEY = "lockState";
+const SESSION_KEY = "browserSessionId";
 
 chrome.runtime.onInstalled.addListener(() => {
   void bootstrapLock("installed");
@@ -49,11 +50,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 async function bootstrapLock(reason) {
   const config = await getAuthConfig();
+  const sessionId = await getBrowserSessionId();
   const nextState = {
     unlocked: false,
     createdAt: Date.now(),
     unlockedAt: null,
     reason,
+    sessionId,
     extensionId: chrome.runtime.id,
     recipientEmail: "",
     maskedRecipientEmail: "",
@@ -89,7 +92,7 @@ async function saveLockState(lockState) {
 }
 
 async function getPublicLockState() {
-  const state = await getLockState();
+  const state = await ensureCurrentLockState("startup");
 
   if (!state) {
     return {
@@ -115,7 +118,7 @@ function toPublicLockState(state) {
 }
 
 async function verifyAccessCode(code) {
-  const state = await getLockState();
+  const state = await ensureCurrentLockState("startup");
   const config = await getAuthConfig();
 
   if (!state?.challengeToken) {
@@ -213,6 +216,39 @@ async function requestAccessCode(state, config) {
     await updateBadge(updatedState);
     return updatedState;
   }
+}
+
+async function ensureCurrentLockState(reason) {
+  const [state, sessionId] = await Promise.all([
+    getLockState(),
+    getBrowserSessionId()
+  ]);
+
+  if (!state || state.sessionId !== sessionId) {
+    return bootstrapLock(reason);
+  }
+
+  return state;
+}
+
+async function getBrowserSessionId() {
+  const data = await chrome.storage.session.get(SESSION_KEY);
+
+  if (data[SESSION_KEY]) {
+    return data[SESSION_KEY];
+  }
+
+  const sessionId = createSessionId();
+  await chrome.storage.session.set({ [SESSION_KEY]: sessionId });
+  return sessionId;
+}
+
+function createSessionId() {
+  if (globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 async function updateBadge(state) {
