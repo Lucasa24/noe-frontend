@@ -441,6 +441,7 @@ async function restoreTabsAfterUnlock(state) {
   const blockedTab = await findBlockedTab();
   let activeAssigned = false;
   let restoredCount = 0;
+  let targetTabId = null;
 
   for (let index = 0; index < restorableTabs.length; index += 1) {
     const tab = restorableTabs[index];
@@ -457,9 +458,13 @@ async function restoreTabsAfterUnlock(state) {
     }
 
     try {
-      await chrome.tabs.create(createProperties);
+      const createdTab = await chrome.tabs.create(createProperties);
       activeAssigned = activeAssigned || shouldActivate;
       restoredCount += 1;
+
+      if (shouldActivate && typeof createdTab?.id === "number") {
+        targetTabId = createdTab.id;
+      }
     } catch (_error) {
       // Ignore tabs that Chrome refuses to recreate.
     }
@@ -471,6 +476,14 @@ async function restoreTabsAfterUnlock(state) {
 
   if (typeof blockedTab?.id === "number") {
     await chrome.tabs.remove(blockedTab.id).catch(() => undefined);
+  }
+
+  if (typeof blockedTab?.windowId === "number") {
+    await chrome.windows.update(blockedTab.windowId, { focused: true }).catch(() => undefined);
+  }
+
+  if (typeof targetTabId === "number") {
+    await chrome.tabs.update(targetTabId, { active: true }).catch(() => undefined);
   }
 
   return {
