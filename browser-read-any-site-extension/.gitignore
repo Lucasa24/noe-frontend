@@ -1,0 +1,4 @@
+node_modules/
+instancia-2/node_modules/
+.env
+.vercel

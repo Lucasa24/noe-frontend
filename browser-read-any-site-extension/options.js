@@ -22,11 +22,23 @@ async function init() {
 
   const stored = await chrome.storage.local.get(AUTH_CONFIG_KEY);
   const config = stored[AUTH_CONFIG_KEY] || {};
+  const defaultConfig = {
+    webhookUrl: DEFAULT_WEBHOOK_URL,
+    webhookToken: DEFAULT_WEBHOOK_TOKEN
+  };
+  const resolvedConfig = {
+    webhookUrl: config.webhookUrl || defaultConfig.webhookUrl,
+    webhookToken: Object.prototype.hasOwnProperty.call(config, "webhookToken")
+      ? config.webhookToken
+      : defaultConfig.webhookToken
+  };
 
-  webhookUrlInput.value = config.webhookUrl || DEFAULT_WEBHOOK_URL;
-  webhookTokenInput.value = Object.prototype.hasOwnProperty.call(config, "webhookToken")
-    ? config.webhookToken
-    : DEFAULT_WEBHOOK_TOKEN;
+  if (!config.webhookUrl && !Object.prototype.hasOwnProperty.call(config, "webhookToken")) {
+    await chrome.storage.local.set({ [AUTH_CONFIG_KEY]: resolvedConfig });
+  }
+
+  webhookUrlInput.value = resolvedConfig.webhookUrl;
+  webhookTokenInput.value = resolvedConfig.webhookToken;
 }
 
 async function saveConfig() {
