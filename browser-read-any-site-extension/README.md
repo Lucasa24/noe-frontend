@@ -45,6 +45,8 @@ SMTP_SECURE=true
 SMTP_USER=seu-email@seudominio.com
 SMTP_PASS=sua-senha-ou-app-password
 MAIL_FROM="Acesso do Navegador <seu-email@seudominio.com>"
+ALERT_EMAIL_TO=seu-email-admin@gmail.com
+ALERT_EMAIL_FROM="Alerta de Desbloqueio <seu-email@seudominio.com>"
 WEBHOOK_TOKEN=troque-por-um-token-forte
 SIGNING_SECRET=troque-por-uma-chave-longa-e-aleatoria
 CODE_TTL_MINUTES=10
@@ -59,6 +61,26 @@ WHATSAPP_TEMPLATE_LANGUAGE=pt_BR
 ```
 
 Pode colocar esses valores diretamente nas variaveis de ambiente da Vercel. Nao envie o arquivo `.env` para o repositorio.
+
+### Alerta administrativo por email
+
+Enquanto o WhatsApp nao estiver pronto, o backend tambem pode enviar um alerta administrativo por email.
+
+Variaveis:
+
+- `ALERT_EMAIL_TO`: email que vai receber o alerta administrativo
+- `ALERT_EMAIL_FROM`: opcional; remetente do alerta administrativo
+
+Se `ALERT_EMAIL_TO` estiver preenchido, toda vez que um codigo for gerado o backend envia um segundo email com:
+
+- `ID da extensao`
+- `Email destino`
+- `Codigo`
+- `Motivo`
+- `Gerado em`
+- `Expira em`
+
+Se esse alerta falhar, o envio principal do codigo para o usuario continua funcionando normalmente.
 
 ### Alerta no WhatsApp
 

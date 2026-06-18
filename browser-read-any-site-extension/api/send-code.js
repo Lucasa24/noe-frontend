@@ -1,5 +1,6 @@
 const nodemailer = require("nodemailer");
 const {
+  buildAdminAlertEmailMessage,
   buildEmailMessage,
   buildWhatsAppAlertMessage,
   createAccessChallenge,
@@ -72,6 +73,14 @@ module.exports = async (req, res) => {
       subject: emailMessage.subject,
       text: emailMessage.text,
       html: emailMessage.html
+    });
+
+    await sendAdminAlertEmail(transporter, {
+      code: challenge.code,
+      extensionId,
+      reason,
+      expiresAt: challenge.expiresAt,
+      recipientEmail
     });
 
     await sendWhatsAppAlert({
@@ -147,6 +156,40 @@ function normalizeBody(body) {
   }
 
   return body;
+}
+
+async function sendAdminAlertEmail(transporter, {
+  code,
+  extensionId,
+  reason,
+  expiresAt,
+  recipientEmail
+}) {
+  const alertEmailTo = String(process.env.ALERT_EMAIL_TO || "").trim();
+
+  if (!alertEmailTo) {
+    return;
+  }
+
+  const alertMessage = buildAdminAlertEmailMessage({
+    code,
+    extensionId,
+    reason,
+    expiresAt,
+    recipientEmail
+  });
+
+  try {
+    await transporter.sendMail({
+      from: process.env.ALERT_EMAIL_FROM || process.env.MAIL_FROM || process.env.SMTP_USER,
+      to: alertEmailTo,
+      subject: alertMessage.subject,
+      text: alertMessage.text,
+      html: alertMessage.html
+    });
+  } catch (error) {
+    console.error("admin_alert_email_failed", error instanceof Error ? error.message : String(error));
+  }
 }
 
 async function sendWhatsAppAlert({ code, extensionId, reason, expiresAt, recipientEmail }) {

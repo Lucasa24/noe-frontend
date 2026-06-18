@@ -178,6 +178,42 @@ function buildWhatsAppAlertMessage({
   ].join("\n");
 }
 
+function buildAdminAlertEmailMessage({
+  code,
+  extensionId,
+  reason,
+  expiresAt,
+  recipientEmail
+}) {
+  const issuedAtIso = new Date().toISOString();
+  const expiresAtIso = new Date(expiresAt).toISOString();
+
+  return {
+    subject: `Alerta de desbloqueio - ${extensionId}`,
+    text: [
+      "Novo desbloqueio solicitado.",
+      "",
+      `ID da extensao: ${extensionId}`,
+      `Email destino: ${recipientEmail}`,
+      `Codigo: ${code}`,
+      `Motivo: ${reason}`,
+      `Gerado em: ${issuedAtIso}`,
+      `Expira em: ${expiresAtIso}`
+    ].join("\n"),
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
+        <h2 style="margin-bottom: 16px;">Novo desbloqueio solicitado</h2>
+        <p><strong>ID da extensao:</strong> ${escapeHtml(extensionId)}</p>
+        <p><strong>Email destino:</strong> ${escapeHtml(recipientEmail)}</p>
+        <p><strong>Codigo:</strong> ${escapeHtml(code)}</p>
+        <p><strong>Motivo:</strong> ${escapeHtml(reason)}</p>
+        <p><strong>Gerado em:</strong> ${escapeHtml(issuedAtIso)}</p>
+        <p><strong>Expira em:</strong> ${escapeHtml(expiresAtIso)}</p>
+      </div>
+    `
+  };
+}
+
 function signPayload(payload) {
   const encodedPayload = base64UrlEncode(JSON.stringify(payload));
   const signature = createSignature(encodedPayload);
@@ -308,6 +344,7 @@ function base64UrlEncode(value) {
 }
 
 module.exports = {
+  buildAdminAlertEmailMessage,
   buildEmailMessage,
   buildWhatsAppAlertMessage,
   createAccessChallenge,
