@@ -3,6 +3,7 @@ const LOCK_STATE_KEY = "lockState";
 const SESSION_KEY = "browserSessionId";
 const DEFAULT_WEBHOOK_URL = "https://noe-frontend.vercel.app/api/send-code";
 const DEFAULT_WEBHOOK_TOKEN = "b4b7f9f9e7c64f3d9c1a8d2f6e3b7a91";
+const BLOCKED_PAGE_PATH = "blocked.html";
 
 chrome.runtime.onInstalled.addListener(() => {
   void bootstrapLock("installed");
@@ -10,6 +11,26 @@ chrome.runtime.onInstalled.addListener(() => {
 
 chrome.runtime.onStartup.addListener(() => {
   void bootstrapLock("startup");
+});
+
+chrome.tabs.onCreated.addListener((tab) => {
+  const tabUrl = tab.pendingUrl || tab.url || "";
+
+  if (!tabUrl) {
+    return;
+  }
+
+  void enforceLockedTab(tab.id, tabUrl);
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  const tabUrl = changeInfo.url || tab.pendingUrl || tab.url || "";
+
+  if (!tabUrl) {
+    return;
+  }
+
+  void enforceLockedTab(tabId, tabUrl);
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -80,6 +101,7 @@ async function bootstrapLock(reason) {
   await saveLockState(nextState);
 
   await updateBadge(nextState);
+  await enforceLockedBrowser(nextState);
   return nextState;
 }
 
@@ -310,6 +332,84 @@ async function ensureCurrentLockState(reason) {
   }
 
   return state;
+}
+
+async function enforceLockedBrowser(state) {
+  if (!state || state.unlocked) {
+    return;
+  }
+
+  const blockedUrl = getBlockedPageUrl();
+  const tabs = await chrome.tabs.query({});
+  let blockedTab = tabs.find((tab) => isBlockedPageUrl(tab.pendingUrl || tab.url || ""));
+
+  if (!blockedTab) {
+    blockedTab = await chrome.tabs.create({ url: blockedUrl, active: true });
+  } else if (blockedTab.id) {
+    await chrome.tabs.update(blockedTab.id, { active: true, url: blockedUrl });
+  }
+
+  const tabsToClose = tabs
+    .filter((tab) => typeof tab.id === "number" && tab.id !== blockedTab?.id)
+    .map((tab) => tab.id);
+
+  if (tabsToClose.length > 0) {
+    await chrome.tabs.remove(tabsToClose);
+  }
+}
+
+async function enforceLockedTab(tabId, tabUrl) {
+  if (typeof tabId !== "number") {
+    return;
+  }
+
+  const state = await ensureCurrentLockState("startup");
+
+  if (!state || state.unlocked) {
+    return;
+  }
+
+  if (isAllowedWhileLocked(tabUrl)) {
+    return;
+  }
+
+  const blockedTab = await findBlockedTab();
+
+  if (blockedTab?.id && blockedTab.id !== tabId) {
+    await chrome.tabs.remove(tabId).catch(() => undefined);
+    await chrome.tabs.update(blockedTab.id, { active: true }).catch(() => undefined);
+    return;
+  }
+
+  await chrome.tabs.update(tabId, { url: getBlockedPageUrl(), active: true }).catch(() => undefined);
+}
+
+async function findBlockedTab() {
+  const tabs = await chrome.tabs.query({});
+  return tabs.find((tab) => isBlockedPageUrl(tab.pendingUrl || tab.url || "")) || null;
+}
+
+function getBlockedPageUrl() {
+  return chrome.runtime.getURL(BLOCKED_PAGE_PATH);
+}
+
+function isBlockedPageUrl(url) {
+  return normalizeUrl(url) === normalizeUrl(getBlockedPageUrl());
+}
+
+function isAllowedWhileLocked(url) {
+  const normalizedUrl = normalizeUrl(url);
+
+  if (!normalizedUrl) {
+    return false;
+  }
+
+  return normalizedUrl === normalizeUrl(getBlockedPageUrl())
+    || normalizedUrl === normalizeUrl(chrome.runtime.getURL("options.html"));
+}
+
+function normalizeUrl(url) {
+  return String(url || "").split("#")[0];
 }
 
 async function getBrowserSessionId() {

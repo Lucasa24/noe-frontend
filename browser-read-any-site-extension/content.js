@@ -23,10 +23,28 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: rgba(10, 12, 18, 0.92);
+      background: #05070d;
       color: #f5f7fb;
       font-family: Arial, sans-serif;
       padding: 24px;
+    }
+
+    html.bras-lock-active,
+    html.bras-lock-active body {
+      background: #05070d !important;
+    }
+
+    html.bras-lock-active body > * {
+      visibility: hidden !important;
+    }
+
+    html.bras-lock-active #bras-lock-overlay,
+    html.bras-lock-active #bras-lock-overlay * {
+      visibility: visible !important;
+    }
+
+    html.bras-lock-active body {
+      overflow: hidden !important;
     }
 
     #bras-lock-card {
@@ -178,6 +196,7 @@
 
   function lockDocument() {
     state.locked = true;
+    document.documentElement.classList.add("bras-lock-active");
     document.documentElement.style.overflow = "hidden";
 
     if (!state.stopEvents) {
@@ -202,6 +221,7 @@
 
   function unlockDocument() {
     state.locked = false;
+    document.documentElement.classList.remove("bras-lock-active");
     document.documentElement.style.overflow = "";
 
     if (state.overlay) {
