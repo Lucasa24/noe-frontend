@@ -6,9 +6,9 @@ Extensao para Chrome/Edge com permissao de leitura em qualquer site e bloqueio d
 
 - Continua declarando `host_permissions` com `<all_urls>`.
 - Injeta `content.js` em qualquer site e mostra uma tela de bloqueio no topo da pagina.
-- Gera um codigo temporario ao instalar a extensao, ao iniciar o navegador e ao pedir reenvio manual.
 - Invalida a liberacao anterior quando o navegador e aberto de novo, exigindo um novo codigo a cada nova sessao do navegador.
-- Envia o codigo para um webhook HTTP configurado, para que o seu backend encaminhe o email.
+- Solicita o envio do codigo somente quando o usuario clica em `Enviar codigo` e escolhe um destinatario.
+- Envia o codigo para um webhook HTTP configurado, para que o seu backend encaminhe o email para o destinatario selecionado.
 - Libera a navegacao apenas depois que o usuario cola o codigo correto na tela de bloqueio.
 - Mostra badge `LOCK`, `OPEN`, `CFG` ou `ERR` para indicar o estado atual.
 
@@ -22,6 +22,7 @@ Esse backend agora expõe:
 
 - `POST /api/send-code`
 - `POST /api/verify-code`
+- `POST /api/recipients`
 - `GET /api/health`
 
 O fluxo de producao funciona assim:
@@ -48,7 +49,7 @@ WEBHOOK_TOKEN=troque-por-um-token-forte
 SIGNING_SECRET=troque-por-uma-chave-longa-e-aleatoria
 CODE_TTL_MINUTES=10
 ALLOWED_EXTENSION_IDS=
-EXTENSION_EMAIL_MAP={"abcdefghijklmnopabcdefghijklmnop":"email1@gmail.com","qrstuvwxyzabcdefqrstuvwxyzabcdef":"email2@gmail.com"}
+EXTENSION_EMAIL_MAP={"abcdefghijklmnopabcdefghijklmnop":{"andre":"andre@gmail.com","maria":"maria@gmail.com"},"qrstuvwxyzabcdefqrstuvwxyzabcdef":"email2@gmail.com"}
 ```
 
 Pode colocar esses valores diretamente nas variaveis de ambiente da Vercel. Nao envie o arquivo `.env` para o repositorio.
@@ -60,12 +61,13 @@ Agora o email de destino pode ficar preso ao `ID da extensao` no backend.
 Exemplo:
 
 ```env
-EXTENSION_EMAIL_MAP={"abcdefghijklmnopabcdefghijklmnop":"email1@gmail.com","qrstuvwxyzabcdefqrstuvwxyzabcdef":"email2@gmail.com"}
+EXTENSION_EMAIL_MAP={"abcdefghijklmnopabcdefghijklmnop":{"andre":"andre@gmail.com","maria":"maria@gmail.com"},"qrstuvwxyzabcdefqrstuvwxyzabcdef":"email2@gmail.com"}
 ```
 
 Com isso:
 
-- se a extensao com ID `abcdefghijklmnopabcdefghijklmnop` pedir um codigo, o email vai para `email1@gmail.com`
+- se a extensao com ID `abcdefghijklmnopabcdefghijklmnop` pedir um codigo com `recipientKey: "andre"`, o email vai para `andre@gmail.com`
+- se a extensao com ID `abcdefghijklmnopabcdefghijklmnop` pedir um codigo com `recipientKey: "maria"`, o email vai para `maria@gmail.com`
 - se a extensao com ID `qrstuvwxyzabcdefqrstuvwxyzabcdef` pedir um codigo, o email vai para `email2@gmail.com`
 
 O frontend da extensao nao precisa mais salvar o email de destino localmente.
@@ -113,7 +115,16 @@ O service worker envia um `POST` JSON semelhante a este para `send-code`:
 ```json
 {
   "extensionId": "abcdefghijklmnopabcdefghijklmnop",
-  "reason": "startup"
+  "reason": "manual_request",
+  "recipientKey": "andre"
+}
+```
+
+Para listar os destinatarios disponiveis para a extensao, a extensao chama `recipients`:
+
+```json
+{
+  "extensionId": "abcdefghijklmnopabcdefghijklmnop"
 }
 ```
 
