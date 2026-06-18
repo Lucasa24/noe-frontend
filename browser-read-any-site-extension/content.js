@@ -147,12 +147,11 @@
       <div id="bras-lock-card">
         <h1>Navegador bloqueado</h1>
         <p id="bras-lock-description">
-          Selecione um destinatario para enviar o codigo e depois cole o codigo recebido para liberar a navegacao nesta sessao.
+          Clique em "Liberar acesso" para escolher um destinatario e enviar o codigo. Depois cole o codigo recebido para liberar a navegacao nesta sessao.
         </p>
         <input id="bras-lock-input" type="password" inputmode="numeric" autocomplete="one-time-code" placeholder="Cole o codigo recebido" />
         <div id="bras-lock-actions">
           <button id="bras-lock-submit" class="bras-primary" type="button">Liberar acesso</button>
-          <button id="bras-lock-resend" class="bras-secondary" type="button">Enviar codigo</button>
         </div>
         <div id="bras-lock-recipient-picker"></div>
         <div id="bras-lock-status"></div>
@@ -160,7 +159,6 @@
     `;
 
     overlay.querySelector("#bras-lock-submit").addEventListener("click", handlePrimaryAction);
-    overlay.querySelector("#bras-lock-resend").addEventListener("click", requestCode);
 
     const input = overlay.querySelector("#bras-lock-input");
     input.addEventListener("keydown", (event) => {
@@ -249,7 +247,7 @@
     }
 
     if (lockState.sendStatus === "idle") {
-      updateStatus('Clique em "Enviar codigo" para solicitar um novo codigo.');
+      updateStatus('Clique em "Liberar acesso" para solicitar um novo codigo.');
       return;
     }
 
