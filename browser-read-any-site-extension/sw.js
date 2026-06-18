@@ -1,6 +1,8 @@
 const AUTH_CONFIG_KEY = "authConfig";
 const LOCK_STATE_KEY = "lockState";
 const SESSION_KEY = "browserSessionId";
+const DEFAULT_WEBHOOK_URL = "https://noe-frontend.vercel.app/api/send-code";
+const DEFAULT_WEBHOOK_TOKEN = "b4b7f9f9e7c64f3d9c1a8d2f6e3b7a91";
 
 chrome.runtime.onInstalled.addListener(() => {
   void bootstrapLock("installed");
@@ -83,7 +85,13 @@ async function bootstrapLock(reason) {
 
 async function getAuthConfig() {
   const data = await chrome.storage.local.get(AUTH_CONFIG_KEY);
-  return data[AUTH_CONFIG_KEY] || {};
+  const config = data[AUTH_CONFIG_KEY] || {};
+  return {
+    webhookUrl: config.webhookUrl || DEFAULT_WEBHOOK_URL,
+    webhookToken: Object.prototype.hasOwnProperty.call(config, "webhookToken")
+      ? config.webhookToken
+      : DEFAULT_WEBHOOK_TOKEN
+  };
 }
 
 async function getLockState() {
