@@ -30,7 +30,8 @@ module.exports = async (req, res) => {
     const reason = String(body.reason || "startup").trim();
     const recipientEmail = resolveRecipientEmail({
       extensionId,
-      fallbackEmail: body.to
+      fallbackEmail: body.to,
+      recipientKey: body.recipientKey
     });
 
     if (!extensionId) {
