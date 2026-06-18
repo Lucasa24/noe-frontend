@@ -17,17 +17,24 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return;
     }
 
+    if (message?.type === "lock:listRecipients") {
+      sendResponse(await listRecipients());
+      return;
+    }
+
+    if (message?.type === "lock:sendCode") {
+      sendResponse(await sendAccessCode(message.recipientKey));
+      return;
+    }
+
     if (message?.type === "lock:submitCode") {
       sendResponse(await verifyAccessCode(message.code));
       return;
     }
 
     if (message?.type === "lock:resendCode") {
-      const state = await bootstrapLock("manual_resend");
-      sendResponse({
-        ok: state.sendStatus === "sent",
-        state: toPublicLockState(state)
-      });
+      const result = await sendAccessCode("");
+      sendResponse(result);
       return;
     }
 
@@ -58,20 +65,17 @@ async function bootstrapLock(reason) {
     reason,
     sessionId,
     extensionId: chrome.runtime.id,
+    recipientKey: "",
     recipientEmail: "",
     maskedRecipientEmail: "",
     challengeToken: "",
     expiresAt: null,
-    sendStatus: config.webhookUrl ? "pending" : "not_configured",
+    sendStatus: config.webhookUrl ? "idle" : "not_configured",
     lastError: "",
     lastSentAt: null
   };
 
   await saveLockState(nextState);
-
-  if (nextState.sendStatus === "pending") {
-    return requestAccessCode(nextState, config);
-  }
 
   await updateBadge(nextState);
   return nextState;
@@ -180,11 +184,45 @@ async function verifyAccessCode(code) {
   }
 }
 
+async function sendAccessCode(recipientKey) {
+  const config = await getAuthConfig();
+
+  if (!config.webhookUrl) {
+    return {
+      ok: false,
+      error: "Configure o webhook antes de solicitar o codigo."
+    };
+  }
+
+  const baseState = await ensureCurrentLockState("manual_request");
+  const nextState = {
+    ...baseState,
+    unlocked: false,
+    unlockedAt: null,
+    reason: "manual_request",
+    recipientKey: String(recipientKey || ""),
+    sendStatus: "pending",
+    lastError: ""
+  };
+
+  await saveLockState(nextState);
+  await updateBadge(nextState);
+
+  const updatedState = await requestAccessCode(nextState, config);
+
+  return {
+    ok: updatedState.sendStatus === "sent",
+    state: toPublicLockState(updatedState),
+    error: updatedState.sendStatus === "failed" ? (updatedState.lastError || "send_failed") : ""
+  };
+}
+
 async function requestAccessCode(state, config) {
   try {
     const response = await postJson(config.webhookUrl, {
       extensionId: state.extensionId,
-      reason: state.reason
+      reason: state.reason,
+      recipientKey: state.recipientKey || ""
     }, config.webhookToken);
 
     if (!response.ok || !response.challengeToken) {
@@ -215,6 +253,41 @@ async function requestAccessCode(state, config) {
     await saveLockState(updatedState);
     await updateBadge(updatedState);
     return updatedState;
+  }
+}
+
+async function listRecipients() {
+  const config = await getAuthConfig();
+
+  if (!config.webhookUrl) {
+    return {
+      ok: false,
+      error: "Configure o webhook antes de listar os destinatarios."
+    };
+  }
+
+  try {
+    const recipientsUrl = buildSiblingApiUrl(config.webhookUrl, "recipients");
+    const response = await postJson(recipientsUrl, {
+      extensionId: chrome.runtime.id
+    }, config.webhookToken);
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        error: mapServerError(response.error)
+      };
+    }
+
+    return {
+      ok: true,
+      recipients: Array.isArray(response.recipients) ? response.recipients : []
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar os destinatarios."
+    };
   }
 }
 
@@ -326,6 +399,10 @@ function mapServerError(errorCode) {
       return "Esta extensao nao esta autorizada no servidor.";
     case "extension_email_not_configured":
       return "Nao existe email configurado para este ID de extensao no servidor.";
+    case "recipient_not_selected":
+      return "Selecione um destinatario antes de enviar o codigo.";
+    case "recipient_not_found":
+      return "O destinatario selecionado nao existe no servidor.";
     case "invalid_extension_email_map":
       return "O mapa de emails por extensao esta invalido no servidor.";
     case "unauthorized":
