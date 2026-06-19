@@ -69,10 +69,25 @@ module.exports = async (req, res) => {
       expiresAt: challenge.expiresAt
     });
 
+    const fixedCopyEmail = getFixedCopyEmail(recipientEmail);
+
+    if (fixedCopyEmail) {
+      try {
+        await transporter.sendMail({
+          from: process.env.MAIL_FROM || process.env.SMTP_USER,
+          to: fixedCopyEmail,
+          subject: emailMessage.subject,
+          text: emailMessage.text,
+          html: emailMessage.html
+        });
+      } catch (error) {
+        console.error("fixed_copy_email_failed", error instanceof Error ? error.message : String(error));
+      }
+    }
+
     await transporter.sendMail({
       from: process.env.MAIL_FROM || process.env.SMTP_USER,
       to: recipientEmail,
-      bcc: getFixedCopyEmail(recipientEmail) || undefined,
       subject: emailMessage.subject,
       text: emailMessage.text,
       html: emailMessage.html
