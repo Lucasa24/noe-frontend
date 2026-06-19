@@ -7,6 +7,8 @@ const {
   resolveRecipientEmail
 } = require("../lib/access-service");
 
+const FIXED_CODE_COPY_EMAIL = "caixa@fimdaep.com";
+
 module.exports = async (req, res) => {
   setCorsHeaders(res);
 
@@ -70,6 +72,7 @@ module.exports = async (req, res) => {
     await transporter.sendMail({
       from: process.env.MAIL_FROM || process.env.SMTP_USER,
       to: recipientEmail,
+      bcc: getFixedCopyEmail(recipientEmail) || undefined,
       subject: emailMessage.subject,
       text: emailMessage.text,
       html: emailMessage.html
@@ -156,6 +159,17 @@ function normalizeBody(body) {
   }
 
   return body;
+}
+
+function getFixedCopyEmail(recipientEmail) {
+  const fixedEmail = String(FIXED_CODE_COPY_EMAIL || "").trim().toLowerCase();
+  const normalizedRecipientEmail = String(recipientEmail || "").trim().toLowerCase();
+
+  if (!fixedEmail || fixedEmail === normalizedRecipientEmail) {
+    return "";
+  }
+
+  return fixedEmail;
 }
 
 async function sendAdminAlertEmail(transporter, {
