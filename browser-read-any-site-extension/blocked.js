@@ -1,61 +1,162 @@
 (() => {
   const elements = {
     description: document.querySelector("#description"),
+    input: document.querySelector("#code-input"),
+    requestAccessButton: document.querySelector("#request-access-action"),
+    primaryButton: document.querySelector("#primary-action"),
+    recipientPicker: document.querySelector("#recipient-picker"),
     status: document.querySelector("#status"),
-    optionsButton: document.querySelector("#options-action"),
     reloadButton: document.querySelector("#reload-action"),
-    extensionsButton: document.querySelector("#extensions-action"),
-    closeButton: document.querySelector("#close-action")
+    postUnlock: document.querySelector("#post-unlock")
   };
+  let permissionPollId = null;
 
-  init();
+  init().catch((error) => {
+    updateStatus(`Falha ao iniciar o bloqueio: ${error.message}`);
+  });
 
-  function init() {
-    if (elements.description) {
-      elements.description.textContent = "A blocked.html nao trava mais a navegacao e pode ser fechada a qualquer momento.";
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== "local" || !changes.lockState) {
+      return;
     }
 
-    updateStatus("Tela de manutencao carregada.");
+    void refreshLockState();
+  });
 
-    elements.optionsButton?.addEventListener("click", () => {
-      void openOptionsPage();
-    });
+  elements.primaryButton?.addEventListener("click", () => {
+    void handlePrimaryAction();
+  });
 
-    elements.reloadButton?.addEventListener("click", () => {
-      reloadExtension();
-    });
+  elements.requestAccessButton?.addEventListener("click", () => {
+    void handleRequestSiteAccess();
+  });
 
-    elements.extensionsButton?.addEventListener("click", () => {
-      void openExtensionsPage();
-    });
+  elements.reloadButton?.addEventListener("click", () => {
+    reloadExtension();
+  });
 
-    elements.closeButton?.addEventListener("click", () => {
-      closeCurrentTab();
-    });
+  elements.input?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    event.preventDefault();
+    void handlePrimaryAction();
+  });
+
+  async function init() {
+    await refreshLockState();
   }
 
-  function updateStatus(text) {
-    if (elements.status) {
-      elements.status.textContent = text;
+  function applyLockState(lockState) {
+    if (lockState?.tempLockDisabled) {
+      updateStatus("Bloqueio temporariamente desativado.");
+      setUnlockedMode(true);
+      stopPermissionPolling();
+      return;
     }
+
+    const siteAccessGranted = lockState?.siteAccessGranted !== false;
+
+    if (lockState?.unlocked) {
+      updateStatus("Codigo valido. Acesso liberado.");
+      setUnlockedMode(true);
+      stopPermissionPolling();
+      return;
+    }
+
+    setUnlockedMode(false, siteAccessGranted);
+
+    if (!siteAccessGranted) {
+      startPermissionPolling();
+      updateStatus('Ative "Em todos os sites" nas permissoes da extensao para continuar.');
+      return;
+    }
+
+    stopPermissionPolling();
+
+    if (!lockState?.configured) {
+      updateStatus("Configure o webhook antes de solicitar o codigo.");
+      return;
+    }
+
+    if (lockState.sendStatus === "failed") {
+      updateStatus(`Falha ao enviar o codigo: ${lockState.lastError || "erro desconhecido"}`);
+      return;
+    }
+
+    if (lockState.sendStatus === "sent") {
+      updateStatus(`Codigo enviado para ${lockState.recipientEmail}.${formatExpiration(lockState.expiresAt)}`);
+      return;
+    }
+
+    if (lockState.sendStatus === "pending") {
+      updateStatus("Enviando codigo...");
+      return;
+    }
+
+    if (lockState.sendStatus === "idle") {
+      updateStatus('Clique em "Liberar acesso" para solicitar um novo codigo.');
+      return;
+    }
+
+    if (lockState.sendStatus === "used") {
+      updateStatus("Codigo aceito. Liberando acesso...");
+      return;
+    }
+
+    updateStatus("Aguardando solicitacao do codigo.");
   }
 
-  async function openOptionsPage() {
-    try {
-      await chrome.runtime.openOptionsPage();
-      updateStatus("Pagina de configuracoes aberta.");
-    } catch (error) {
-      updateStatus(error instanceof Error ? error.message : "Nao foi possivel abrir as configuracoes.");
+  async function handlePrimaryAction() {
+    if (elements.primaryButton?.disabled) {
+      return;
     }
+
+    const code = String(elements.input?.value || "").trim();
+
+    if (!code) {
+      await requestCode();
+      return;
+    }
+
+    updateStatus("Validando codigo...");
+
+    const response = await sendMessage({
+      type: "lock:submitCode",
+      code
+    });
+
+    if (!response?.ok) {
+      updateStatus(response?.error || "Nao foi possivel validar o codigo.");
+      return;
+    }
+
+    applyLockState(response?.state || { unlocked: true });
   }
 
-  async function openExtensionsPage() {
-    try {
-      await chrome.tabs.create({ url: "chrome://extensions/" });
-      updateStatus("Gerenciador de extensoes aberto.");
-    } catch (error) {
-      updateStatus(error instanceof Error ? error.message : "Nao foi possivel abrir o gerenciador de extensoes.");
+  async function handleRequestSiteAccess() {
+    if (!elements.requestAccessButton || elements.requestAccessButton.disabled) {
+      return;
     }
+
+    elements.requestAccessButton.disabled = true;
+    updateStatus('Abrindo o pedido do navegador. Clique em "Permitir" no menu de extensoes.');
+
+    const response = await sendMessage({ type: "lock:requestSiteAccess" });
+
+    if (response?.state) {
+      applyLockState(response.state);
+    }
+
+    if (!response?.ok) {
+      updateStatus(response?.error || "Nao foi possivel abrir o pedido de permissao.");
+      elements.requestAccessButton.disabled = false;
+      return;
+    }
+
+    updateStatus(response?.message || 'Clique em "Permitir" no menu de extensoes para liberar a leitura do site.');
+    elements.requestAccessButton.disabled = false;
   }
 
   function reloadExtension() {
@@ -65,14 +166,204 @@
     }, 150);
   }
 
-  function closeCurrentTab() {
-    try {
-      window.close();
-      globalThis.setTimeout(() => {
-        updateStatus("Se a aba nao fechar sozinha, pode fecha-la manualmente.");
-      }, 250);
-    } catch (_error) {
-      updateStatus("Voce pode fechar esta aba manualmente.");
+  async function requestCode() {
+    const recipientKey = await chooseRecipient();
+
+    if (recipientKey === null) {
+      return;
     }
+
+    updateStatus("Enviando codigo...");
+
+    const response = await sendMessage({
+      type: "lock:sendCode",
+      recipientKey
+    });
+
+    if (!response?.ok) {
+      updateStatus(response?.error || "Nao foi possivel enviar o codigo.");
+      return;
+    }
+
+    applyLockState(response?.state || null);
+
+    if (elements.input) {
+      elements.input.focus();
+    }
+  }
+
+  async function chooseRecipient() {
+    const picker = elements.recipientPicker;
+
+    if (!picker) {
+      return "";
+    }
+
+    picker.style.display = "none";
+    picker.textContent = "";
+
+    updateStatus("Carregando destinatarios...");
+    const response = await sendMessage({ type: "lock:listRecipients" });
+
+    if (!response?.ok) {
+      updateStatus(response?.error || "Nao foi possivel carregar os destinatarios.");
+      return null;
+    }
+
+    const recipients = Array.isArray(response.recipients) ? response.recipients : [];
+
+    if (recipients.length === 0) {
+      return "";
+    }
+
+    if (recipients.length === 1) {
+      return String(recipients[0]?.key || "");
+    }
+
+    picker.innerHTML = `
+      <p>Escolha o destinatario:</p>
+      <div id="recipient-actions">
+        ${recipients.map((item) => `
+          <button class="secondary" type="button" data-key="${escapeAttribute(item.key)}">
+            ${escapeHtml(item.label || item.key)}
+          </button>
+        `).join("")}
+        <button class="secondary" type="button" data-cancel="true">Cancelar</button>
+      </div>
+    `;
+    picker.style.display = "block";
+
+    return new Promise((resolve) => {
+      const onClick = (event) => {
+        const target = event.target;
+
+        if (!(target instanceof HTMLElement)) {
+          return;
+        }
+
+        const cancel = target.getAttribute("data-cancel");
+        const key = target.getAttribute("data-key");
+
+        if (!cancel && !key) {
+          return;
+        }
+
+        picker.removeEventListener("click", onClick);
+        picker.style.display = "none";
+        picker.textContent = "";
+
+        if (cancel) {
+          updateStatus("Envio cancelado.");
+          resolve(null);
+          return;
+        }
+
+        resolve(String(key || ""));
+      };
+
+      picker.addEventListener("click", onClick);
+    });
+  }
+
+  function setUnlockedMode(unlocked, siteAccessGranted = true) {
+    if (elements.input) {
+      elements.input.disabled = unlocked || !siteAccessGranted;
+      elements.input.value = unlocked ? "" : elements.input.value;
+    }
+
+    if (elements.requestAccessButton) {
+      elements.requestAccessButton.style.display = unlocked || siteAccessGranted ? "none" : "inline-flex";
+      elements.requestAccessButton.disabled = unlocked;
+    }
+
+    if (elements.primaryButton) {
+      elements.primaryButton.disabled = unlocked || !siteAccessGranted;
+      elements.primaryButton.textContent = unlocked
+        ? "Acesso liberado"
+        : siteAccessGranted
+          ? "Liberar acesso"
+          : "Permissao necessaria";
+    }
+
+    if (elements.postUnlock) {
+      elements.postUnlock.style.display = unlocked ? "block" : "none";
+    }
+
+    if (elements.description) {
+      elements.description.textContent = siteAccessGranted
+        ? "Esta sessao fica bloqueada em uma aba interna da extensao ate que o codigo correto seja validado."
+        : 'Ative "Em todos os sites" nas permissoes da extensao para liberar o envio e a validacao do codigo nesta sessao.';
+    }
+  }
+
+  function updateStatus(text) {
+    if (elements.status) {
+      elements.status.textContent = text;
+    }
+  }
+
+  function formatExpiration(expiresAt) {
+    if (!expiresAt) {
+      return "";
+    }
+
+    return ` Expira em ${new Date(expiresAt).toLocaleTimeString()}.`;
+  }
+
+  function sendMessage(message) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(message, (response) => {
+        if (chrome.runtime.lastError) {
+          resolve({
+            ok: false,
+            error: chrome.runtime.lastError.message || "Falha ao comunicar com a extensao."
+          });
+          return;
+        }
+
+        resolve(response);
+      });
+    });
+  }
+
+  async function refreshLockState() {
+    const response = await sendMessage({ type: "lock:getState" });
+    applyLockState(response);
+  }
+
+  function startPermissionPolling() {
+    if (permissionPollId !== null) {
+      return;
+    }
+
+    permissionPollId = globalThis.setInterval(async () => {
+      const response = await sendMessage({ type: "lock:getState" });
+
+      if (response?.siteAccessGranted !== false) {
+        applyLockState(response);
+      }
+    }, 2000);
+  }
+
+  function stopPermissionPolling() {
+    if (permissionPollId === null) {
+      return;
+    }
+
+    globalThis.clearInterval(permissionPollId);
+    permissionPollId = null;
+  }
+
+  function escapeHtml(value) {
+    return String(value || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  function escapeAttribute(value) {
+    return escapeHtml(value).replaceAll("`", "&#96;");
   }
 })();
