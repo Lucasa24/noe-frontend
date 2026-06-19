@@ -12,7 +12,8 @@
     submitButton: null,
     recipientPicker: null,
     stopEvents: null,
-    permissionPollId: null
+    permissionPollId: null,
+    recipientPickerReady: false
   };
 
   window.__BROWSER_READ_ANY_SITE__ = state;
@@ -166,24 +167,24 @@
       <div id="bras-lock-card">
         <h1>Navegador bloqueado</h1>
         <p id="bras-lock-description">
-          Clique em "Liberar acesso" para escolher um destinatario e enviar o codigo. Depois cole o codigo recebido para liberar a navegacao nesta sessao.
+          Escolha o destinatario abaixo para receber o codigo e depois valide-o para liberar a navegacao nesta sessao.
         </p>
         <input id="bras-lock-input" type="password" inputmode="numeric" autocomplete="one-time-code" placeholder="Cole o codigo recebido" />
         <div id="bras-lock-actions">
-          <button id="bras-lock-submit" class="bras-primary" type="button">Liberar acesso</button>
+          <button id="bras-lock-submit" class="bras-primary" type="button">Validar codigo</button>
         </div>
         <div id="bras-lock-recipient-picker"></div>
         <div id="bras-lock-status"></div>
       </div>
     `;
 
-    overlay.querySelector("#bras-lock-submit").addEventListener("click", handlePrimaryAction);
+    overlay.querySelector("#bras-lock-submit").addEventListener("click", handleSubmitCode);
 
     const input = overlay.querySelector("#bras-lock-input");
     input.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
         event.preventDefault();
-        void handlePrimaryAction();
+        void handleSubmitCode();
       }
     });
 
@@ -260,6 +261,8 @@
     setInteractionMode(siteAccessGranted);
 
     if (!siteAccessGranted) {
+      state.recipientPickerReady = false;
+      hideRecipientPicker();
       startPermissionPolling();
       updateStatus('Ative "Em todos os sites" nas permissoes da extensao para continuar.');
       return;
@@ -268,9 +271,13 @@
     stopPermissionPolling();
 
     if (!lockState?.configured) {
+      state.recipientPickerReady = false;
+      hideRecipientPicker();
       updateStatus("Configure o webhook e o token. O email de destino fica vinculado ao ID da extensao no servidor.");
       return;
     }
+
+    void ensureRecipientPicker();
 
     if (lockState.sendStatus === "failed") {
       updateStatus(`Falha ao enviar o codigo: ${lockState.lastError || "erro desconhecido"}`);
@@ -289,7 +296,7 @@
     }
 
     if (lockState.sendStatus === "idle") {
-      updateStatus('Clique em "Liberar acesso" para solicitar um novo codigo.');
+      updateStatus("Escolha o destinatario abaixo para solicitar um novo codigo.");
       return;
     }
 
@@ -301,7 +308,7 @@
     updateStatus("Aguardando solicitacao do codigo.");
   }
 
-  async function handlePrimaryAction() {
+  async function handleSubmitCode() {
     if (state.submitButton?.disabled) {
       return;
     }
@@ -309,7 +316,7 @@
     const code = String(state.input?.value || "").trim();
 
     if (!code) {
-      await requestCode();
+      updateStatus("Escolha um destinatario abaixo para receber o codigo.");
       return;
     }
 
@@ -329,13 +336,7 @@
     unlockDocument();
   }
 
-  async function requestCode() {
-    const recipientKey = await chooseRecipient();
-
-    if (recipientKey === null) {
-      return;
-    }
-
+  async function requestCode(recipientKey) {
     updateStatus("Enviando codigo...");
     const response = await sendMessage({
       type: "lock:sendCode",
@@ -351,32 +352,40 @@
     state.input?.focus();
   }
 
-  async function chooseRecipient() {
+  async function ensureRecipientPicker() {
     const picker = state.recipientPicker;
 
-    if (!picker) {
-      return "";
+    if (!picker || state.recipientPickerReady) {
+      return;
     }
-
-    picker.style.display = "none";
-    picker.textContent = "";
 
     updateStatus("Carregando destinatarios...");
     const response = await sendMessage({ type: "lock:listRecipients" });
 
     if (!response?.ok) {
+      state.recipientPickerReady = false;
+      hideRecipientPicker();
       updateStatus(response?.error || "Nao foi possivel carregar os destinatarios.");
-      return null;
+      return;
     }
 
     const recipients = Array.isArray(response.recipients) ? response.recipients : [];
 
     if (recipients.length === 0) {
-      return "";
+      state.recipientPickerReady = true;
+      renderRecipientPicker([{ key: "", label: "Enviar codigo" }]);
+      return;
     }
 
-    if (recipients.length === 1) {
-      return String(recipients[0]?.key || "");
+    state.recipientPickerReady = true;
+    renderRecipientPicker(recipients);
+  }
+
+  function renderRecipientPicker(recipients) {
+    const picker = state.recipientPicker;
+
+    if (!picker) {
+      return;
     }
 
     picker.innerHTML = `
@@ -387,41 +396,37 @@
             ${escapeHtml(item.label || item.key)}
           </button>
         `).join("")}
-        <button class="bras-secondary" type="button" data-cancel="true">Cancelar</button>
       </div>
     `;
     picker.style.display = "block";
 
-    return new Promise((resolve) => {
-      const onClick = (event) => {
-        const target = event.target;
+    picker.onclick = (event) => {
+      const target = event.target;
 
-        if (!(target instanceof HTMLElement)) {
-          return;
-        }
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
 
-        const cancel = target.getAttribute("data-cancel");
-        const key = target.getAttribute("data-key");
+      const key = target.getAttribute("data-key");
 
-        if (!cancel && !key) {
-          return;
-        }
+      if (key === null) {
+        return;
+      }
 
-        picker.removeEventListener("click", onClick);
-        picker.style.display = "none";
-        picker.textContent = "";
+      void requestCode(String(key || ""));
+    };
+  }
 
-        if (cancel) {
-          updateStatus("Envio cancelado.");
-          resolve(null);
-          return;
-        }
+  function hideRecipientPicker() {
+    const picker = state.recipientPicker;
 
-        resolve(String(key || ""));
-      };
+    if (!picker) {
+      return;
+    }
 
-      picker.addEventListener("click", onClick);
-    });
+    picker.style.display = "none";
+    picker.textContent = "";
+    picker.onclick = null;
   }
 
   function updateStatus(text) {
@@ -437,12 +442,12 @@
 
     if (state.submitButton) {
       state.submitButton.disabled = !siteAccessGranted;
-      state.submitButton.textContent = siteAccessGranted ? "Liberar acesso" : "Permissao necessaria";
+      state.submitButton.textContent = siteAccessGranted ? "Validar codigo" : "Permissao necessaria";
     }
 
     if (state.descriptionText) {
       state.descriptionText.textContent = siteAccessGranted
-        ? 'Clique em "Liberar acesso" para escolher um destinatario e enviar o codigo. Depois cole o codigo recebido para liberar a navegacao nesta sessao.'
+        ? "Escolha o destinatario abaixo para receber o codigo e depois valide-o para liberar a navegacao nesta sessao."
         : 'Ative "Em todos os sites" nas permissoes da extensao para liberar o envio e a validacao do codigo nesta sessao.';
     }
   }

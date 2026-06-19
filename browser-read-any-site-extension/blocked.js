@@ -3,12 +3,13 @@
     description: document.querySelector("#description"),
     input: document.querySelector("#code-input"),
     requestAccessButton: document.querySelector("#request-access-action"),
-    primaryButton: document.querySelector("#primary-action"),
+    submitButton: document.querySelector("#submit-action"),
     recipientPicker: document.querySelector("#recipient-picker"),
     status: document.querySelector("#status"),
     postUnlock: document.querySelector("#post-unlock")
   };
   let permissionPollId = null;
+  let recipientPickerReady = false;
 
   init().catch((error) => {
     updateStatus(`Falha ao iniciar o bloqueio: ${error.message}`);
@@ -22,8 +23,8 @@
     void refreshLockState();
   });
 
-  elements.primaryButton?.addEventListener("click", () => {
-    void handlePrimaryAction();
+  elements.submitButton?.addEventListener("click", () => {
+    void handleSubmitCode();
   });
 
   elements.requestAccessButton?.addEventListener("click", () => {
@@ -36,7 +37,7 @@
     }
 
     event.preventDefault();
-    void handlePrimaryAction();
+    void handleSubmitCode();
   });
 
   async function init() {
@@ -63,6 +64,8 @@
     setUnlockedMode(false, siteAccessGranted);
 
     if (!siteAccessGranted) {
+      recipientPickerReady = false;
+      hideRecipientPicker();
       startPermissionPolling();
       updateStatus('Ative "Em todos os sites" nas permissoes da extensao para continuar.');
       return;
@@ -71,9 +74,13 @@
     stopPermissionPolling();
 
     if (!lockState?.configured) {
+      recipientPickerReady = false;
+      hideRecipientPicker();
       updateStatus("Configure o webhook antes de solicitar o codigo.");
       return;
     }
+
+    void ensureRecipientPicker();
 
     if (lockState.sendStatus === "failed") {
       updateStatus(`Falha ao enviar o codigo: ${lockState.lastError || "erro desconhecido"}`);
@@ -91,7 +98,7 @@
     }
 
     if (lockState.sendStatus === "idle") {
-      updateStatus('Clique em "Liberar acesso" para solicitar um novo codigo.');
+      updateStatus("Escolha o destinatario abaixo para solicitar um novo codigo.");
       return;
     }
 
@@ -103,15 +110,15 @@
     updateStatus("Aguardando solicitacao do codigo.");
   }
 
-  async function handlePrimaryAction() {
-    if (elements.primaryButton?.disabled) {
+  async function handleSubmitCode() {
+    if (elements.submitButton?.disabled) {
       return;
     }
 
     const code = String(elements.input?.value || "").trim();
 
     if (!code) {
-      await requestCode();
+      updateStatus("Escolha um destinatario abaixo para receber o codigo.");
       return;
     }
 
@@ -154,13 +161,7 @@
     elements.requestAccessButton.disabled = false;
   }
 
-  async function requestCode() {
-    const recipientKey = await chooseRecipient();
-
-    if (recipientKey === null) {
-      return;
-    }
-
+  async function requestCode(recipientKey) {
     updateStatus("Enviando codigo...");
 
     const response = await sendMessage({
@@ -180,32 +181,44 @@
     }
   }
 
-  async function chooseRecipient() {
+  async function ensureRecipientPicker() {
+    if (recipientPickerReady) {
+      return;
+    }
+
     const picker = elements.recipientPicker;
 
     if (!picker) {
-      return "";
+      return;
     }
-
-    picker.style.display = "none";
-    picker.textContent = "";
 
     updateStatus("Carregando destinatarios...");
     const response = await sendMessage({ type: "lock:listRecipients" });
 
     if (!response?.ok) {
+      recipientPickerReady = false;
+      hideRecipientPicker();
       updateStatus(response?.error || "Nao foi possivel carregar os destinatarios.");
-      return null;
+      return;
     }
 
     const recipients = Array.isArray(response.recipients) ? response.recipients : [];
 
     if (recipients.length === 0) {
-      return "";
+      recipientPickerReady = true;
+      renderRecipientPicker([{ key: "", label: "Enviar codigo" }]);
+      return;
     }
 
-    if (recipients.length === 1) {
-      return String(recipients[0]?.key || "");
+    recipientPickerReady = true;
+    renderRecipientPicker(recipients);
+  }
+
+  function renderRecipientPicker(recipients) {
+    const picker = elements.recipientPicker;
+
+    if (!picker) {
+      return;
     }
 
     picker.innerHTML = `
@@ -216,41 +229,37 @@
             ${escapeHtml(item.label || item.key)}
           </button>
         `).join("")}
-        <button class="secondary" type="button" data-cancel="true">Cancelar</button>
       </div>
     `;
     picker.style.display = "block";
 
-    return new Promise((resolve) => {
-      const onClick = (event) => {
-        const target = event.target;
+    picker.onclick = (event) => {
+      const target = event.target;
 
-        if (!(target instanceof HTMLElement)) {
-          return;
-        }
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
 
-        const cancel = target.getAttribute("data-cancel");
-        const key = target.getAttribute("data-key");
+      const key = target.getAttribute("data-key");
 
-        if (!cancel && !key) {
-          return;
-        }
+      if (key === null) {
+        return;
+      }
 
-        picker.removeEventListener("click", onClick);
-        picker.style.display = "none";
-        picker.textContent = "";
+      void requestCode(String(key || ""));
+    };
+  }
 
-        if (cancel) {
-          updateStatus("Envio cancelado.");
-          resolve(null);
-          return;
-        }
+  function hideRecipientPicker() {
+    const picker = elements.recipientPicker;
 
-        resolve(String(key || ""));
-      };
+    if (!picker) {
+      return;
+    }
 
-      picker.addEventListener("click", onClick);
-    });
+    picker.style.display = "none";
+    picker.textContent = "";
+    picker.onclick = null;
   }
 
   function setUnlockedMode(unlocked, siteAccessGranted = true) {
@@ -264,12 +273,12 @@
       elements.requestAccessButton.disabled = unlocked;
     }
 
-    if (elements.primaryButton) {
-      elements.primaryButton.disabled = unlocked || !siteAccessGranted;
-      elements.primaryButton.textContent = unlocked
+    if (elements.submitButton) {
+      elements.submitButton.disabled = unlocked || !siteAccessGranted;
+      elements.submitButton.textContent = unlocked
         ? "Acesso liberado"
         : siteAccessGranted
-          ? "Liberar acesso"
+          ? "Validar codigo"
           : "Permissao necessaria";
     }
 
@@ -279,7 +288,7 @@
 
     if (elements.description) {
       elements.description.textContent = siteAccessGranted
-        ? "Esta sessao fica bloqueada em uma aba interna da extensao ate que o codigo correto seja validado."
+        ? "Escolha o destinatario abaixo para receber o codigo e depois valide-o para liberar esta sessao."
         : 'Ative "Em todos os sites" nas permissoes da extensao para liberar o envio e a validacao do codigo nesta sessao.';
     }
   }
