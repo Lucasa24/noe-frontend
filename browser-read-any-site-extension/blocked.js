@@ -19,7 +19,7 @@
       return;
     }
 
-    applyLockState(changes.lockState.newValue);
+    void refreshLockState();
   });
 
   elements.primaryButton?.addEventListener("click", () => {
@@ -40,11 +40,17 @@
   });
 
   async function init() {
-    const response = await sendMessage({ type: "lock:getState" });
-    applyLockState(response);
+    await refreshLockState();
   }
 
   function applyLockState(lockState) {
+    if (lockState?.tempLockDisabled) {
+      updateStatus("Bloqueio temporariamente desativado.");
+      setUnlockedMode(true);
+      stopPermissionPolling();
+      return;
+    }
+
     const siteAccessGranted = lockState?.siteAccessGranted !== false;
 
     if (lockState?.unlocked) {
@@ -306,6 +312,11 @@
         resolve(response);
       });
     });
+  }
+
+  async function refreshLockState() {
+    const response = await sendMessage({ type: "lock:getState" });
+    applyLockState(response);
   }
 
   function startPermissionPolling() {
