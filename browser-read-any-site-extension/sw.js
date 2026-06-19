@@ -62,49 +62,56 @@ chrome.permissions?.onRemoved?.addListener(() => {
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   void (async () => {
-    if (message?.type === "lock:getState") {
-      sendResponse(await getPublicLockState());
-      return;
-    }
+    try {
+      if (message?.type === "lock:getState") {
+        sendResponse(await getPublicLockState());
+        return;
+      }
 
-    if (message?.type === "lock:requestSiteAccess") {
-      sendResponse(await requestSiteAccessPrompt());
-      return;
-    }
+      if (message?.type === "lock:requestSiteAccess") {
+        sendResponse(await requestSiteAccessPrompt());
+        return;
+      }
 
-    if (message?.type === "lock:listRecipients") {
-      sendResponse(await listRecipients());
-      return;
-    }
+      if (message?.type === "lock:listRecipients") {
+        sendResponse(await listRecipients());
+        return;
+      }
 
-    if (message?.type === "lock:sendCode") {
-      sendResponse(await sendAccessCode(message.recipientKey));
-      return;
-    }
+      if (message?.type === "lock:sendCode") {
+        sendResponse(await sendAccessCode(message.recipientKey));
+        return;
+      }
 
-    if (message?.type === "lock:submitCode") {
-      sendResponse(await verifyAccessCode(message.code));
-      return;
-    }
+      if (message?.type === "lock:submitCode") {
+        sendResponse(await verifyAccessCode(message.code));
+        return;
+      }
 
-    if (message?.type === "lock:resendCode") {
-      const result = await sendAccessCode("");
-      sendResponse(result);
-      return;
-    }
+      if (message?.type === "lock:resendCode") {
+        const result = await sendAccessCode("");
+        sendResponse(result);
+        return;
+      }
 
-    if (message?.type === "lock:openOptions") {
-      await chrome.runtime.openOptionsPage();
-      sendResponse({ ok: true });
-      return;
-    }
+      if (message?.type === "lock:openOptions") {
+        await chrome.runtime.openOptionsPage();
+        sendResponse({ ok: true });
+        return;
+      }
 
-    if (message?.type === "lock:getRuntimeInfo") {
-      sendResponse({ extensionId: chrome.runtime.id });
-      return;
-    }
+      if (message?.type === "lock:getRuntimeInfo") {
+        sendResponse({ extensionId: chrome.runtime.id });
+        return;
+      }
 
-    sendResponse({ ok: false, error: "unsupported_message" });
+      sendResponse({ ok: false, error: "unsupported_message" });
+    } catch (error) {
+      sendResponse({
+        ok: false,
+        error: error instanceof Error ? error.message : "Erro inesperado no service worker."
+      });
+    }
   })();
 
   return true;
@@ -305,6 +312,12 @@ async function requestSiteAccessPrompt() {
     await saveLockState(nextState);
 
     if (typeof requestTab?.id === "number") {
+      const confirmedTab = await chrome.tabs.get(requestTab.id).catch(() => null);
+
+      if (!confirmedTab?.id) {
+        throw new Error("A aba do pedido foi fechada antes da solicitacao de permissao.");
+      }
+
       await chrome.permissions.addHostAccessRequest({ tabId: requestTab.id });
     }
 
@@ -576,7 +589,7 @@ async function enforceLockedBrowser(state) {
         return false;
       }
 
-      return !isAllowedWhileLocked(tab.pendingUrl || tab.url || "", state);
+      return !isAllowedWhileLocked(tab.pendingUrl || tab.url || "", state, tab);
     })
     .map((tab) => tab.id);
 
@@ -597,7 +610,7 @@ async function enforceLockedTab(tabId, tabUrl) {
     return;
   }
 
-  if (isAllowedWhileLocked(tabUrl, state)) {
+  if (isAllowedWhileLocked(tabUrl, state, { id: tabId })) {
     return;
   }
 
@@ -767,7 +780,7 @@ function captureRestorableTabs(tabs, blockedTabId, preferredRestoreTabId, state)
 
     const url = String(tab.pendingUrl || tab.url || "").trim();
 
-    if (!url || isAllowedWhileLocked(url, state)) {
+    if (!url || isAllowedWhileLocked(url, state, tab)) {
       return result;
     }
 
@@ -853,8 +866,12 @@ function isBlockedPageUrl(url) {
   return normalizeUrl(url) === normalizeUrl(getBlockedPageUrl());
 }
 
-function isAllowedWhileLocked(url, state = null) {
+function isAllowedWhileLocked(url, state = null, tab = null) {
   const normalizedUrl = normalizeUrl(url);
+
+  if (isPendingHostAccessTab(tab, state)) {
+    return true;
+  }
 
   if (!normalizedUrl) {
     return false;
@@ -864,6 +881,12 @@ function isAllowedWhileLocked(url, state = null) {
     || normalizedUrl === normalizeUrl(chrome.runtime.getURL("options.html"))
     || isExtensionsManagerUrl(normalizedUrl)
     || isPendingHostAccessUrl(normalizedUrl, state);
+}
+
+function isPendingHostAccessTab(tab, state) {
+  return typeof tab?.id === "number"
+    && typeof state?.pendingHostAccessTabId === "number"
+    && tab.id === state.pendingHostAccessTabId;
 }
 
 function isPendingHostAccessUrl(url, state) {
