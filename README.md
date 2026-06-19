@@ -1,222 +1,36 @@
-# Browser Read Any Site
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-Extensao para Chrome/Edge com permissao de leitura em qualquer site e bloqueio de navegacao por codigo temporario.
+## Getting Started
 
-## O que ela faz agora
+First, run the development server:
 
-- Continua declarando `host_permissions` com `<all_urls>`.
-- Injeta `content.js` em qualquer site e mostra uma tela de bloqueio no topo da pagina.
-- Invalida a liberacao anterior quando o navegador e aberto de novo, exigindo um novo codigo a cada nova sessao do navegador.
-- Solicita o envio do codigo somente quando o usuario clica em `Liberar acesso` (com o campo de codigo vazio) e escolhe um destinatario.
-- Envia o codigo para um webhook HTTP configurado, para que o seu backend encaminhe o email para o destinatario selecionado.
-- Libera a navegacao apenas depois que o usuario cola o codigo correto na tela de bloqueio.
-- Mostra badge `LOCK`, `OPEN`, `CFG` ou `ERR` para indicar o estado atual.
-
-## Backend Vercel com Google Workspace SMTP
-
-O backend agora deve ser publicado a partir da pasta raiz `browser-read-any-site-extension`.
-
-Esta subpasta fica responsavel apenas pelos arquivos da extensao desta comunidade.
-
-O projeto unico da Vercel expõe:
-
-- `POST /api/send-code`
-- `POST /api/verify-code`
-- `POST /api/recipients`
-- `GET /api/health`
-
-O fluxo de producao funciona assim:
-
-1. A extensao chama `send-code`.
-2. O servidor gera o codigo, define expiracao e assina um desafio stateless.
-3. O servidor envia o codigo por email via Google Workspace SMTP.
-4. A extensao guarda apenas o desafio assinado.
-5. Quando o usuario cola o codigo, a extensao chama `verify-code`.
-6. O servidor valida assinatura, expiracao e codigo antes de liberar.
-
-### Variaveis de ambiente
-
-Crie as variaveis abaixo na Vercel:
-
-```env
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=465
-SMTP_SECURE=true
-SMTP_USER=seu-email@seudominio.com
-SMTP_PASS=sua-senha-ou-app-password
-MAIL_FROM="Acesso do Navegador <seu-email@seudominio.com>"
-ALERT_EMAIL_TO=seu-email-admin@gmail.com
-ALERT_EMAIL_FROM="Alerta de Desbloqueio <seu-email@seudominio.com>"
-WEBHOOK_TOKEN=troque-por-um-token-forte
-SIGNING_SECRET=troque-por-uma-chave-longa-e-aleatoria
-CODE_TTL_MINUTES=10
-ALLOWED_EXTENSION_IDS=
-EXTENSION_EMAIL_MAP={"abcdefghijklmnopabcdefghijklmnop":{"andre":"andre@gmail.com","maria":"maria@gmail.com"},"qrstuvwxyzabcdefqrstuvwxyzabcdef":"email2@gmail.com"}
-WHATSAPP_PROVIDER=meta
-WHATSAPP_TOKEN=seu-token-da-meta
-WHATSAPP_PHONE_NUMBER_ID=seu-phone-number-id
-WHATSAPP_ADMIN_TO=5511999999999
-WHATSAPP_TEMPLATE_NAME=
-WHATSAPP_TEMPLATE_LANGUAGE=pt_BR
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-Pode colocar esses valores diretamente nas variaveis de ambiente da Vercel. Nao envie o arquivo `.env` para o repositorio.
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-### Alerta administrativo por email
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-Enquanto o WhatsApp nao estiver pronto, o backend tambem pode enviar um alerta administrativo por email.
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-Variaveis:
+## Learn More
 
-- `ALERT_EMAIL_TO`: email que vai receber o alerta administrativo
-- `ALERT_EMAIL_FROM`: opcional; remetente do alerta administrativo
+To learn more about Next.js, take a look at the following resources:
 
-Se `ALERT_EMAIL_TO` estiver preenchido, toda vez que um codigo for gerado o backend envia um segundo email com:
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-- `ID da extensao`
-- `Email destino`
-- `Codigo`
-- `Motivo`
-- `Gerado em`
-- `Expira em`
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-Se esse alerta falhar, o envio principal do codigo para o usuario continua funcionando normalmente.
+## Deploy on Vercel
 
-### Alerta no WhatsApp
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-O backend agora pode enviar um alerta para o seu WhatsApp toda vez que um codigo for gerado.
-
-Variaveis:
-
-- `WHATSAPP_PROVIDER=meta`
-- `WHATSAPP_TOKEN`: token da WhatsApp Cloud API
-- `WHATSAPP_PHONE_NUMBER_ID`: identificador do numero configurado na Meta
-- `WHATSAPP_ADMIN_TO`: seu numero no formato internacional, por exemplo `5511999999999`
-- `WHATSAPP_TEMPLATE_NAME`: opcional; se preencher, o backend envia template em vez de texto simples
-- `WHATSAPP_TEMPLATE_LANGUAGE`: opcional; padrao `pt_BR`
-
-Sem `WHATSAPP_TEMPLATE_NAME`, o backend tenta enviar uma mensagem de texto simples com:
-
-- `ID da extensao`
-- `Email destino`
-- `Codigo`
-- `Motivo`
-- `Gerado em`
-- `Expira em`
-
-Com `WHATSAPP_TEMPLATE_NAME`, o backend envia um template com 5 parametros nesta ordem:
-
-1. `extensionId`
-2. `recipientEmail`
-3. `code`
-4. `reason`
-5. `expiresAt`
-
-O envio do WhatsApp e adicional: se ele falhar, o email continua sendo enviado normalmente.
-
-### Mapeamento por ID da extensao
-
-Agora o email de destino pode ficar preso ao `ID da extensao` no backend.
-
-Exemplo:
-
-```env
-EXTENSION_EMAIL_MAP={"abcdefghijklmnopabcdefghijklmnop":{"andre":"andre@gmail.com","maria":"maria@gmail.com"},"qrstuvwxyzabcdefqrstuvwxyzabcdef":"email2@gmail.com"}
-```
-
-Com isso:
-
-- se a extensao com ID `abcdefghijklmnopabcdefghijklmnop` pedir um codigo com `recipientKey: "andre"`, o email vai para `andre@gmail.com`
-- se a extensao com ID `abcdefghijklmnopabcdefghijklmnop` pedir um codigo com `recipientKey: "maria"`, o email vai para `maria@gmail.com`
-- se a extensao com ID `qrstuvwxyzabcdefqrstuvwxyzabcdef` pedir um codigo, o email vai para `email2@gmail.com`
-
-O frontend da extensao nao precisa mais salvar o email de destino localmente.
-
-### Deploy na Vercel
-
-1. Suba a pasta raiz `browser-read-any-site-extension` para um repositorio Git.
-2. Importe o projeto na Vercel usando a raiz do projeto unico.
-3. Adicione as variaveis de ambiente acima.
-4. A Vercel vai instalar `nodemailer` a partir do `package.json` da raiz.
-5. Depois do deploy, use a URL:
-   - `https://seu-projeto.vercel.app/api/send-code`
-6. Teste:
-   - `https://seu-projeto.vercel.app/api/health`
-
-### Configuracao na extensao
-
-Na pagina de opcoes da extensao, preencha:
-
-- `Webhook de envio`: `https://seu-projeto.vercel.app/api/send-code`
-- `Token do webhook`: o mesmo valor definido em `WEBHOOK_TOKEN`
-
-## Seguranca recomendada
-
-- Defina `SIGNING_SECRET` com um valor longo e aleatorio.
-- Defina `WEBHOOK_TOKEN` com um valor forte e preencha o mesmo token na extensao.
-- Se quiser restringir a instalacao de producao, preencha `ALLOWED_EXTENSION_IDS` com o ID final da extensao na Chrome Web Store ou no navegador alvo.
-- Use `CODE_TTL_MINUTES` para expirar o codigo rapido, por exemplo `5` ou `10`.
-
-## Como configurar
-
-1. Abra `chrome://extensions/` ou `edge://extensions/`.
-2. Ative `Modo do desenvolvedor`.
-3. Clique em `Carregar sem compactacao`.
-4. Selecione a pasta `comunidade-invictus-browser-read-any-site-extension`.
-5. Abra os detalhes da extensao e entre em `Pagina de opcoes`.
-6. Configure:
-   - `Webhook de envio`
-   - `Token do webhook` (opcional)
-
-## Payload enviado ao webhook
-
-O service worker envia um `POST` JSON semelhante a este para `send-code`:
-
-```json
-{
-  "extensionId": "abcdefghijklmnopabcdefghijklmnop",
-  "reason": "manual_request",
-  "recipientKey": "andre"
-}
-```
-
-Para listar os destinatarios disponiveis para a extensao, a extensao chama `recipients`:
-
-```json
-{
-  "extensionId": "abcdefghijklmnopabcdefghijklmnop"
-}
-```
-
-Resposta esperada de `send-code`:
-
-```json
-{
-  "ok": true,
-  "challengeToken": "token-assinado",
-  "expiresAt": 1760000000000,
-  "recipientEmail": "ex***@gmail.com"
-}
-```
-
-Payload enviado para `verify-code`:
-
-```json
-{
-  "challengeToken": "token-assinado",
-  "code": "123456",
-  "extensionId": "abcdefghijklmnopabcdefghijklmnop"
-}
-```
-
-## Observacoes sobre Google Workspace SMTP
-
-- O envio usa normalmente `smtp.gmail.com`.
-- Em muitos casos, voce vai usar uma `App Password` da conta Google Workspace.
-- Dependendo das politicas do seu Workspace, o admin pode precisar liberar esse modo de autenticacao ou voce pode optar por relay SMTP do dominio.
-
-## Limitacoes importantes
-
-- Extensoes comuns nao conseguem bloquear, ler, habilitar ou desabilitar outras extensoes instaladas no navegador.
-- Esta implementacao bloqueia a navegacao nas paginas comuns abertas pelo navegador, mas nao controla extensoes de terceiros.
-- O envio automatico de email exige um backend ou automacao externa; o navegador sozinho nao oferece um SMTP confiavel e seguro para isso.
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
