@@ -5,7 +5,7 @@ const SESSION_KEY = "browserSessionId";
 const DEFAULT_WEBHOOK_URL = "https://noe-frontend.vercel.app/api/send-code";
 const DEFAULT_WEBHOOK_TOKEN = "b4b7f9f9e7c64f3d9c1a8d2f6e3b7a91";
 const BLOCKED_PAGE_PATH = "blocked.html";
-const TEMP_DISABLE_BROWSER_LOCK = true;
+const TEMP_DISABLE_BROWSER_LOCK = false;
 
 chrome.runtime.onInstalled.addListener(() => {
   void bootstrapLock("installed");
