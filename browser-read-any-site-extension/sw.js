@@ -231,10 +231,11 @@ async function getPublicLockState() {
 
   if (!state) {
     return {
-      unlocked: false,
+      unlocked: TEMP_DISABLE_BROWSER_LOCK,
       configured: false,
       extensionId: chrome.runtime.id,
-      siteAccessGranted
+      siteAccessGranted,
+      tempLockDisabled: TEMP_DISABLE_BROWSER_LOCK
     };
   }
 
@@ -244,7 +245,7 @@ async function getPublicLockState() {
 function toPublicLockState(state, options = {}) {
   const siteAccessGranted = options.siteAccessGranted !== false;
   return {
-    unlocked: Boolean(state.unlocked) && siteAccessGranted,
+    unlocked: TEMP_DISABLE_BROWSER_LOCK || (Boolean(state.unlocked) && siteAccessGranted),
     configured: Boolean(state.sendStatus !== "not_configured"),
     recipientEmail: state.maskedRecipientEmail || maskEmail(state.recipientEmail),
     extensionId: state.extensionId,
@@ -252,7 +253,8 @@ function toPublicLockState(state, options = {}) {
     sendStatus: state.sendStatus,
     lastError: state.lastError || "",
     siteAccessGranted,
-    pendingHostAccessUrl: state.pendingHostAccessUrl || ""
+    pendingHostAccessUrl: state.pendingHostAccessUrl || "",
+    tempLockDisabled: TEMP_DISABLE_BROWSER_LOCK
   };
 }
 
