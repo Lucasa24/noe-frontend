@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Navegador bloqueado</title>
+    <title>Pagina interna da extensao</title>
     <style>
       :root {
         color-scheme: dark;
@@ -25,7 +25,7 @@
         font-family: Arial, sans-serif;
       }
 
-      #blocked-card {
+      #info-card {
         width: min(440px, 100%);
         border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 16px;
@@ -45,22 +45,11 @@
         color: #d8dee9;
       }
 
-      input {
-        width: 100%;
-        margin: 12px 0;
-        padding: 12px 14px;
-        border-radius: 10px;
-        border: 1px solid #374151;
-        background: #0f172a;
-        color: #f8fafc;
-        font-size: 16px;
-      }
-
-      #blocked-actions,
-      #recipient-actions {
+      #page-actions {
         display: flex;
         gap: 10px;
         flex-wrap: wrap;
+        margin-top: 18px;
       }
 
       button {
@@ -82,51 +71,26 @@
         border: 1px solid #374151;
       }
 
-      #recipient-picker {
-        display: none;
-        margin-top: 14px;
-        padding: 12px;
-        border-radius: 12px;
-        border: 1px solid #374151;
-        background: rgba(15, 23, 42, 0.9);
-      }
-
-      #recipient-picker p {
-        margin-bottom: 10px;
-      }
-
       #status {
         min-height: 22px;
         margin-top: 12px;
-        color: #fbbf24;
+        color: #93c5fd;
         font-size: 14px;
-      }
-
-      #post-unlock {
-        display: none;
-        margin-top: 16px;
-        padding: 12px;
-        border-radius: 12px;
-        background: rgba(37, 99, 235, 0.12);
-        border: 1px solid rgba(96, 165, 250, 0.25);
-        color: #dbeafe;
       }
     </style>
   </head>
   <body>
-    <main id="blocked-card">
-      <h1>Navegador bloqueado</h1>
+    <main id="info-card">
+      <h1>Pagina interna da extensao</h1>
       <p id="description">
-        Esta sessao fica bloqueada em uma aba interna da extensao ate que o codigo correto seja validado.
+        A `blocked.html` nao faz mais bloqueio. Esta pagina agora serve apenas como atalho de manutencao da extensao.
       </p>
-      <input id="code-input" type="password" inputmode="numeric" autocomplete="one-time-code" placeholder="Cole o codigo recebido" />
-      <div id="blocked-actions">
-        <button id="request-access-action" class="secondary" type="button" style="display: none;">Liberar agora</button>
-        <button id="primary-action" class="primary" type="button">Liberar acesso</button>
+      <div id="page-actions">
+        <button id="options-action" class="primary" type="button">Abrir configuracoes</button>
+        <button id="extensions-action" class="secondary" type="button">Abrir extensoes</button>
+        <button id="close-action" class="secondary" type="button">Fechar aba</button>
       </div>
-      <div id="recipient-picker"></div>
       <div id="status"></div>
-      <div id="post-unlock">Acesso liberado. Agora voce pode abrir novas abas normalmente.</div>
     </main>
     <script src="blocked.js"></script>
   </body>
