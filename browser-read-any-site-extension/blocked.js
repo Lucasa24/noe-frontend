@@ -2,6 +2,7 @@
   const elements = {
     description: document.querySelector("#description"),
     input: document.querySelector("#code-input"),
+    requestAccessButton: document.querySelector("#request-access-action"),
     primaryButton: document.querySelector("#primary-action"),
     recipientPicker: document.querySelector("#recipient-picker"),
     status: document.querySelector("#status"),
@@ -23,6 +24,10 @@
 
   elements.primaryButton?.addEventListener("click", () => {
     void handlePrimaryAction();
+  });
+
+  elements.requestAccessButton?.addEventListener("click", () => {
+    void handleRequestSiteAccess();
   });
 
   elements.input?.addEventListener("keydown", (event) => {
@@ -117,6 +122,30 @@
     }
 
     applyLockState(response?.state || { unlocked: true });
+  }
+
+  async function handleRequestSiteAccess() {
+    if (!elements.requestAccessButton || elements.requestAccessButton.disabled) {
+      return;
+    }
+
+    elements.requestAccessButton.disabled = true;
+    updateStatus('Abrindo o pedido do navegador. Clique em "Permitir" no menu de extensoes.');
+
+    const response = await sendMessage({ type: "lock:requestSiteAccess" });
+
+    if (response?.state) {
+      applyLockState(response.state);
+    }
+
+    if (!response?.ok) {
+      updateStatus(response?.error || "Nao foi possivel abrir o pedido de permissao.");
+      elements.requestAccessButton.disabled = false;
+      return;
+    }
+
+    updateStatus(response?.message || 'Clique em "Permitir" no menu de extensoes para liberar a leitura do site.');
+    elements.requestAccessButton.disabled = false;
   }
 
   async function requestCode() {
@@ -222,6 +251,11 @@
     if (elements.input) {
       elements.input.disabled = unlocked || !siteAccessGranted;
       elements.input.value = unlocked ? "" : elements.input.value;
+    }
+
+    if (elements.requestAccessButton) {
+      elements.requestAccessButton.style.display = unlocked || siteAccessGranted ? "none" : "inline-flex";
+      elements.requestAccessButton.disabled = unlocked;
     }
 
     if (elements.primaryButton) {
