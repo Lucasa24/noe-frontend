@@ -760,7 +760,12 @@ function isAllowedWhileLocked(url) {
   }
 
   return normalizedUrl === normalizeUrl(getBlockedPageUrl())
-    || normalizedUrl === normalizeUrl(chrome.runtime.getURL("options.html"));
+    || normalizedUrl === normalizeUrl(chrome.runtime.getURL("options.html"))
+    || isExtensionsManagerUrl(normalizedUrl);
+}
+
+function isExtensionsManagerUrl(url) {
+  return /^(chrome|edge):\/\/extensions\/?(?:[?#].*)?$/i.test(String(url || "").trim());
 }
 
 function normalizeUrl(url) {
