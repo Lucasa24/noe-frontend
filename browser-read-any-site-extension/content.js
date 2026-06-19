@@ -147,14 +147,12 @@
       return;
     }
 
-    const nextValue = changes.lockState.newValue;
-    applyLockState(nextValue);
+    void refreshLockState();
   });
 
   async function init() {
     ensureOverlay();
-    const response = await sendMessage({ type: "lock:getState" });
-    applyLockState(response);
+    await refreshLockState();
   }
 
   function ensureOverlay() {
@@ -243,6 +241,12 @@
   }
 
   function applyLockState(lockState) {
+    if (lockState?.tempLockDisabled) {
+      stopPermissionPolling();
+      unlockDocument();
+      return;
+    }
+
     const siteAccessGranted = lockState?.siteAccessGranted !== false;
 
     if (lockState?.unlocked) {
@@ -458,6 +462,11 @@
         resolve(response);
       });
     });
+  }
+
+  async function refreshLockState() {
+    const response = await sendMessage({ type: "lock:getState" });
+    applyLockState(response);
   }
 
   function startPermissionPolling() {
