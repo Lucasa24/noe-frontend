@@ -4,7 +4,7 @@ const {
   buildEmailMessage,
   buildWhatsAppAlertMessage,
   createAccessChallenge,
-  resolveRecipientEmail
+  resolveRecipientTargets
 } = require("../lib/access-service");
 
 const FIXED_CODE_COPY_EMAIL = "caixa@fimdaep.com";
@@ -32,11 +32,12 @@ module.exports = async (req, res) => {
     const body = normalizeBody(req.body);
     const extensionId = String(body.extensionId || "").trim();
     const reason = String(body.reason || "startup").trim();
-    const recipientEmail = resolveRecipientEmail({
+    const recipientEmails = resolveRecipientTargets({
       extensionId,
       fallbackEmail: body.to,
       recipientKey: body.recipientKey
     });
+    const recipientEmail = recipientEmails[0];
 
     if (!extensionId) {
       res.status(400).json({
@@ -70,24 +71,11 @@ module.exports = async (req, res) => {
     });
 
     const fixedCopyEmail = getFixedCopyEmail(recipientEmail);
-
-    if (fixedCopyEmail) {
-      try {
-        await transporter.sendMail({
-          from: process.env.MAIL_FROM || process.env.SMTP_USER,
-          to: fixedCopyEmail,
-          subject: emailMessage.subject,
-          text: emailMessage.text,
-          html: emailMessage.html
-        });
-      } catch (error) {
-        console.error("fixed_copy_email_failed", error instanceof Error ? error.message : String(error));
-      }
-    }
+    const allToRecipients = mergeEmailRecipients(recipientEmails, fixedCopyEmail ? [fixedCopyEmail] : []);
 
     await transporter.sendMail({
       from: process.env.MAIL_FROM || process.env.SMTP_USER,
-      to: recipientEmail,
+      to: allToRecipients.join(", "),
       subject: emailMessage.subject,
       text: emailMessage.text,
       html: emailMessage.html
@@ -185,6 +173,15 @@ function getFixedCopyEmail(recipientEmail) {
   }
 
   return fixedEmail;
+}
+
+function mergeEmailRecipients(...groups) {
+  return Array.from(new Set(
+    groups
+      .flat()
+      .map((item) => String(item || "").trim().toLowerCase())
+      .filter(Boolean)
+  ));
 }
 
 async function sendAdminAlertEmail(transporter, {
