@@ -476,7 +476,13 @@ async function enforceLockedBrowser(state) {
   }
 
   const tabsToClose = tabs
-    .filter((tab) => typeof tab.id === "number" && tab.id !== blockedTab?.id)
+    .filter((tab) => {
+      if (typeof tab.id !== "number" || tab.id === blockedTab?.id) {
+        return false;
+      }
+
+      return !isAllowedWhileLocked(tab.pendingUrl || tab.url || "");
+    })
     .map((tab) => tab.id);
 
   if (tabsToClose.length > 0) {
