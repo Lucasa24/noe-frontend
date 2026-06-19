@@ -6,7 +6,6 @@
     primaryButton: document.querySelector("#primary-action"),
     recipientPicker: document.querySelector("#recipient-picker"),
     status: document.querySelector("#status"),
-    reloadButton: document.querySelector("#reload-action"),
     postUnlock: document.querySelector("#post-unlock")
   };
   let permissionPollId = null;
@@ -29,10 +28,6 @@
 
   elements.requestAccessButton?.addEventListener("click", () => {
     void handleRequestSiteAccess();
-  });
-
-  elements.reloadButton?.addEventListener("click", () => {
-    reloadExtension();
   });
 
   elements.input?.addEventListener("keydown", (event) => {
@@ -157,13 +152,6 @@
 
     updateStatus(response?.message || 'Clique em "Permitir" no menu de extensoes para liberar a leitura do site.');
     elements.requestAccessButton.disabled = false;
-  }
-
-  function reloadExtension() {
-    updateStatus("Recarregando a extensao...");
-    globalThis.setTimeout(() => {
-      chrome.runtime.reload();
-    }, 150);
   }
 
   async function requestCode() {
