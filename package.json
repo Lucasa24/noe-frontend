@@ -1,34 +1,9 @@
 {
-  "name": "noe-frontend",
-  "version": "0.1.0",
+  "name": "browser-read-any-site-extension-backend",
+  "version": "1.0.0",
   "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
+  "description": "Backend Vercel compartilhado para multiplas comunidades da extensao Browser Read Any Site.",
   "dependencies": {
-    "@aws-sdk/client-ses": "^3.974.0",
-    "@vercel/blob": "^2.0.0",
-    "next": "16.0.10",
-    "nodemailer": "^7.0.12",
-    "pg": "^8.17.2",
-    "react": "19.2.1",
-    "react-dom": "19.2.1",
-    "resend": "^6.8.0",
-    "svix": "^1.84.1"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/nodemailer": "^7.0.5",
-    "@types/pg": "^8.16.0",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.0.10",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "nodemailer": "^6.10.0"
   }
 }
