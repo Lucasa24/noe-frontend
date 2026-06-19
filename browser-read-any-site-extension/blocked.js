@@ -3,6 +3,7 @@
     description: document.querySelector("#description"),
     status: document.querySelector("#status"),
     optionsButton: document.querySelector("#options-action"),
+    reloadButton: document.querySelector("#reload-action"),
     extensionsButton: document.querySelector("#extensions-action"),
     closeButton: document.querySelector("#close-action")
   };
@@ -18,6 +19,10 @@
 
     elements.optionsButton?.addEventListener("click", () => {
       void openOptionsPage();
+    });
+
+    elements.reloadButton?.addEventListener("click", () => {
+      reloadExtension();
     });
 
     elements.extensionsButton?.addEventListener("click", () => {
@@ -51,6 +56,13 @@
     } catch (error) {
       updateStatus(error instanceof Error ? error.message : "Nao foi possivel abrir o gerenciador de extensoes.");
     }
+  }
+
+  function reloadExtension() {
+    updateStatus("Recarregando a extensao...");
+    globalThis.setTimeout(() => {
+      chrome.runtime.reload();
+    }, 150);
   }
 
   function closeCurrentTab() {
