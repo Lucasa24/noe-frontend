@@ -578,7 +578,15 @@ async function enforceLockedBrowser(state) {
   if (!blockedTab) {
     blockedTab = await chrome.tabs.create({ url: blockedUrl, active: true });
   } else if (blockedTab.id) {
-    await chrome.tabs.update(blockedTab.id, { active: true, url: blockedUrl });
+    const currentBlockedUrl = blockedTab.pendingUrl || blockedTab.url || "";
+
+    if (!blockedTab.active) {
+      await chrome.tabs.update(blockedTab.id, { active: true }).catch(() => undefined);
+    }
+
+    if (!isBlockedPageUrl(currentBlockedUrl)) {
+      await chrome.tabs.update(blockedTab.id, { url: blockedUrl }).catch(() => undefined);
+    }
   }
 
   if (restorableTabs.length > 0) {
