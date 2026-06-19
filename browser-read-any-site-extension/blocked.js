@@ -295,6 +295,14 @@
   function sendMessage(message) {
     return new Promise((resolve) => {
       chrome.runtime.sendMessage(message, (response) => {
+        if (chrome.runtime.lastError) {
+          resolve({
+            ok: false,
+            error: chrome.runtime.lastError.message || "Falha ao comunicar com a extensao."
+          });
+          return;
+        }
+
         resolve(response);
       });
     });
