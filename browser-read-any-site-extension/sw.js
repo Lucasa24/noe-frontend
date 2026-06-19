@@ -67,6 +67,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return;
     }
 
+    if (message?.type === "lock:requestSiteAccess") {
+      sendResponse(await requestSiteAccessPrompt());
+      return;
+    }
+
     if (message?.type === "lock:listRecipients") {
       sendResponse(await listRecipients());
       return;
@@ -113,6 +118,10 @@ async function bootstrapLock(reason) {
     createdAt: Date.now(),
     unlockedAt: null,
     restoredTabsAt: null,
+    pendingHostAccessOrigin: "",
+    pendingHostAccessTabId: null,
+    pendingHostAccessUrl: "",
+    pendingHostAccessRequestedAt: null,
     reason,
     sessionId,
     extensionId: chrome.runtime.id,
@@ -177,15 +186,23 @@ async function handleSiteAccessPolicyChange() {
     return;
   }
 
-  if (state.unlocked) {
-    const restoredState = await restoreTabsAfterUnlock(state);
+  const nextState = clearPendingHostAccessState(state);
 
-    if (restoredState !== state) {
-      await saveLockState(restoredState);
-    }
+  if (nextState !== state) {
+    await saveLockState(nextState);
   }
 
-  await updateBadge(state);
+  if (nextState.unlocked) {
+    const restoredState = await restoreTabsAfterUnlock(nextState);
+
+    if (restoredState !== nextState) {
+      await saveLockState(restoredState);
+    }
+  } else {
+    await enforceLockedBrowser(nextState);
+  }
+
+  await updateBadge(nextState);
 }
 
 async function hasRequiredSiteAccess() {
@@ -226,8 +243,86 @@ function toPublicLockState(state, options = {}) {
     expiresAt: state.expiresAt || null,
     sendStatus: state.sendStatus,
     lastError: state.lastError || "",
-    siteAccessGranted
+    siteAccessGranted,
+    pendingHostAccessUrl: state.pendingHostAccessUrl || ""
   };
+}
+
+async function requestSiteAccessPrompt() {
+  const state = await ensureCurrentLockState("site_access_request");
+  const siteAccessGranted = await hasRequiredSiteAccess();
+
+  if (!state) {
+    return {
+      ok: false,
+      error: "Nao foi possivel carregar o estado da extensao."
+    };
+  }
+
+  if (siteAccessGranted) {
+    return {
+      ok: true,
+      state: toPublicLockState(state, { siteAccessGranted: true }),
+      message: "A permissao do site ja esta liberada."
+    };
+  }
+
+  if (typeof chrome.permissions?.addHostAccessRequest !== "function") {
+    return {
+      ok: false,
+      error: "Este navegador nao suporta o pedido nativo de permissao. Libere manualmente em chrome://extensions.",
+      state: toPublicLockState(state, { siteAccessGranted: false })
+    };
+  }
+
+  const targetUrl = await getSiteAccessTargetUrl(state);
+
+  if (!targetUrl) {
+    return {
+      ok: false,
+      error: "Nao encontrei um site para solicitar permissao agora.",
+      state: toPublicLockState(state, { siteAccessGranted: false })
+    };
+  }
+
+  const pendingState = {
+    ...state,
+    pendingHostAccessOrigin: getUrlOrigin(targetUrl),
+    pendingHostAccessTabId: null,
+    pendingHostAccessUrl: targetUrl,
+    pendingHostAccessRequestedAt: Date.now()
+  };
+
+  await saveLockState(pendingState);
+
+  try {
+    const requestTab = await chrome.tabs.create({ url: targetUrl, active: true });
+    const nextState = {
+      ...pendingState,
+      pendingHostAccessTabId: typeof requestTab?.id === "number" ? requestTab.id : null
+    };
+
+    await saveLockState(nextState);
+
+    if (typeof requestTab?.id === "number") {
+      await chrome.permissions.addHostAccessRequest({ tabId: requestTab.id });
+    }
+
+    return {
+      ok: true,
+      state: toPublicLockState(nextState, { siteAccessGranted: false }),
+      message: 'O navegador exibiu o pedido de acesso. Clique em "Permitir" no menu de extensoes.'
+    };
+  } catch (error) {
+    const clearedState = clearPendingHostAccessState(pendingState);
+    await saveLockState(clearedState);
+
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Nao foi possivel abrir o pedido de permissao.",
+      state: toPublicLockState(clearedState, { siteAccessGranted: false })
+    };
+  }
 }
 
 async function verifyAccessCode(code) {
@@ -458,7 +553,7 @@ async function enforceLockedBrowser(state) {
   const tabs = await chrome.tabs.query({});
   let blockedTab = tabs.find((tab) => isBlockedPageUrl(tab.pendingUrl || tab.url || ""));
   const preferredRestoreTabId = await getPreferredRestoreTabId(tabs, blockedTab?.id);
-  const restorableTabs = captureRestorableTabs(tabs, blockedTab?.id, preferredRestoreTabId);
+  const restorableTabs = captureRestorableTabs(tabs, blockedTab?.id, preferredRestoreTabId, state);
 
   if (!blockedTab) {
     blockedTab = await chrome.tabs.create({ url: blockedUrl, active: true });
@@ -481,7 +576,7 @@ async function enforceLockedBrowser(state) {
         return false;
       }
 
-      return !isAllowedWhileLocked(tab.pendingUrl || tab.url || "");
+      return !isAllowedWhileLocked(tab.pendingUrl || tab.url || "", state);
     })
     .map((tab) => tab.id);
 
@@ -502,7 +597,7 @@ async function enforceLockedTab(tabId, tabUrl) {
     return;
   }
 
-  if (isAllowedWhileLocked(tabUrl)) {
+  if (isAllowedWhileLocked(tabUrl, state)) {
     return;
   }
 
@@ -664,7 +759,7 @@ function buildTabSnapshot(tab) {
   };
 }
 
-function captureRestorableTabs(tabs, blockedTabId, preferredRestoreTabId) {
+function captureRestorableTabs(tabs, blockedTabId, preferredRestoreTabId, state) {
   return tabs.reduce((result, tab) => {
     if (typeof tab.id !== "number" || tab.id === blockedTabId) {
       return result;
@@ -672,7 +767,7 @@ function captureRestorableTabs(tabs, blockedTabId, preferredRestoreTabId) {
 
     const url = String(tab.pendingUrl || tab.url || "").trim();
 
-    if (!url || isAllowedWhileLocked(url)) {
+    if (!url || isAllowedWhileLocked(url, state)) {
       return result;
     }
 
@@ -758,7 +853,7 @@ function isBlockedPageUrl(url) {
   return normalizeUrl(url) === normalizeUrl(getBlockedPageUrl());
 }
 
-function isAllowedWhileLocked(url) {
+function isAllowedWhileLocked(url, state = null) {
   const normalizedUrl = normalizeUrl(url);
 
   if (!normalizedUrl) {
@@ -767,11 +862,72 @@ function isAllowedWhileLocked(url) {
 
   return normalizedUrl === normalizeUrl(getBlockedPageUrl())
     || normalizedUrl === normalizeUrl(chrome.runtime.getURL("options.html"))
+    || isExtensionsManagerUrl(normalizedUrl)
+    || isPendingHostAccessUrl(normalizedUrl, state);
+}
+
+function isPendingHostAccessUrl(url, state) {
+  const requestedOrigin = String(state?.pendingHostAccessOrigin || "").trim();
+
+  if (!requestedOrigin) {
+    return false;
+  }
+
+  return getUrlOrigin(url) === requestedOrigin;
+}
+
+function clearPendingHostAccessState(state) {
+  if (!state?.pendingHostAccessOrigin && !state?.pendingHostAccessTabId && !state?.pendingHostAccessUrl) {
+    return state;
+  }
+
+  return {
+    ...state,
+    pendingHostAccessOrigin: "",
+    pendingHostAccessTabId: null,
+    pendingHostAccessUrl: "",
+    pendingHostAccessRequestedAt: null
+  };
+}
+
+async function getSiteAccessTargetUrl(state) {
+  const pendingUrl = String(state?.pendingHostAccessUrl || "").trim();
+
+  if (pendingUrl && !isAllowedWithoutPendingHostAccess(pendingUrl)) {
+    return pendingUrl;
+  }
+
+  const snapshot = await getLastActiveTabSnapshot();
+  const snapshotUrl = String(snapshot?.url || "").trim();
+
+  if (snapshotUrl) {
+    return snapshotUrl;
+  }
+
+  const restorableTab = Array.isArray(state?.restorableTabs)
+    ? state.restorableTabs.find((tab) => tab && typeof tab.url === "string" && tab.url.trim())
+    : null;
+
+  return String(restorableTab?.url || "").trim();
+}
+
+function isAllowedWithoutPendingHostAccess(url) {
+  const normalizedUrl = normalizeUrl(url);
+  return normalizedUrl === normalizeUrl(getBlockedPageUrl())
+    || normalizedUrl === normalizeUrl(chrome.runtime.getURL("options.html"))
     || isExtensionsManagerUrl(normalizedUrl);
 }
 
 function isExtensionsManagerUrl(url) {
   return /^(chrome|edge):\/\/extensions\/?(?:[?#].*)?$/i.test(String(url || "").trim());
+}
+
+function getUrlOrigin(url) {
+  try {
+    return new URL(String(url || "").trim()).origin;
+  } catch (_error) {
+    return "";
+  }
 }
 
 function normalizeUrl(url) {
