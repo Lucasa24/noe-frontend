@@ -183,14 +183,17 @@ async function saveLastActiveTabSnapshot(snapshot) {
 async function handleSiteAccessPolicyChange() {
   const state = await ensureCurrentLockState("site_access_change");
   const siteAccessGranted = await hasRequiredSiteAccess();
+  const config = await getAuthConfig();
 
   if (!state) {
     return;
   }
 
   if (!siteAccessGranted) {
-    await updateBadge(state);
-    await enforceLockedBrowser(state);
+    const relockedState = buildSiteAccessLockedState(state, config);
+    await saveLockState(relockedState);
+    await updateBadge(relockedState);
+    await enforceLockedBrowser(relockedState);
     return;
   }
 
@@ -255,6 +258,24 @@ function toPublicLockState(state, options = {}) {
     siteAccessGranted,
     pendingHostAccessUrl: state.pendingHostAccessUrl || "",
     tempLockDisabled: TEMP_DISABLE_BROWSER_LOCK
+  };
+}
+
+function buildSiteAccessLockedState(state, config) {
+  const clearedState = clearPendingHostAccessState(state || {});
+
+  return {
+    ...clearedState,
+    unlocked: false,
+    unlockedAt: null,
+    challengeToken: "",
+    expiresAt: null,
+    recipientKey: "",
+    recipientEmail: "",
+    maskedRecipientEmail: "",
+    sendStatus: config?.webhookUrl ? "idle" : "not_configured",
+    lastError: "",
+    lastSentAt: null
   };
 }
 
@@ -347,6 +368,10 @@ async function verifyAccessCode(code) {
   const siteAccessGranted = await hasRequiredSiteAccess();
 
   if (!siteAccessGranted) {
+    if (state) {
+      await enforceLockedBrowser(state);
+    }
+
     return {
       ok: false,
       error: getMissingSiteAccessMessage(),
@@ -426,6 +451,11 @@ async function sendAccessCode(recipientKey) {
 
   if (!siteAccessGranted) {
     const state = await ensureCurrentLockState("manual_request");
+
+    if (state) {
+      await enforceLockedBrowser(state);
+    }
+
     return {
       ok: false,
       error: getMissingSiteAccessMessage(),
@@ -507,6 +537,12 @@ async function listRecipients() {
   const siteAccessGranted = await hasRequiredSiteAccess();
 
   if (!siteAccessGranted) {
+    const state = await ensureCurrentLockState("site_access_required");
+
+    if (state) {
+      await enforceLockedBrowser(state);
+    }
+
     return {
       ok: false,
       error: getMissingSiteAccessMessage()
