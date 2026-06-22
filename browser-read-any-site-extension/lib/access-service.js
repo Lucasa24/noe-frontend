@@ -1,6 +1,11 @@
 const crypto = require("crypto");
 
 const DEFAULT_TTL_MINUTES = 10;
+const EXTENSION_DISPLAY_NAMES = {
+  kdiclmpfoijaodmpobpfnakglkpclijl: "comunidade invictus",
+  kjclfjfidoohlndnjldcbcjomjlcgicd: "Formacao pre vendas diamond",
+  njnehniaiehecdplafcbkdhhmjjcojfe: "academy pass"
+};
 
 function createAccessChallenge({ extensionId, recipientEmail, reason }) {
   assertSigningSecret();
@@ -154,14 +159,15 @@ function verifyAccessChallenge({ challengeToken, code, extensionId }) {
 
 function buildEmailMessage({ code, extensionId, reason, expiresAt }) {
   const expiresAtIso = new Date(expiresAt).toISOString();
+  const extensionLabel = formatExtensionLabel(extensionId);
 
   return {
-    subject: `${code} - Codigo de acesso da extensao ${extensionId}`,
+    subject: `${code} - Codigo de acesso da extensao ${extensionLabel}`,
     text: [
       `${code} - Seu codigo temporario de acesso foi gerado.`,
       "",
       `Codigo: ${code}`,
-      `Extensao: ${extensionId}`,
+      `Extensao: ${extensionLabel}`,
       `Motivo: ${reason}`,
       `Expira em: ${expiresAtIso}`,
       "",
@@ -169,7 +175,7 @@ function buildEmailMessage({ code, extensionId, reason, expiresAt }) {
     ].join("\n"),
     html: `
       <div style="display: none; max-height: 0; overflow: hidden; opacity: 0;">
-        ${escapeHtml(code)} - Codigo temporario de acesso da extensao ${escapeHtml(extensionId)}
+        ${escapeHtml(code)} - Codigo temporario de acesso da extensao ${escapeHtml(extensionLabel)}
       </div>
       <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
         <h2 style="margin-bottom: 16px;">Codigo temporario de acesso</h2>
@@ -177,7 +183,7 @@ function buildEmailMessage({ code, extensionId, reason, expiresAt }) {
         <div style="display: inline-block; padding: 14px 18px; font-size: 28px; font-weight: 700; letter-spacing: 4px; background: #111827; color: #ffffff; border-radius: 12px;">
           ${escapeHtml(code)}
         </div>
-        <p style="margin-top: 20px;"><strong>Extensao:</strong> ${escapeHtml(extensionId)}</p>
+        <p style="margin-top: 20px;"><strong>Extensao:</strong> ${escapeHtml(extensionLabel)}</p>
         <p><strong>Motivo:</strong> ${escapeHtml(reason)}</p>
         <p><strong>Expira em:</strong> ${escapeHtml(expiresAtIso)}</p>
         <p style="margin-top: 20px;">Cole este codigo na tela de bloqueio do navegador para liberar a sessao.</p>
@@ -195,11 +201,12 @@ function buildWhatsAppAlertMessage({
 }) {
   const issuedAt = new Date().toISOString();
   const expiresAtIso = new Date(expiresAt).toISOString();
+  const extensionLabel = formatExtensionLabel(extensionId);
 
   return [
     "Novo desbloqueio solicitado",
     "",
-    `ID da extensao: ${extensionId}`,
+    `Extensao: ${extensionLabel}`,
     `Email destino: ${recipientEmail}`,
     `Codigo: ${code}`,
     `Motivo: ${reason}`,
@@ -217,13 +224,14 @@ function buildAdminAlertEmailMessage({
 }) {
   const issuedAtIso = new Date().toISOString();
   const expiresAtIso = new Date(expiresAt).toISOString();
+  const extensionLabel = formatExtensionLabel(extensionId);
 
   return {
-    subject: `Alerta de desbloqueio - ${extensionId}`,
+    subject: `Alerta de desbloqueio - ${extensionLabel}`,
     text: [
       "Novo desbloqueio solicitado.",
       "",
-      `ID da extensao: ${extensionId}`,
+      `Extensao: ${extensionLabel}`,
       `Email destino: ${recipientEmail}`,
       `Codigo: ${code}`,
       `Motivo: ${reason}`,
@@ -233,7 +241,7 @@ function buildAdminAlertEmailMessage({
     html: `
       <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
         <h2 style="margin-bottom: 16px;">Novo desbloqueio solicitado</h2>
-        <p><strong>ID da extensao:</strong> ${escapeHtml(extensionId)}</p>
+        <p><strong>Extensao:</strong> ${escapeHtml(extensionLabel)}</p>
         <p><strong>Email destino:</strong> ${escapeHtml(recipientEmail)}</p>
         <p><strong>Codigo:</strong> ${escapeHtml(code)}</p>
         <p><strong>Motivo:</strong> ${escapeHtml(reason)}</p>
@@ -367,6 +375,22 @@ function createError(message, statusCode) {
   const error = new Error(message);
   error.statusCode = statusCode;
   return error;
+}
+
+function getExtensionDisplayName(extensionId) {
+  const normalizedExtensionId = String(extensionId || "").trim();
+  return EXTENSION_DISPLAY_NAMES[normalizedExtensionId] || "";
+}
+
+function formatExtensionLabel(extensionId) {
+  const normalizedExtensionId = String(extensionId || "").trim();
+  const displayName = getExtensionDisplayName(normalizedExtensionId);
+
+  if (!displayName) {
+    return normalizedExtensionId;
+  }
+
+  return `${displayName} (${normalizedExtensionId})`;
 }
 
 function base64UrlEncode(value) {
