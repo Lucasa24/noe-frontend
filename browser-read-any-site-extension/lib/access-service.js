@@ -5,7 +5,8 @@ const EXTENSION_DISPLAY_NAMES = {
   kdiclmpfoijaodmpobpfnakglkpclijl: "comunidade invictus",
   kjclfjfidoohlndnjldcbcjomjlcgicd: "Formacao pre vendas diamond",
   njnehniaiehecdplafcbkdhhmjjcojfe: "academy pass",
-  dmenpfckkeafegadpafdndbnhgfmiffb: "COMUNIDADE LENDÁRIA 2026"
+  dmenpfckkeafegadpafdndbnhgfmiffb: "COMUNIDADE LENDÁRIA 2026",
+  jncbkkimmoapjemleedmklnlgiioiffj: "DOUG - SKOOL"
 };
 
 function createAccessChallenge({ extensionId, recipientEmail, reason }) {
