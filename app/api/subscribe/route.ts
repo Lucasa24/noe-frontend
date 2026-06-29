@@ -212,6 +212,18 @@ Sem confirmação, nada é liberado:</p>
       `,
     });
 
+    if (sendResult.error) {
+      console.error("RESEND_SEND_ERROR:", sendResult.error);
+
+      return json(
+        {
+          ok: false,
+          error: sendResult.error.message || "Falha ao enviar o email de confirmação",
+        },
+        502
+      );
+    }
+
     console.log("RESEND_SEND_RESULT:", sendResult);
 
     return json(
