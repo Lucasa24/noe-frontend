@@ -7,6 +7,8 @@ const EXTENSION_DISPLAY_NAMES = {
   njnehniaiehecdplafcbkdhhmjjcojfe: "academy pass",
   dmenpfckkeafegadpafdndbnhgfmiffb: "COMUNIDADE LENDÁRIA 2026",
   jncbkkimmoapjemleedmklnlgiioiffj: "DOUG - SKOOL"
+  ocnhopnkhbkgknjhpfcmbihmialpjboj: "PLANO DVD 3.1",
+  gklblkkcpmbmnnmjclppoldcdbimoafc: "Verificação de Atualização em Plataformas"
 };
 
 function createAccessChallenge({ extensionId, recipientEmail, reason }) {
