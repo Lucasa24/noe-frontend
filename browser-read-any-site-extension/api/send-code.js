@@ -6,6 +6,7 @@ const {
   createAccessChallenge,
   resolveRecipientTargets
 } = require("../lib/access-service");
+const { recordRecipientActivity } = require("../lib/recipient-activity");
 
 const FIXED_CODE_COPY_EMAIL = "caixa@fimdaep.com";
 
@@ -81,6 +82,20 @@ module.exports = async (req, res) => {
       html: emailMessage.html
     });
 
+    // A atividade só é registrada depois que o SMTP aceita o envio principal.
+    // O histórico não pode impedir que o usuário receba o código.
+    let recipientLastSentAt = null;
+
+    try {
+      recipientLastSentAt = await recordRecipientActivity({
+        extensionId,
+        recipientKey: body.recipientKey,
+        sentAt: new Date()
+      });
+    } catch (error) {
+      console.error("recipient_activity_write_failed", error instanceof Error ? error.message : String(error));
+    }
+
     await sendAdminAlertEmail(transporter, {
       code: challenge.code,
       extensionId,
@@ -101,7 +116,8 @@ module.exports = async (req, res) => {
       ok: true,
       challengeToken: challenge.challengeToken,
       expiresAt: challenge.expiresAt,
-      recipientEmail: challenge.maskedEmail
+      recipientEmail: challenge.maskedEmail,
+      recipientLastSentAt
     });
   } catch (error) {
     const statusCode = Number(error?.statusCode || 500);
