@@ -13,7 +13,11 @@
     recipientPicker: null,
     stopEvents: null,
     permissionPollId: null,
-    recipientPickerReady: false
+    recipientPickerReady: false,
+    recipients: [],
+    recipientQuery: "",
+    selectedRecipientKey: "",
+    recipientPickerListenersAttached: false
   };
 
   window.__BROWSER_READ_ANY_SITE__ = state;
@@ -131,10 +135,147 @@
       font-size: 14px;
     }
 
-    #bras-lock-recipient-actions {
-      display: flex;
-      flex-wrap: wrap;
+    #recipient-picker {
+      display: grid;
       gap: 10px;
+    }
+
+    .bras-recipient-search {
+      position: relative;
+    }
+
+    .bras-recipient-search-icon {
+      position: absolute;
+      top: 50%;
+      left: 12px;
+      width: 18px;
+      height: 18px;
+      color: #94a3b8;
+      pointer-events: none;
+      transform: translateY(-50%);
+    }
+
+    #bras-lock-card #bras-lock-recipient-search {
+      width: 100%;
+      box-sizing: border-box;
+      margin: 0;
+      padding: 11px 12px 11px 40px;
+      border-radius: 10px;
+      border: 1px solid #475569;
+      background: #020617;
+      color: #f8fafc;
+      font-size: 16px;
+    }
+
+    #bras-lock-card #bras-lock-recipient-search::placeholder {
+      color: #94a3b8;
+    }
+
+    #bras-lock-recipient-actions {
+      display: grid;
+      gap: 8px;
+      max-height: min(320px, 40vh);
+      margin: 0;
+      padding: 0 2px 0 0;
+      overflow-y: auto;
+      scrollbar-color: #475569 transparent;
+      scrollbar-width: thin;
+    }
+
+    .bras-recipient-item {
+      list-style: none;
+    }
+
+    .bras-recipient-option {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      min-height: 64px;
+      gap: 12px;
+      padding: 12px;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      background: #111827;
+      color: #f8fafc;
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+    }
+
+    .bras-recipient-option:hover {
+      border-color: #60a5fa;
+      background: #172554;
+    }
+
+    .bras-recipient-option:focus-visible,
+    #bras-lock-recipient-search:focus-visible {
+      outline: 3px solid rgba(96, 165, 250, 0.75);
+      outline-offset: 2px;
+    }
+
+    .bras-recipient-option.is-selected {
+      border-color: #3b82f6;
+      background: #1d4ed8;
+    }
+
+    .bras-recipient-copy {
+      display: grid;
+      min-width: 0;
+      gap: 3px;
+    }
+
+    .bras-recipient-name {
+      overflow: hidden;
+      color: #f8fafc;
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .bras-recipient-activity {
+      color: #cbd5e1;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .bras-recipient-badge {
+      flex: 0 0 auto;
+      padding: 4px 7px;
+      border-radius: 999px;
+      background: #0f766e;
+      color: #ecfeff;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    #bras-lock-recipient-empty {
+      margin: 0;
+      padding: 18px 10px;
+      color: #cbd5e1;
+      text-align: center;
+    }
+
+    @media (max-width: 480px) {
+      #bras-lock-overlay {
+        align-items: flex-start;
+        padding: 12px;
+        overflow-y: auto;
+      }
+
+      #bras-lock-card {
+        margin: auto 0;
+        padding: 18px;
+      }
+
+      #bras-lock-recipient-actions {
+        max-height: 38vh;
+      }
+
+      .bras-recipient-option {
+        min-height: 60px;
+      }
     }
   `;
   (document.head || document.documentElement).appendChild(style);
@@ -337,6 +478,8 @@
   }
 
   async function requestCode(recipientKey) {
+    state.selectedRecipientKey = recipientKey;
+    renderRecipientPicker();
     updateStatus("Enviando codigo...");
     const response = await sendMessage({
       type: "lock:sendCode",
@@ -349,17 +492,21 @@
     }
 
     applyLockState(response?.state || null);
+    await ensureRecipientPicker({ force: true, silent: true });
     state.input?.focus();
   }
 
-  async function ensureRecipientPicker() {
+  async function ensureRecipientPicker({ force = false, silent = false } = {}) {
     const picker = state.recipientPicker;
 
-    if (!picker || state.recipientPickerReady) {
+    if (!picker || (state.recipientPickerReady && !force)) {
       return;
     }
 
-    updateStatus("Carregando destinatarios...");
+    if (!silent) {
+      updateStatus("Carregando destinatarios...");
+    }
+
     const response = await sendMessage({ type: "lock:listRecipients" });
 
     if (!response?.ok) {
@@ -373,48 +520,205 @@
 
     if (recipients.length === 0) {
       state.recipientPickerReady = true;
-      renderRecipientPicker([{ key: "", label: "Enviar codigo" }]);
+      state.recipients = [{ key: "", label: "Enviar codigo", lastSentAt: null }];
+      renderRecipientPicker();
       return;
     }
 
     state.recipientPickerReady = true;
-    renderRecipientPicker(recipients);
+    state.recipients = recipients;
+    renderRecipientPicker();
   }
 
-  function renderRecipientPicker(recipients) {
+  function renderRecipientPicker() {
     const picker = state.recipientPicker;
 
     if (!picker) {
       return;
     }
 
-    picker.innerHTML = `
-      <p>Escolha o destinatario:</p>
-      <div id="bras-lock-recipient-actions">
-        ${recipients.map((item) => `
-          <button class="bras-secondary" type="button" data-key="${escapeAttribute(item.key)}">
-            ${escapeHtml(item.label || item.key)}
-          </button>
-        `).join("")}
-      </div>
-    `;
-    picker.style.display = "block";
+    if (!picker.querySelector("#recipient-picker")) {
+      picker.innerHTML = `
+        <section id="recipient-picker" aria-label="Escolha do destinatario">
+          <p>Escolha o destinatario:</p>
+          <div class="bras-recipient-search">
+            <svg class="bras-recipient-search-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="6"></circle>
+              <path d="m16 16 4 4"></path>
+            </svg>
+            <input id="bras-lock-recipient-search" type="search" autocomplete="off" aria-label="Buscar destinatário" placeholder="Buscar destinatário..." />
+          </div>
+          <div id="recipient-actions">
+            <ul id="bras-lock-recipient-actions" aria-label="Destinatarios"></ul>
+            <p id="bras-lock-recipient-empty" role="status" aria-live="polite" hidden>Nenhum destinatário encontrado.</p>
+          </div>
+        </section>
+      `;
+      attachRecipientPickerListeners(picker);
+    }
 
-    picker.onclick = (event) => {
+    const searchInput = picker.querySelector("#bras-lock-recipient-search");
+    const list = picker.querySelector("#bras-lock-recipient-actions");
+    const emptyState = picker.querySelector("#bras-lock-recipient-empty");
+
+    if (!(searchInput instanceof HTMLInputElement) || !(list instanceof HTMLUListElement) || !(emptyState instanceof HTMLElement)) {
+      return;
+    }
+
+    searchInput.value = state.recipientQuery;
+    const sortedRecipients = sortRecipientsByActivity(state.recipients);
+    const recipients = filterRecipients(sortedRecipients, state.recipientQuery);
+    const mostRecentRecipient = sortedRecipients.find((item) => getRecipientTimestamp(item) > 0);
+
+    list.innerHTML = recipients.map((item) => {
+      const key = String(item.key || "");
+      const label = String(item.label || key);
+      const isSelected = key === state.selectedRecipientKey;
+      const isMostRecent = key === mostRecentRecipient?.key;
+
+      return `
+        <li class="bras-recipient-item">
+          <button
+            class="bras-recipient-option${isSelected ? " is-selected" : ""}"
+            type="button"
+            data-key="${escapeAttribute(key)}"
+            aria-pressed="${isSelected ? "true" : "false"}"
+          >
+            <span class="bras-recipient-copy">
+              <span class="bras-recipient-name">${escapeHtml(label)}</span>
+              <span class="bras-recipient-activity">${escapeHtml(formatRecipientActivity(item.lastSentAt))}</span>
+            </span>
+            ${isMostRecent ? '<span class="bras-recipient-badge">Mais recente</span>' : ""}
+          </button>
+        </li>
+      `;
+    }).join("");
+    emptyState.hidden = recipients.length > 0;
+    picker.style.display = "block";
+  }
+
+  function attachRecipientPickerListeners(picker) {
+    if (state.recipientPickerListenersAttached) {
+      return;
+    }
+
+    picker.addEventListener("input", (event) => {
+      const target = event.target;
+
+      if (target instanceof HTMLInputElement && target.id === "bras-lock-recipient-search") {
+        state.recipientQuery = target.value;
+        renderRecipientPicker();
+      }
+    });
+
+    picker.addEventListener("click", (event) => {
       const target = event.target;
 
       if (!(target instanceof HTMLElement)) {
         return;
       }
 
-      const key = target.getAttribute("data-key");
+      const button = target.closest("button[data-key]");
+
+      if (!(button instanceof HTMLButtonElement) || !picker.contains(button)) {
+        return;
+      }
+
+      const key = button.getAttribute("data-key");
 
       if (key === null) {
         return;
       }
 
       void requestCode(String(key || ""));
-    };
+    });
+
+    picker.addEventListener("keydown", (event) => {
+      const target = event.target;
+
+      if (!(target instanceof HTMLButtonElement) || !target.matches("button[data-key]")) {
+        return;
+      }
+
+      // Enter ativa o botão nativamente. Espaço é tratado aqui para garantir
+      // a seleção sem rolagem da página e sem duplicar o evento de clique.
+      if (event.key === " " || event.key === "Spacebar") {
+        event.preventDefault();
+        target.click();
+      }
+    });
+
+    state.recipientPickerListenersAttached = true;
+  }
+
+  function sortRecipientsByActivity(recipients) {
+    return [...(Array.isArray(recipients) ? recipients : [])]
+      .map((item) => ({
+        key: String(item?.key || ""),
+        label: String(item?.label || item?.key || ""),
+        lastSentAt: getRecipientTimestamp(item) > 0 ? item.lastSentAt : null
+      }))
+      .sort((left, right) => {
+        const activityDifference = getRecipientTimestamp(right) - getRecipientTimestamp(left);
+
+        if (activityDifference !== 0) {
+          return activityDifference;
+        }
+
+        return left.label.localeCompare(right.label, "pt-BR", { sensitivity: "base" });
+      });
+  }
+
+  function filterRecipients(recipients, query) {
+    const normalizedQuery = normalizeSearchText(query);
+
+    if (!normalizedQuery) {
+      return recipients;
+    }
+
+    return recipients.filter((item) => normalizeSearchText(item.label).includes(normalizedQuery));
+  }
+
+  function normalizeSearchText(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase("pt-BR")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function getRecipientTimestamp(recipient) {
+    const timestamp = Date.parse(String(recipient?.lastSentAt || ""));
+    return Number.isFinite(timestamp) ? timestamp : 0;
+  }
+
+  function formatRecipientActivity(lastSentAt) {
+    const timestamp = Date.parse(String(lastSentAt || ""));
+
+    if (!Number.isFinite(timestamp)) {
+      return "Nenhum código enviado";
+    }
+
+    const date = new Date(timestamp);
+    const now = new Date();
+    const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const targetDayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+    const daysAgo = Math.round((dayStart - targetDayStart) / 86400000);
+    const time = date.toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+
+    if (daysAgo === 0) {
+      return `Último código: hoje, ${time}`;
+    }
+
+    if (daysAgo === 1) {
+      return `Último código: ontem, ${time}`;
+    }
+
+    return `Último código: ${date.toLocaleDateString("pt-BR")}, ${time}`;
   }
 
   function hideRecipientPicker() {
@@ -426,7 +730,8 @@
 
     picker.style.display = "none";
     picker.textContent = "";
-    picker.onclick = null;
+    state.recipients = [];
+    state.recipientQuery = "";
   }
 
   function updateStatus(text) {
