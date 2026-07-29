@@ -1,4 +1,5 @@
 const { listRecipientsForExtension } = require("../lib/access-service");
+const { getRecipientActivity } = require("../lib/recipient-activity");
 
 module.exports = async (req, res) => {
   setCorsHeaders(res);
@@ -31,10 +32,26 @@ module.exports = async (req, res) => {
     }
 
     const recipients = listRecipientsForExtension(extensionId);
+    let activityByRecipient = {};
+
+    try {
+      activityByRecipient = await getRecipientActivity(
+        extensionId,
+        recipients.map((recipient) => recipient.key)
+      );
+    } catch (error) {
+      // A indisponibilidade temporária do histórico não pode impedir a
+      // escolha nem o envio do código.
+      console.error("recipient_activity_list_failed", error instanceof Error ? error.message : String(error));
+    }
+    const recipientsWithActivity = recipients.map((recipient) => ({
+      ...recipient,
+      lastSentAt: activityByRecipient[recipient.key] || null
+    }));
 
     res.status(200).json({
       ok: true,
-      recipients
+      recipients: recipientsWithActivity
     });
   } catch (error) {
     res.status(Number(error?.statusCode || 500)).json({
