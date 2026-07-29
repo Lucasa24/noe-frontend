@@ -52,6 +52,7 @@ SIGNING_SECRET=troque-por-uma-chave-longa-e-aleatoria
 CODE_TTL_MINUTES=10
 ALLOWED_EXTENSION_IDS=
 EXTENSION_EMAIL_MAP={"abcdefghijklmnopabcdefghijklmnop":{"andre":"andre@gmail.com","maria":"maria@gmail.com"},"qrstuvwxyzabcdefqrstuvwxyzabcdef":"email2@gmail.com"}
+BLOB_READ_WRITE_TOKEN=vercel_blob_rw_seu_token
 WHATSAPP_PROVIDER=meta
 WHATSAPP_TOKEN=seu-token-da-meta
 WHATSAPP_PHONE_NUMBER_ID=seu-phone-number-id
@@ -61,6 +62,16 @@ WHATSAPP_TEMPLATE_LANGUAGE=pt_BR
 ```
 
 Pode colocar esses valores diretamente nas variaveis de ambiente da Vercel. Nao envie o arquivo `.env` para o repositorio.
+
+### Atividade recente dos destinatarios
+
+O seletor de destinatarios usa o Vercel Blob para armazenar, por extensao e destinatario, o horario do ultimo codigo enviado. Isso mantem a ordenacao igual em navegadores e dispositivos diferentes.
+
+1. No projeto da Vercel, crie ou conecte um **Blob Store**.
+2. A Vercel criara a variavel `BLOB_READ_WRITE_TOKEN`; mantenha-a disponivel no ambiente de producao.
+3. Faca um novo deploy depois de salvar a variavel.
+
+Se o Blob ainda nao estiver configurado, a extensao continua enviando codigos e exibindo a lista, mas nao consegue recuperar a atividade anterior.
 
 ### Alerta administrativo por email
 
