@@ -24,15 +24,13 @@
   };
 
   const PENDING_PROFILES = {
-    jncbkkimmoapjemleedmklnlgiioiffj: {
-      Agent: {
-        email: "internetmoneyxtratosferic@gmail.com",
-        renewalDate: "2026-07-25",
-        monthlyPrice: "R$ 9,00",
-        chargeAmountCents: 900,
-        supportEmail: "caixa@mentorxlab.com",
-        supportWhatsApp: "http://wa.me/5591984272483?text=Olá,%20gostaria%20de%20consultar%20as%20opções%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
-      }
+    Agent: {
+      email: "internetmoneyxtratosferic@gmail.com",
+      renewalDate: "2026-07-25",
+      monthlyPrice: "R$ 9,00",
+      chargeAmountCents: 900,
+      supportEmail: "caixa@mentorxlab.com",
+      supportWhatsApp: "http://wa.me/5591984272483?text=Olá,%20gostaria%20de%20consultar%20as%20opções%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
     }
   };
 
@@ -811,7 +809,7 @@
   }
 
   async function requestCode(recipientKey) {
-    const pendingProfile = PENDING_PROFILES[state.currentExtensionId]?.[recipientKey];
+    const pendingProfile = PENDING_PROFILES[recipientKey];
     if (pendingProfile) {
       showPendingProfile(pendingProfile, recipientKey);
       return;
@@ -925,9 +923,9 @@
           >
             <span class="bras-recipient-copy">
               <span class="bras-recipient-name">${escapeHtml(label)}</span>
-              <span class="bras-recipient-activity" ${PENDING_PROFILES[state.currentExtensionId]?.[key] ? 'style="color:#fca5a5"' : ''}>${PENDING_PROFILES[state.currentExtensionId]?.[key] ? escapeHtml("⚠️ Atrasado há " + calculateDaysLate(PENDING_PROFILES[state.currentExtensionId][key].renewalDate) + " dias") : escapeHtml(formatRecipientActivity(item.lastSentAt))}</span>
+              <span class="bras-recipient-activity" ${PENDING_PROFILES[key] ? 'style="color:#fca5a5"' : ''}>${PENDING_PROFILES[key] ? escapeHtml("⚠️ Atrasado há " + calculateDaysLate(PENDING_PROFILES[key].renewalDate) + " dias") : escapeHtml(formatRecipientActivity(item.lastSentAt))}</span>
             </span>
-            ${PENDING_PROFILES[state.currentExtensionId]?.[key] ? '<span class="bras-recipient-badge-pending">⚠️ Renovar</span>' : isMostRecent ? '<span class="bras-recipient-badge">Mais recente</span>' : ""}
+            ${PENDING_PROFILES[key] ? '<span class="bras-recipient-badge-pending">⚠️ Renovar</span>' : isMostRecent ? '<span class="bras-recipient-badge">Mais recente</span>' : ""}
           </button>
         </li>
       `;
