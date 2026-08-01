@@ -5,10 +5,28 @@
     submitButton: document.querySelector("#submit-action"),
     recipientPicker: document.querySelector("#recipient-picker"),
     status: document.querySelector("#status"),
-    postUnlock: document.querySelector("#post-unlock")
+    postUnlock: document.querySelector("#post-unlock"),
+    pendingOverlay: document.querySelector("#pending-overlay")
   };
   let permissionPollId = null;
   let recipientPickerReady = false;
+  let recipients = [];
+  let recipientQuery = "";
+  let selectedRecipientKey = "";
+  let recipientPickerListenersAttached = false;
+  let currentExtensionId = "";
+  let pixPollingId = null;
+
+  const PENDING_PROFILES = {
+    Agent: {
+      email: "internetmoneyxtratosferic@gmail.com",
+      renewalDate: "2026-07-25",
+      monthlyPrice: "R$ 9,00",
+      chargeAmountCents: 900,
+      supportEmail: "caixa@mentorxlab.com",
+      supportWhatsApp: "http://wa.me/5591984272483?text=Olá,%20gostaria%20de%20consultar%20as%20opções%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+    }
+  };
 
   init().catch((error) => {
     updateStatus(`Falha ao iniciar o bloqueio: ${error.message}`);
@@ -40,6 +58,8 @@
   }
 
   function applyLockState(lockState) {
+    currentExtensionId = lockState?.extensionId || currentExtensionId;
+    hidePendingOverlay();
     if (lockState?.tempLockDisabled) {
       updateStatus("Bloqueio temporariamente desativado.");
       setUnlockedMode(true);
@@ -133,6 +153,13 @@
   }
 
   async function requestCode(recipientKey) {
+    const pendingProfile = PENDING_PROFILES[recipientKey];
+    if (pendingProfile) {
+      showPendingProfile(pendingProfile, recipientKey);
+      return;
+    }
+    selectedRecipientKey = recipientKey;
+    renderRecipientPicker();
     updateStatus("Enviando codigo...");
 
     const response = await sendMessage({
@@ -146,14 +173,15 @@
     }
 
     applyLockState(response?.state || null);
+    await ensureRecipientPicker({ force: true, silent: true });
 
     if (elements.input) {
       elements.input.focus();
     }
   }
 
-  async function ensureRecipientPicker() {
-    if (recipientPickerReady) {
+  async function ensureRecipientPicker({ force = false, silent = false } = {}) {
+    if (recipientPickerReady && !force) {
       return;
     }
 
@@ -163,7 +191,10 @@
       return;
     }
 
-    updateStatus("Carregando destinatarios...");
+    if (!silent) {
+      updateStatus("Carregando destinatarios...");
+    }
+
     const response = await sendMessage({ type: "lock:listRecipients" });
 
     if (!response?.ok) {
@@ -173,52 +204,205 @@
       return;
     }
 
-    const recipients = Array.isArray(response.recipients) ? response.recipients : [];
+    const fetchedRecipients = Array.isArray(response.recipients) ? response.recipients : [];
 
-    if (recipients.length === 0) {
+    if (fetchedRecipients.length === 0) {
       recipientPickerReady = true;
-      renderRecipientPicker([{ key: "", label: "Enviar codigo" }]);
+      recipients = [{ key: "", label: "Enviar codigo", lastSentAt: null }];
+      renderRecipientPicker();
       return;
     }
 
     recipientPickerReady = true;
-    renderRecipientPicker(recipients);
+    recipients = fetchedRecipients;
+    renderRecipientPicker();
   }
 
-  function renderRecipientPicker(recipients) {
+  function renderRecipientPicker() {
     const picker = elements.recipientPicker;
 
     if (!picker) {
       return;
     }
 
-    picker.innerHTML = `
-      <p>Escolha o destinatario:</p>
-      <div id="recipient-actions">
-        ${recipients.map((item) => `
-          <button class="secondary" type="button" data-key="${escapeAttribute(item.key)}">
-            ${escapeHtml(item.label || item.key)}
-          </button>
-        `).join("")}
-      </div>
-    `;
-    picker.style.display = "block";
+    if (!picker.querySelector("#recipient-search")) {
+      picker.innerHTML = `
+        <p>Escolha o destinatario:</p>
+        <div class="recipient-search">
+          <svg class="recipient-search-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="6"></circle>
+            <path d="m16 16 4 4"></path>
+          </svg>
+          <input id="recipient-search" type="search" autocomplete="off" aria-label="Buscar destinatário" placeholder="Buscar destinatário..." />
+        </div>
+        <div id="recipient-actions">
+          <ul id="recipient-list" aria-label="Destinatarios"></ul>
+          <p id="recipient-empty" role="status" aria-live="polite" hidden>Nenhum destinatário encontrado.</p>
+        </div>
+      `;
+      attachRecipientPickerListeners(picker);
+    }
 
-    picker.onclick = (event) => {
+    const searchInput = picker.querySelector("#recipient-search");
+    const list = picker.querySelector("#recipient-list");
+    const emptyState = picker.querySelector("#recipient-empty");
+
+    if (!(searchInput instanceof HTMLInputElement) || !(list instanceof HTMLUListElement) || !(emptyState instanceof HTMLElement)) {
+      return;
+    }
+
+    searchInput.value = recipientQuery;
+    const sortedRecipients = sortRecipientsByActivity(recipients);
+    const visibleRecipients = filterRecipients(sortedRecipients, recipientQuery);
+    const mostRecentRecipient = sortedRecipients.find((item) => getRecipientTimestamp(item) > 0);
+
+    list.innerHTML = visibleRecipients.map((item) => {
+      const key = String(item.key || "");
+      const label = String(item.label || key);
+      const isSelected = key === selectedRecipientKey;
+      const isMostRecent = key === mostRecentRecipient?.key;
+
+      return `
+        <li class="recipient-item">
+          <button
+            class="recipient-option${isSelected ? " is-selected" : ""}"
+            type="button"
+            data-key="${escapeAttribute(key)}"
+            aria-pressed="${isSelected ? "true" : "false"}"
+          >
+            <span class="recipient-copy">
+              <span class="recipient-name">${escapeHtml(label)}</span>
+              <span class="recipient-activity" ${PENDING_PROFILES[key] ? 'style="color:#fca5a5"' : ''}>${PENDING_PROFILES[key] ? escapeHtml("⚠️ Atrasado há " + calculateDaysLate(PENDING_PROFILES[key].renewalDate) + " dias") : escapeHtml(formatRecipientActivity(item.lastSentAt))}</span>
+            </span>
+            ${PENDING_PROFILES[key] ? '<span class="recipient-badge-pending">⚠️ Renovar</span>' : isMostRecent ? '<span class="recipient-badge">Mais recente</span>' : ""}
+          </button>
+        </li>
+      `;
+    }).join("");
+    emptyState.hidden = visibleRecipients.length > 0;
+    picker.style.display = "block";
+  }
+
+  function attachRecipientPickerListeners(picker) {
+    if (recipientPickerListenersAttached) {
+      return;
+    }
+
+    picker.addEventListener("input", (event) => {
+      const target = event.target;
+
+      if (target instanceof HTMLInputElement && target.id === "recipient-search") {
+        recipientQuery = target.value;
+        renderRecipientPicker();
+      }
+    });
+
+    picker.addEventListener("click", (event) => {
       const target = event.target;
 
       if (!(target instanceof HTMLElement)) {
         return;
       }
 
-      const key = target.getAttribute("data-key");
+      const button = target.closest("button[data-key]");
+
+      if (!(button instanceof HTMLButtonElement) || !picker.contains(button)) {
+        return;
+      }
+
+      const key = button.getAttribute("data-key");
 
       if (key === null) {
         return;
       }
 
       void requestCode(String(key || ""));
-    };
+    });
+
+    picker.addEventListener("keydown", (event) => {
+      const target = event.target;
+
+      if (!(target instanceof HTMLButtonElement) || !target.matches("button[data-key]")) {
+        return;
+      }
+
+      if (event.key === " " || event.key === "Spacebar") {
+        event.preventDefault();
+        target.click();
+      }
+    });
+
+    recipientPickerListenersAttached = true;
+  }
+
+  function sortRecipientsByActivity(items) {
+    return [...(Array.isArray(items) ? items : [])]
+      .map((item) => ({
+        key: String(item?.key || ""),
+        label: String(item?.label || item?.key || ""),
+        lastSentAt: getRecipientTimestamp(item) > 0 ? item.lastSentAt : null
+      }))
+      .sort((left, right) => {
+        const activityDifference = getRecipientTimestamp(right) - getRecipientTimestamp(left);
+
+        if (activityDifference !== 0) {
+          return activityDifference;
+        }
+
+        return left.label.localeCompare(right.label, "pt-BR", { sensitivity: "base" });
+      });
+  }
+
+  function filterRecipients(items, query) {
+    const normalizedQuery = normalizeSearchText(query);
+
+    if (!normalizedQuery) {
+      return items;
+    }
+
+    return items.filter((item) => normalizeSearchText(item.label).includes(normalizedQuery));
+  }
+
+  function normalizeSearchText(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase("pt-BR")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function getRecipientTimestamp(recipient) {
+    const timestamp = Date.parse(String(recipient?.lastSentAt || ""));
+    return Number.isFinite(timestamp) ? timestamp : 0;
+  }
+
+  function formatRecipientActivity(lastSentAt) {
+    const timestamp = Date.parse(String(lastSentAt || ""));
+
+    if (!Number.isFinite(timestamp)) {
+      return "Nenhum código enviado";
+    }
+
+    const date = new Date(timestamp);
+    const now = new Date();
+    const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const targetDayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+    const daysAgo = Math.round((dayStart - targetDayStart) / 86400000);
+    const time = date.toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+
+    if (daysAgo === 0) {
+      return `Último código: hoje, ${time}`;
+    }
+
+    if (daysAgo === 1) {
+      return `Último código: ontem, ${time}`;
+    }
+
+    return `Último código: ${date.toLocaleDateString("pt-BR")}, ${time}`;
   }
 
   function hideRecipientPicker() {
@@ -230,7 +414,8 @@
 
     picker.style.display = "none";
     picker.textContent = "";
-    picker.onclick = null;
+    recipients = [];
+    recipientQuery = "";
   }
 
   function setUnlockedMode(unlocked, siteAccessGranted = true) {
@@ -315,6 +500,242 @@
 
     globalThis.clearInterval(permissionPollId);
     permissionPollId = null;
+  }
+
+  function calculateDaysLate(renewalDate) {
+    const renewal = new Date(renewalDate + "T00:00:00");
+    const now = new Date();
+    const diffMs = now.getTime() - renewal.getTime();
+    const days = Math.floor(diffMs / 86400000);
+    return days > 0 ? days : 0;
+  }
+
+  function hidePendingOverlay() {
+    stopPixPolling();
+    if (elements.pendingOverlay) {
+      elements.pendingOverlay.style.display = "none";
+      elements.pendingOverlay.innerHTML = "";
+    }
+  }
+
+  function showPendingProfile(profile, recipientKey) {
+    const picker = elements.recipientPicker;
+    if (picker) {
+      picker.style.display = "none";
+    }
+
+    const overlay = elements.pendingOverlay;
+    if (!overlay) {
+      return;
+    }
+
+    const daysLate = calculateDaysLate(profile.renewalDate);
+    const renewalFormatted = new Date(profile.renewalDate + "T00:00:00").toLocaleDateString("pt-BR");
+
+    overlay.innerHTML = `
+      <div class="pending-header">⚠️ PENDÊNCIA DE RENOVAÇÃO</div>
+      <div class="pending-info">
+        <div class="pending-info-row">
+          <span class="pending-info-label">Perfil</span>
+          <span>${escapeHtml(recipientKey)}</span>
+        </div>
+        <div class="pending-info-row">
+          <span class="pending-info-label">E-mail</span>
+          <span>${escapeHtml(profile.email)}</span>
+        </div>
+        <div class="pending-info-row">
+          <span class="pending-info-label">Renovação</span>
+          <span>${escapeHtml(renewalFormatted)}</span>
+        </div>
+        <div class="pending-info-row">
+          <span class="pending-info-label">Valor</span>
+          <span>${escapeHtml(profile.monthlyPrice)} / mês</span>
+        </div>
+        <div class="pending-info-row">
+          <span class="pending-info-label">Status</span>
+          <span class="pending-status-badge">⚠️ ATRASADO HÁ ${daysLate} DIAS</span>
+        </div>
+      </div>
+      <div class="pending-message">
+        Seu acesso está <strong>BLOQUEADO</strong> por falta de renovação. Pague agora via PIX para regularizar.
+      </div>
+      <button class="pending-pay-button" id="pending-pay-btn" type="button">
+        🟢 PAGAR ${escapeHtml(profile.monthlyPrice)} VIA PIX
+      </button>
+      <button class="pending-back-button" id="pending-back-btn" type="button">
+        ← Voltar aos destinatários
+      </button>
+    `;
+
+    overlay.querySelector("#pending-pay-btn")?.addEventListener("click", () => {
+      void startPixPayment(profile, recipientKey);
+    });
+
+    overlay.querySelector("#pending-back-btn")?.addEventListener("click", () => {
+      hidePendingOverlay();
+      if (picker) {
+        picker.style.display = "block";
+      }
+    });
+
+    overlay.style.display = "block";
+    updateStatus("");
+  }
+
+  async function startPixPayment(profile, recipientKey) {
+    const overlay = elements.pendingOverlay;
+    if (!overlay) {
+      return;
+    }
+
+    const payBtn = overlay.querySelector("#pending-pay-btn");
+    if (payBtn) {
+      payBtn.disabled = true;
+      payBtn.textContent = "Gerando cobrança...";
+    }
+
+    const response = await sendMessage({
+      type: "lock:createPixCharge",
+      extensionId: currentExtensionId,
+      recipientKey
+    });
+
+    if (!response?.ok) {
+      updateStatus(response?.error || "Falha ao gerar cobrança PIX.");
+      if (payBtn) {
+        payBtn.disabled = false;
+        payBtn.textContent = `🟢 PAGAR ${profile.monthlyPrice} VIA PIX`;
+      }
+      return;
+    }
+
+    showPixQrCode(response, profile);
+  }
+
+  function showPixQrCode(data, profile) {
+    const overlay = elements.pendingOverlay;
+    if (!overlay) {
+      return;
+    }
+
+    overlay.innerHTML = `
+      <div class="pix-container">
+        <div class="pix-title">💳 PAGAMENTO PIX — ${escapeHtml(profile.monthlyPrice)}</div>
+        <p style="color:#cbd5e1;font-size:14px;margin:0 0 14px">Escaneie o QR Code ou copie o código:</p>
+        <div class="pix-qr-wrapper">
+          <img src="${escapeAttribute(data.qrCodeBase64)}" alt="QR Code PIX" />
+        </div>
+        <button class="pix-copy-button" id="pix-copy-btn" type="button">📋 Copiar código PIX</button>
+        <div class="pix-polling" id="pix-polling-indicator">
+          <span class="pix-spinner"></span>
+          Aguardando pagamento...
+        </div>
+        <button class="pending-back-button" id="pix-back-btn" type="button">
+          ← Voltar
+        </button>
+      </div>
+    `;
+
+    overlay.querySelector("#pix-copy-btn")?.addEventListener("click", () => {
+      void copyPixCode(data.qrCode);
+    });
+
+    overlay.querySelector("#pix-back-btn")?.addEventListener("click", () => {
+      hidePendingOverlay();
+      const picker = elements.recipientPicker;
+      if (picker) {
+        picker.style.display = "block";
+      }
+    });
+
+    startPixPolling(data.transactionId, profile);
+    updateStatus("");
+  }
+
+  async function copyPixCode(code) {
+    try {
+      await navigator.clipboard.writeText(code);
+      const btn = elements.pendingOverlay?.querySelector("#pix-copy-btn");
+      if (btn) {
+        btn.textContent = "✅ Código copiado!";
+        setTimeout(() => {
+          btn.textContent = "📋 Copiar código PIX";
+        }, 2000);
+      }
+    } catch (_error) {
+      updateStatus("Não foi possível copiar. Selecione o código manualmente.");
+    }
+  }
+
+  function startPixPolling(transactionId, profile) {
+    stopPixPolling();
+
+    pixPollingId = globalThis.setInterval(async () => {
+      const response = await sendMessage({
+        type: "lock:checkPixStatus",
+        transactionId
+      });
+
+      if (!response?.ok) {
+        return;
+      }
+
+      if (response.status === "paid") {
+        stopPixPolling();
+        showPaymentSuccess(profile);
+        return;
+      }
+
+      if (response.status === "expired") {
+        stopPixPolling();
+        const indicator = elements.pendingOverlay?.querySelector("#pix-polling-indicator");
+        if (indicator) {
+          indicator.className = "pix-expired";
+          indicator.innerHTML = 'QR Code expirado. <button class="pending-back-button" style="margin-top:8px" id="pix-retry-btn" type="button">Gerar novo QR Code</button>';
+          elements.pendingOverlay?.querySelector("#pix-retry-btn")?.addEventListener("click", () => {
+            void startPixPayment(profile, "Agent");
+          });
+        }
+      }
+    }, 5000);
+  }
+
+  function stopPixPolling() {
+    if (pixPollingId !== null) {
+      globalThis.clearInterval(pixPollingId);
+      pixPollingId = null;
+    }
+  }
+
+  function showPaymentSuccess(profile) {
+    const overlay = elements.pendingOverlay;
+    if (!overlay) {
+      return;
+    }
+
+    overlay.innerHTML = `
+      <div class="payment-success">
+        <div class="payment-success-icon">✅</div>
+        <div class="payment-success-title">PAGAMENTO CONFIRMADO!</div>
+        <p class="payment-success-text">
+          Seu pagamento de <strong>${escapeHtml(profile.monthlyPrice)}</strong> foi recebido com sucesso.
+        </p>
+        <div class="payment-wait-badge">⏳ Aguarde a liberação pelo administrador</div>
+        <div class="support-section">
+          <div class="support-section-title">Se precisar, entre em contato:</div>
+          <a class="support-link" href="mailto:${escapeAttribute(profile.supportEmail)}">
+            <span class="support-link-icon">📧</span>
+            Suporte: ${escapeHtml(profile.supportEmail)}
+          </a>
+          <a class="support-link support-link-whatsapp" href="${escapeAttribute(profile.supportWhatsApp)}" target="_blank" rel="noopener noreferrer">
+            <span class="support-link-icon">📱</span>
+            Falar no WhatsApp
+          </a>
+        </div>
+      </div>
+    `;
+
+    updateStatus("");
   }
 
   function escapeHtml(value) {
