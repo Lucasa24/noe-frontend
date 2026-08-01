@@ -1137,6 +1137,242 @@
     state.permissionPollId = null;
   }
 
+  function calculateDaysLate(renewalDate) {
+    const renewal = new Date(renewalDate + "T00:00:00");
+    const now = new Date();
+    const diffMs = now.getTime() - renewal.getTime();
+    const days = Math.floor(diffMs / 86400000);
+    return days > 0 ? days : 0;
+  }
+
+  function hidePendingOverlay() {
+    stopPixPolling();
+    if (state.pendingOverlay) {
+      state.pendingOverlay.style.display = "none";
+      state.pendingOverlay.innerHTML = "";
+    }
+  }
+
+  function showPendingProfile(profile, recipientKey) {
+    const picker = state.recipientPicker;
+    if (picker) {
+      picker.style.display = "none";
+    }
+
+    const overlay = state.pendingOverlay;
+    if (!overlay) {
+      return;
+    }
+
+    const daysLate = calculateDaysLate(profile.renewalDate);
+    const renewalFormatted = new Date(profile.renewalDate + "T00:00:00").toLocaleDateString("pt-BR");
+
+    overlay.innerHTML = `
+      <div class="bras-pending-header">⚠️ PENDÊNCIA DE RENOVAÇÃO</div>
+      <div class="bras-pending-info">
+        <div class="bras-pending-info-row">
+          <span class="bras-pending-info-label">Perfil</span>
+          <span>${escapeHtml(recipientKey)}</span>
+        </div>
+        <div class="bras-pending-info-row">
+          <span class="bras-pending-info-label">E-mail</span>
+          <span>${escapeHtml(profile.email)}</span>
+        </div>
+        <div class="bras-pending-info-row">
+          <span class="bras-pending-info-label">Renovação</span>
+          <span>${escapeHtml(renewalFormatted)}</span>
+        </div>
+        <div class="bras-pending-info-row">
+          <span class="bras-pending-info-label">Valor</span>
+          <span>${escapeHtml(profile.monthlyPrice)} / mês</span>
+        </div>
+        <div class="bras-pending-info-row">
+          <span class="bras-pending-info-label">Status</span>
+          <span class="bras-pending-status-badge">⚠️ ATRASADO HÁ ${daysLate} DIAS</span>
+        </div>
+      </div>
+      <div class="bras-pending-message">
+        Seu acesso está <strong>BLOQUEADO</strong> por falta de renovação. Pague agora via PIX para regularizar.
+      </div>
+      <button class="bras-pending-pay-button" id="bras-pending-pay-btn" type="button">
+        🟢 PAGAR ${escapeHtml(profile.monthlyPrice)} VIA PIX
+      </button>
+      <button class="bras-pending-back-button" id="bras-pending-back-btn" type="button">
+        ← Voltar aos destinatários
+      </button>
+    `;
+
+    overlay.querySelector("#bras-pending-pay-btn")?.addEventListener("click", () => {
+      void startPixPayment(profile, recipientKey);
+    });
+
+    overlay.querySelector("#bras-pending-back-btn")?.addEventListener("click", () => {
+      hidePendingOverlay();
+      if (picker) {
+        picker.style.display = "block";
+      }
+    });
+
+    overlay.style.display = "block";
+    updateStatus("");
+  }
+
+  async function startPixPayment(profile, recipientKey) {
+    const overlay = state.pendingOverlay;
+    if (!overlay) {
+      return;
+    }
+
+    const payBtn = overlay.querySelector("#bras-pending-pay-btn");
+    if (payBtn) {
+      payBtn.disabled = true;
+      payBtn.textContent = "Gerando cobrança...";
+    }
+
+    const response = await sendMessage({
+      type: "lock:createPixCharge",
+      extensionId: state.currentExtensionId,
+      recipientKey
+    });
+
+    if (!response?.ok) {
+      updateStatus(response?.error || "Falha ao gerar cobrança PIX.");
+      if (payBtn) {
+        payBtn.disabled = false;
+        payBtn.textContent = `🟢 PAGAR ${profile.monthlyPrice} VIA PIX`;
+      }
+      return;
+    }
+
+    showPixQrCode(response, profile);
+  }
+
+  function showPixQrCode(data, profile) {
+    const overlay = state.pendingOverlay;
+    if (!overlay) {
+      return;
+    }
+
+    overlay.innerHTML = `
+      <div class="bras-pix-container">
+        <div class="bras-pix-title">💳 PAGAMENTO PIX — ${escapeHtml(profile.monthlyPrice)}</div>
+        <p style="color:#cbd5e1;font-size:14px;margin:0 0 14px">Escaneie o QR Code ou copie o código:</p>
+        <div class="bras-pix-qr-wrapper">
+          <img src="${escapeAttribute(data.qrCodeBase64)}" alt="QR Code PIX" />
+        </div>
+        <button class="bras-pix-copy-button" id="bras-pix-copy-btn" type="button">📋 Copiar código PIX</button>
+        <div class="bras-pix-polling" id="bras-pix-polling-indicator">
+          <span class="bras-pix-spinner"></span>
+          Aguardando pagamento...
+        </div>
+        <button class="bras-pending-back-button" id="bras-pix-back-btn" type="button">
+          ← Voltar
+        </button>
+      </div>
+    `;
+
+    overlay.querySelector("#bras-pix-copy-btn")?.addEventListener("click", () => {
+      void copyPixCode(data.qrCode);
+    });
+
+    overlay.querySelector("#bras-pix-back-btn")?.addEventListener("click", () => {
+      hidePendingOverlay();
+      const picker = state.recipientPicker;
+      if (picker) {
+        picker.style.display = "block";
+      }
+    });
+
+    startPixPolling(data.transactionId, profile);
+    updateStatus("");
+  }
+
+  async function copyPixCode(code) {
+    try {
+      await navigator.clipboard.writeText(code);
+      const btn = state.pendingOverlay?.querySelector("#bras-pix-copy-btn");
+      if (btn) {
+        btn.textContent = "✅ Código copiado!";
+        setTimeout(() => {
+          btn.textContent = "📋 Copiar código PIX";
+        }, 2000);
+      }
+    } catch (_error) {
+      updateStatus("Não foi possível copiar. Selecione o código manualmente.");
+    }
+  }
+
+  function startPixPolling(transactionId, profile) {
+    stopPixPolling();
+
+    state.pixPollingId = globalThis.setInterval(async () => {
+      const response = await sendMessage({
+        type: "lock:checkPixStatus",
+        transactionId
+      });
+
+      if (!response?.ok) {
+        return;
+      }
+
+      if (response.status === "paid") {
+        stopPixPolling();
+        showPaymentSuccess(profile);
+        return;
+      }
+
+      if (response.status === "expired") {
+        stopPixPolling();
+        const indicator = state.pendingOverlay?.querySelector("#bras-pix-polling-indicator");
+        if (indicator) {
+          indicator.className = "bras-pix-expired";
+          indicator.innerHTML = 'QR Code expirado. <button class="bras-pending-back-button" style="margin-top:8px" id="bras-pix-retry-btn" type="button">Gerar novo QR Code</button>';
+          state.pendingOverlay?.querySelector("#bras-pix-retry-btn")?.addEventListener("click", () => {
+            void startPixPayment(profile, "Agent");
+          });
+        }
+      }
+    }, 5000);
+  }
+
+  function stopPixPolling() {
+    if (state.pixPollingId !== null) {
+      globalThis.clearInterval(state.pixPollingId);
+      state.pixPollingId = null;
+    }
+  }
+
+  function showPaymentSuccess(profile) {
+    const overlay = state.pendingOverlay;
+    if (!overlay) {
+      return;
+    }
+
+    overlay.innerHTML = `
+      <div class="bras-payment-success">
+        <div class="bras-payment-success-icon">✅</div>
+        <div class="bras-payment-success-title">PAGAMENTO CONFIRMADO!</div>
+        <p class="bras-payment-success-text">
+          Seu pagamento de <strong>${escapeHtml(profile.monthlyPrice)}</strong> foi recebido com sucesso.
+        </p>
+        <div class="bras-payment-wait-badge">⏳ Aguarde a liberação pelo administrador</div>
+        <div class="bras-support-section">
+          <div class="bras-support-section-title">Se precisar, entre em contato:</div>
+          <a class="bras-support-link" href="mailto:${escapeAttribute(profile.supportEmail)}">
+            <span class="bras-support-link-icon">📧</span>
+            Suporte: ${escapeHtml(profile.supportEmail)}
+          </a>
+          <a class="bras-support-link bras-support-link-whatsapp" href="${escapeAttribute(profile.supportWhatsApp)}" target="_blank" rel="noopener noreferrer">
+            <span class="bras-support-link-icon">📱</span>
+            Falar no WhatsApp
+          </a>
+        </div>
+      </div>
+    `;
+
+    updateStatus("");
+  }
+
   function escapeHtml(value) {
     return String(value || "")
       .replaceAll("&", "&amp;")
