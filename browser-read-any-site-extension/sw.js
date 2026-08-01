@@ -89,6 +89,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return;
       }
 
+      if (message?.type === "lock:createPixCharge") {
+        sendResponse(await createPixCharge(message.extensionId, message.recipientKey));
+        return;
+      }
+
+      if (message?.type === "lock:checkPixStatus") {
+        sendResponse(await checkPixStatus(message.transactionId));
+        return;
+      }
+
       if (message?.type === "lock:resendCode") {
         const result = await sendAccessCode("");
         sendResponse(result);
@@ -493,6 +503,86 @@ async function sendAccessCode(recipientKey) {
   };
 }
 
+async function createPixCharge(extensionId, recipientKey) {
+  const config = await getAuthConfig();
+
+  if (!config.webhookUrl) {
+    return {
+      ok: false,
+      error: "Configure o webhook antes de gerar a cobranca PIX."
+    };
+  }
+
+  try {
+    const pixChargeUrl = buildSiblingApiUrl(config.webhookUrl, "pix-charge");
+    const response = await postJson(pixChargeUrl, {
+      extensionId: String(extensionId || chrome.runtime.id || ""),
+      recipientKey: String(recipientKey || "")
+    }, config.webhookToken);
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        error: mapServerError(response.error)
+      };
+    }
+
+    if (!response.transactionId || !response.qrCode || !response.qrCodeBase64) {
+      return {
+        ok: false,
+        error: "Resposta invalida ao gerar cobranca PIX."
+      };
+    }
+
+    return {
+      ok: true,
+      transactionId: String(response.transactionId),
+      qrCode: String(response.qrCode),
+      qrCodeBase64: normalizePixImageSource(response.qrCodeBase64)
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Nao foi possivel gerar a cobranca PIX."
+    };
+  }
+}
+
+async function checkPixStatus(transactionId) {
+  const config = await getAuthConfig();
+
+  if (!config.webhookUrl) {
+    return {
+      ok: false,
+      error: "Configure o webhook antes de consultar o PIX."
+    };
+  }
+
+  try {
+    const pixStatusUrl = buildSiblingApiUrl(config.webhookUrl, "pix-status");
+    const response = await postJson(pixStatusUrl, {
+      transactionId: String(transactionId || "")
+    }, config.webhookToken);
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        error: mapServerError(response.error)
+      };
+    }
+
+    return {
+      ok: true,
+      status: normalizePixStatus(response.status)
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Nao foi possivel consultar o status do PIX."
+    };
+  }
+}
+
 async function requestAccessCode(state, config) {
   try {
     const response = await postJson(config.webhookUrl, {
@@ -634,13 +724,16 @@ async function enforceLockedBrowser(state) {
     await saveLockState(nextState);
   }
 
+  // Enquanto o Browser Read estiver bloqueado, a tela de bloqueio deve ser a
+  // unica aba disponivel. A unica excecao e a aba temporaria usada pelo
+  // proprio navegador para conceder a permissao de acesso ao site.
   const tabsToClose = tabs
     .filter((tab) => {
       if (typeof tab.id !== "number" || tab.id === blockedTab?.id) {
         return false;
       }
 
-      return !isAllowedWhileLocked(tab.pendingUrl || tab.url || "", state, tab);
+      return !isPendingHostAccessTab(tab, state);
     })
     .map((tab) => tab.id);
 
@@ -933,8 +1026,6 @@ function isAllowedWhileLocked(url, state = null, tab = null) {
   }
 
   return normalizedUrl === normalizeUrl(getBlockedPageUrl())
-    || normalizedUrl === normalizeUrl(chrome.runtime.getURL("options.html"))
-    || isExtensionsManagerUrl(normalizedUrl)
     || isPendingHostAccessUrl(normalizedUrl, state);
 }
 
@@ -1101,6 +1192,38 @@ function buildSiblingApiUrl(baseUrl, endpointName) {
   return url.toString();
 }
 
+function normalizePixStatus(status) {
+  const normalizedStatus = String(status || "").trim().toLowerCase();
+
+  if (!normalizedStatus) {
+    return "pending";
+  }
+
+  if (["paid", "completed", "approved", "success", "succeeded"].includes(normalizedStatus)) {
+    return "paid";
+  }
+
+  if (["expired", "canceled", "cancelled"].includes(normalizedStatus)) {
+    return "expired";
+  }
+
+  return normalizedStatus;
+}
+
+function normalizePixImageSource(value) {
+  const normalizedValue = String(value || "").trim();
+
+  if (!normalizedValue) {
+    return "";
+  }
+
+  if (normalizedValue.startsWith("data:")) {
+    return normalizedValue;
+  }
+
+  return `data:image/png;base64,${normalizedValue}`;
+}
+
 function mapServerError(errorCode) {
   switch (errorCode) {
     case "invalid_code":
@@ -1117,12 +1240,20 @@ function mapServerError(errorCode) {
       return "O destinatario selecionado nao existe no servidor.";
     case "invalid_extension_email_map":
       return "O mapa de emails por extensao esta invalido no servidor.";
+    case "missing_parameters":
+      return "Faltam parametros obrigatorios para concluir a operacao.";
     case "unauthorized":
       return "Token do webhook invalido.";
     case "missing_signing_secret":
       return "O servidor nao foi configurado com a chave de assinatura.";
     case "missing_smtp_config":
       return "O servidor nao foi configurado com SMTP.";
+    case "missing_pushinpay_config":
+      return "O servidor nao foi configurado com o token da PushinPay.";
+    case "pix_charge_failed":
+      return "Nao foi possivel gerar a cobranca PIX.";
+    case "pix_status_failed":
+      return "Nao foi possivel consultar o status do PIX.";
     default:
       return errorCode ? `Erro do servidor: ${errorCode}` : "Falha ao comunicar com o servidor.";
   }
