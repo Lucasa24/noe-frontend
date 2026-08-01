@@ -619,10 +619,10 @@
       return;
     }
 
-    showPixQrCode(response, profile);
+    showPixQrCode(response, profile, recipientKey);
   }
 
-  function showPixQrCode(data, profile) {
+  function showPixQrCode(data, profile, recipientKey) {
     const overlay = elements.pendingOverlay;
     if (!overlay) {
       return;
@@ -658,7 +658,7 @@
       }
     });
 
-    startPixPolling(data.transactionId, profile);
+    startPixPolling(data.transactionId, profile, recipientKey);
     updateStatus("");
   }
 
@@ -677,7 +677,7 @@
     }
   }
 
-  function startPixPolling(transactionId, profile) {
+  function startPixPolling(transactionId, profile, recipientKey) {
     stopPixPolling();
 
     pixPollingId = globalThis.setInterval(async () => {
@@ -703,7 +703,7 @@
           indicator.className = "pix-expired";
           indicator.innerHTML = 'QR Code expirado. <button class="pending-back-button" style="margin-top:8px" id="pix-retry-btn" type="button">Gerar novo QR Code</button>';
           elements.pendingOverlay?.querySelector("#pix-retry-btn")?.addEventListener("click", () => {
-            void startPixPayment(profile, "Agent");
+            void startPixPayment(profile, recipientKey);
           });
         }
       }
