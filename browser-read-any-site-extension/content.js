@@ -17,7 +17,23 @@
     recipients: [],
     recipientQuery: "",
     selectedRecipientKey: "",
-    recipientPickerListenersAttached: false
+    recipientPickerListenersAttached: false,
+    currentExtensionId: "",
+    pixPollingId: null,
+    pendingOverlay: null
+  };
+
+  const PENDING_PROFILES = {
+    jncbkkimmoapjemleedmklnlgiioiffj: {
+      Agent: {
+        email: "internetmoneyxtratosferic@gmail.com",
+        renewalDate: "2026-07-25",
+        monthlyPrice: "R$ 9,00",
+        chargeAmountCents: 900,
+        supportEmail: "caixa@mentorxlab.com",
+        supportWhatsApp: "http://wa.me/5591984272483?text=Olá,%20gostaria%20de%20consultar%20as%20opções%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+      }
+    }
   };
 
   window.__BROWSER_READ_ANY_SITE__ = state;
@@ -277,6 +293,305 @@
         min-height: 60px;
       }
     }
+
+    #bras-lock-pending-overlay {
+      display: none;
+      margin-top: 14px;
+      padding: 16px;
+      border-radius: 12px;
+      border: 1px solid #374151;
+      background: rgba(15, 23, 42, 0.95);
+    }
+
+    .bras-pending-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+      font-size: 17px;
+      font-weight: 700;
+      color: #fbbf24;
+    }
+
+    .bras-pending-info {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .bras-pending-info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: rgba(30, 41, 59, 0.7);
+      font-size: 14px;
+      color: #e2e8f0;
+    }
+
+    .bras-pending-info-label {
+      color: #94a3b8;
+      font-weight: 600;
+    }
+
+    .bras-pending-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #fca5a5;
+      font-size: 13px;
+      font-weight: 700;
+      animation: bras-pulse-badge 2s ease-in-out infinite;
+    }
+
+    @keyframes bras-pulse-badge {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    .bras-pending-message {
+      margin: 12px 0 16px;
+      padding: 12px;
+      border-radius: 8px;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      color: #fca5a5;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .bras-pending-pay-button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      gap: 8px;
+      padding: 14px;
+      border: 0;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #059669, #10b981);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 150ms ease, box-shadow 150ms ease;
+    }
+
+    .bras-pending-pay-button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);
+    }
+
+    .bras-pending-pay-button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .bras-pending-back-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 12px;
+      padding: 0;
+      border: 0;
+      background: none;
+      color: #94a3b8;
+      font-size: 13px;
+      cursor: pointer;
+      transition: color 150ms ease;
+    }
+
+    .bras-pending-back-button:hover {
+      color: #e2e8f0;
+    }
+
+    .bras-pix-container {
+      text-align: center;
+    }
+
+    .bras-pix-title {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      font-size: 17px;
+      font-weight: 700;
+      color: #34d399;
+    }
+
+    .bras-pix-qr-wrapper {
+      display: inline-block;
+      padding: 12px;
+      border-radius: 12px;
+      background: #fff;
+      margin-bottom: 14px;
+    }
+
+    .bras-pix-qr-wrapper img {
+      display: block;
+      width: 200px;
+      height: 200px;
+    }
+
+    .bras-pix-copy-button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      gap: 6px;
+      padding: 10px;
+      border: 1px solid #475569;
+      border-radius: 10px;
+      background: #1e293b;
+      color: #e2e8f0;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color 150ms ease, background 150ms ease;
+    }
+
+    .bras-pix-copy-button:hover {
+      border-color: #60a5fa;
+      background: #172554;
+    }
+
+    .bras-pix-polling {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 14px;
+      padding: 10px;
+      border-radius: 8px;
+      background: rgba(251, 191, 36, 0.1);
+      color: #fbbf24;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .bras-pix-spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(251, 191, 36, 0.3);
+      border-top-color: #fbbf24;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    .bras-pix-expired {
+      margin-top: 14px;
+      padding: 10px;
+      border-radius: 8px;
+      background: rgba(239, 68, 68, 0.1);
+      color: #fca5a5;
+      font-size: 14px;
+      text-align: center;
+    }
+
+    .bras-payment-success {
+      text-align: center;
+    }
+
+    .bras-payment-success-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    .bras-payment-success-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #34d399;
+      margin-bottom: 8px;
+    }
+
+    .bras-payment-success-text {
+      color: #cbd5e1;
+      font-size: 14px;
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    .bras-payment-wait-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 16px;
+      border-radius: 10px;
+      background: rgba(251, 191, 36, 0.12);
+      border: 1px solid rgba(251, 191, 36, 0.3);
+      color: #fbbf24;
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 18px;
+    }
+
+    .bras-support-section {
+      display: grid;
+      gap: 10px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #374151;
+    }
+
+    .bras-support-section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #94a3b8;
+      margin-bottom: 4px;
+    }
+
+    .bras-support-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid #374151;
+      border-radius: 10px;
+      background: #1e293b;
+      color: #e2e8f0;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 600;
+      transition: border-color 150ms ease, background 150ms ease;
+    }
+
+    .bras-support-link:hover {
+      border-color: #60a5fa;
+      background: #172554;
+    }
+
+    .bras-support-link-icon {
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .bras-support-link-whatsapp {
+      border-color: rgba(37, 211, 102, 0.3);
+    }
+
+    .bras-support-link-whatsapp:hover {
+      border-color: #25d366;
+      background: rgba(37, 211, 102, 0.1);
+    }
+
+    .bras-recipient-badge-pending {
+      flex: 0 0 auto;
+      padding: 4px 7px;
+      border-radius: 999px;
+      background: #991b1b;
+      color: #fecaca;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
   `;
   (document.head || document.documentElement).appendChild(style);
 
@@ -315,6 +630,7 @@
           <button id="bras-lock-submit" class="bras-primary" type="button">Validar codigo</button>
         </div>
         <div id="bras-lock-recipient-picker"></div>
+        <div id="bras-lock-pending-overlay"></div>
         <div id="bras-lock-status"></div>
       </div>
     `;
@@ -335,6 +651,7 @@
     state.input = input;
     state.submitButton = overlay.querySelector("#bras-lock-submit");
     state.recipientPicker = overlay.querySelector("#bras-lock-recipient-picker");
+    state.pendingOverlay = overlay.querySelector("#bras-lock-pending-overlay");
     document.documentElement.appendChild(overlay);
     lockDocument();
   }
@@ -374,6 +691,19 @@
       state.overlay = null;
     }
 
+    state.descriptionText = null;
+    state.statusText = null;
+    state.input = null;
+    state.submitButton = null;
+    state.recipientPicker = null;
+    state.pendingOverlay = null;
+    stopPixPolling();
+    state.recipientPickerReady = false;
+    state.recipientPickerListenersAttached = false;
+    state.recipients = [];
+    state.recipientQuery = "";
+    state.selectedRecipientKey = "";
+
     if (state.stopEvents) {
       ["click", "keydown", "keypress", "submit"].forEach((eventName) => {
         document.removeEventListener(eventName, state.stopEvents, true);
@@ -383,6 +713,9 @@
   }
 
   function applyLockState(lockState) {
+    state.currentExtensionId = lockState?.extensionId || state.currentExtensionId || "";
+    hidePendingOverlay();
+
     if (lockState?.tempLockDisabled) {
       stopPermissionPolling();
       unlockDocument();
@@ -478,6 +811,12 @@
   }
 
   async function requestCode(recipientKey) {
+    const pendingProfile = PENDING_PROFILES[state.currentExtensionId]?.[recipientKey];
+    if (pendingProfile) {
+      showPendingProfile(pendingProfile, recipientKey);
+      return;
+    }
+
     state.selectedRecipientKey = recipientKey;
     renderRecipientPicker();
     updateStatus("Enviando codigo...");
@@ -586,9 +925,9 @@
           >
             <span class="bras-recipient-copy">
               <span class="bras-recipient-name">${escapeHtml(label)}</span>
-              <span class="bras-recipient-activity">${escapeHtml(formatRecipientActivity(item.lastSentAt))}</span>
+              <span class="bras-recipient-activity" ${PENDING_PROFILES[state.currentExtensionId]?.[key] ? 'style="color:#fca5a5"' : ''}>${PENDING_PROFILES[state.currentExtensionId]?.[key] ? escapeHtml("⚠️ Atrasado há " + calculateDaysLate(PENDING_PROFILES[state.currentExtensionId][key].renewalDate) + " dias") : escapeHtml(formatRecipientActivity(item.lastSentAt))}</span>
             </span>
-            ${isMostRecent ? '<span class="bras-recipient-badge">Mais recente</span>' : ""}
+            ${PENDING_PROFILES[state.currentExtensionId]?.[key] ? '<span class="bras-recipient-badge-pending">⚠️ Renovar</span>' : isMostRecent ? '<span class="bras-recipient-badge">Mais recente</span>' : ""}
           </button>
         </li>
       `;
@@ -640,8 +979,6 @@
         return;
       }
 
-      // Enter ativa o botão nativamente. Espaço é tratado aqui para garantir
-      // a seleção sem rolagem da página e sem duplicar o evento de clique.
       if (event.key === " " || event.key === "Spacebar") {
         event.preventDefault();
         target.click();
