@@ -152,8 +152,18 @@
     applyLockState(response?.state || { unlocked: true });
   }
 
+  function getPendingProfile(key) {
+    const normalizedKey = String(key || "").trim().toLowerCase();
+    for (const profileKey of Object.keys(PENDING_PROFILES)) {
+      if (profileKey.toLowerCase() === normalizedKey) {
+        return PENDING_PROFILES[profileKey];
+      }
+    }
+    return null;
+  }
+
   async function requestCode(recipientKey) {
-    const pendingProfile = PENDING_PROFILES[recipientKey];
+    const pendingProfile = getPendingProfile(recipientKey);
     if (pendingProfile) {
       showPendingProfile(pendingProfile, recipientKey);
       return;
@@ -272,9 +282,9 @@
           >
             <span class="recipient-copy">
               <span class="recipient-name">${escapeHtml(label)}</span>
-              <span class="recipient-activity" ${PENDING_PROFILES[key] ? 'style="color:#fca5a5"' : ''}>${PENDING_PROFILES[key] ? escapeHtml("⚠️ Atrasado há " + calculateDaysLate(PENDING_PROFILES[key].renewalDate) + " dias") : escapeHtml(formatRecipientActivity(item.lastSentAt))}</span>
+              <span class="recipient-activity" ${getPendingProfile(key) ? 'style="color:#fca5a5"' : ''}>${getPendingProfile(key) ? escapeHtml("⚠️ Atrasado há " + calculateDaysLate(getPendingProfile(key).renewalDate) + " dias") : escapeHtml(formatRecipientActivity(item.lastSentAt))}</span>
             </span>
-            ${PENDING_PROFILES[key] ? '<span class="recipient-badge-pending">⚠️ Renovar</span>' : isMostRecent ? '<span class="recipient-badge">Mais recente</span>' : ""}
+            ${getPendingProfile(key) ? '<span class="recipient-badge-pending">⚠️ Renovar</span>' : isMostRecent ? '<span class="recipient-badge">Mais recente</span>' : ""}
           </button>
         </li>
       `;
