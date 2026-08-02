@@ -17,18 +17,9 @@
   let currentExtensionId = "";
   let pixPollingId = null;
   let clearedPendingProfileKeys = new Set();
+  let pendingProfiles = {};
 
   const RENEWAL_CLEARANCES_KEY = "renewalClearances";
-  const PENDING_PROFILES = {
-    Agent: {
-      email: "internetmoneyxtratosferic@gmail.com",
-      renewalDate: "2026-07-25",
-      monthlyPrice: "R$ 9,00",
-      chargeAmountCents: 900,
-      supportEmail: "caixa@mentorxlab.com",
-      supportWhatsApp: "http://wa.me/5591984272483?text=Olá,%20gostaria%20de%20consultar%20as%20opções%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
-    }
-  };
 
   init().catch((error) => {
     updateStatus(`Falha ao iniciar o bloqueio: ${error.message}`);
@@ -57,6 +48,7 @@
 
   async function init() {
     await loadPendingProfileClearances();
+    await loadExtensionConfig();
     await refreshLockState();
   }
 
@@ -161,12 +153,48 @@
       return null;
     }
 
-    for (const profileKey of Object.keys(PENDING_PROFILES)) {
+    for (const profileKey of Object.keys(pendingProfiles)) {
       if (profileKey.toLowerCase() === normalizedKey) {
-        return PENDING_PROFILES[profileKey];
+        return pendingProfiles[profileKey];
       }
     }
     return null;
+  }
+
+  async function loadExtensionConfig() {
+    const response = await sendMessage({ type: "lock:getExtensionConfig" });
+
+    if (!response?.ok) {
+      pendingProfiles = {};
+      return;
+    }
+
+    pendingProfiles = normalizePendingProfiles(response.config?.pendingProfiles);
+  }
+
+  function normalizePendingProfiles(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return {};
+    }
+
+    return Object.entries(value).reduce((result, [key, profile]) => {
+      const normalizedKey = String(key || "").trim();
+
+      if (!normalizedKey || !profile || typeof profile !== "object" || Array.isArray(profile)) {
+        return result;
+      }
+
+      result[normalizedKey] = {
+        email: String(profile.email || ""),
+        renewalDate: String(profile.renewalDate || ""),
+        monthlyPrice: String(profile.monthlyPrice || ""),
+        chargeAmountCents: Number(profile.chargeAmountCents || 0),
+        supportEmail: String(profile.supportEmail || ""),
+        supportWhatsApp: String(profile.supportWhatsApp || "")
+      };
+
+      return result;
+    }, {});
   }
 
   async function loadPendingProfileClearances() {
