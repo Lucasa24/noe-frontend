@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Browser Read Any Site",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Extensao minima com permissao de leitura em qualquer site.",
   "permissions": [
     "scripting",
