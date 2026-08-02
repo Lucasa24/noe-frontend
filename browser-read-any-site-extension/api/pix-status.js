@@ -1,0 +1,103 @@
+module.exports = async (req, res) => {
+  setCorsHeaders(res);
+
+  if (req.method === "OPTIONS") {
+    res.status(204).end();
+    return;
+  }
+
+  if (req.method !== "POST") {
+    res.status(405).json({
+      ok: false,
+      error: "method_not_allowed"
+    });
+    return;
+  }
+
+  try {
+    assertAuthorized(req);
+
+    const body = normalizeBody(req.body);
+    const { transactionId } = body;
+
+    if (!transactionId) {
+      const error = new Error("missing_parameters");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const pushinPayToken = process.env.PUSHINPAY_TOKEN;
+    if (!pushinPayToken) {
+      const error = new Error("missing_pushinpay_config");
+      error.statusCode = 500;
+      throw error;
+    }
+
+    const response = await fetch(`https://api.pushinpay.com.br/api/transactions/${transactionId}`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${pushinPayToken}`,
+        "Accept": "application/json"
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error("pix_status_failed");
+    }
+
+    const data = await response.json();
+
+    res.status(200).json({
+      ok: true,
+      status: data.status
+    });
+  } catch (error) {
+    res.status(Number(error?.statusCode || 500)).json({
+      ok: false,
+      error: error instanceof Error ? error.message : "pix_status_failed"
+    });
+  }
+};
+
+function setCorsHeaders(res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+}
+
+function assertAuthorized(req) {
+  const expectedToken = process.env.WEBHOOK_TOKEN || "";
+  const providedToken = getBearerToken(req);
+
+  if (expectedToken && providedToken !== expectedToken) {
+    const error = new Error("unauthorized");
+    error.statusCode = 401;
+    throw error;
+  }
+}
+
+function getBearerToken(req) {
+  const header = String(req.headers.authorization || "");
+
+  if (!header.startsWith("Bearer ")) {
+    return "";
+  }
+
+  return header.slice("Bearer ".length).trim();
+}
+
+function normalizeBody(body) {
+  if (!body) {
+    return {};
+  }
+
+  if (typeof body === "string") {
+    try {
+      return JSON.parse(body);
+    } catch (_error) {
+      return {};
+    }
+  }
+
+  return body;
+}
