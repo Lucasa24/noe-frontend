@@ -22,7 +22,7 @@ const EXTENSION_CONFIG_OVERRIDES = {
   // }
 };
 
-module.exports = async (req, res) => {
+async function extensionConfigHandler(req, res) {
   setCorsHeaders(res);
 
   if (req.method === "OPTIONS") {
@@ -63,21 +63,36 @@ module.exports = async (req, res) => {
       error: error instanceof Error ? error.message : "extension_config_failed"
     });
   }
-};
+}
 
 function buildExtensionConfig(extensionId) {
   const override = EXTENSION_CONFIG_OVERRIDES[extensionId] || {};
   return mergeExtensionConfig(DEFAULT_EXTENSION_CONFIG, override);
 }
 
+function resolvePendingProfile(extensionId, recipientKey) {
+  const config = buildExtensionConfig(extensionId);
+  const normalizedRecipientKey = String(recipientKey || "").trim().toLowerCase();
+  const pendingProfiles = config.pendingProfiles || {};
+
+  for (const [profileKey, profile] of Object.entries(pendingProfiles)) {
+    if (String(profileKey || "").trim().toLowerCase() === normalizedRecipientKey) {
+      return profile;
+    }
+  }
+
+  return null;
+}
+
 function mergeExtensionConfig(baseConfig, overrideConfig) {
+  const hasPendingProfileOverride = Object.prototype.hasOwnProperty.call(overrideConfig, "pendingProfiles");
+
   return {
     ...baseConfig,
     ...overrideConfig,
-    pendingProfiles: {
-      ...(baseConfig.pendingProfiles || {}),
-      ...(overrideConfig.pendingProfiles || {})
-    }
+    pendingProfiles: hasPendingProfileOverride
+      ? (overrideConfig.pendingProfiles || {})
+      : (baseConfig.pendingProfiles || {})
   };
 }
 
@@ -123,3 +138,7 @@ function normalizeBody(body) {
 
   return body;
 }
+
+module.exports = extensionConfigHandler;
+module.exports.buildExtensionConfig = buildExtensionConfig;
+module.exports.resolvePendingProfile = resolvePendingProfile;
