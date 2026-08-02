@@ -2,6 +2,7 @@ const AUTH_CONFIG_KEY = "authConfig";
 const LOCK_STATE_KEY = "lockState";
 const LAST_ACTIVE_TAB_KEY = "lastActiveTabSnapshot";
 const SESSION_KEY = "browserSessionId";
+const EXTENSION_CONFIG_CACHE_KEY = "extensionConfigCache";
 const DEFAULT_WEBHOOK_URL = "https://noe-frontend.vercel.app/api/send-code";
 const DEFAULT_WEBHOOK_TOKEN = "b4b7f9f9e7c64f3d9c1a8d2f6e3b7a91";
 const BLOCKED_PAGE_PATH = "blocked.html";
@@ -76,6 +77,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
       if (message?.type === "lock:listRecipients") {
         sendResponse(await listRecipients());
+        return;
+      }
+
+      if (message?.type === "lock:getExtensionConfig") {
+        sendResponse(await getExtensionConfig());
         return;
       }
 
@@ -548,6 +554,41 @@ async function createPixCharge(extensionId, recipientKey) {
   }
 }
 
+async function getExtensionConfig() {
+  const config = await getAuthConfig();
+
+  if (!config.webhookUrl) {
+    return {
+      ok: false,
+      error: "Configure o webhook antes de carregar a configuracao da extensao."
+    };
+  }
+
+  try {
+    const extensionConfigUrl = buildSiblingApiUrl(config.webhookUrl, "extension-config");
+    const response = await postJson(extensionConfigUrl, {
+      extensionId: chrome.runtime.id
+    }, config.webhookToken);
+
+    if (!response.ok || !response.config) {
+      return await getCachedExtensionConfig(mapServerError(response.error));
+    }
+
+    const normalizedConfig = normalizeExtensionConfig(response.config);
+    await saveExtensionConfigCache(normalizedConfig);
+
+    return {
+      ok: true,
+      source: "remote",
+      config: normalizedConfig
+    };
+  } catch (error) {
+    return getCachedExtensionConfig(
+      error instanceof Error ? error.message : "Nao foi possivel carregar a configuracao da extensao."
+    );
+  }
+}
+
 async function checkPixStatus(transactionId) {
   const config = await getAuthConfig();
 
@@ -669,6 +710,34 @@ async function listRecipients() {
       error: error instanceof Error ? error.message : "Nao foi possivel carregar os destinatarios."
     };
   }
+}
+
+async function getCachedExtensionConfig(errorMessage) {
+  const data = await chrome.storage.local.get(EXTENSION_CONFIG_CACHE_KEY).catch(() => ({}));
+  const cachedConfig = data[EXTENSION_CONFIG_CACHE_KEY]?.config || null;
+
+  if (cachedConfig) {
+    return {
+      ok: true,
+      source: "cache",
+      error: errorMessage,
+      config: normalizeExtensionConfig(cachedConfig)
+    };
+  }
+
+  return {
+    ok: false,
+    error: errorMessage || "Nao foi possivel carregar a configuracao da extensao."
+  };
+}
+
+async function saveExtensionConfigCache(config) {
+  await chrome.storage.local.set({
+    [EXTENSION_CONFIG_CACHE_KEY]: {
+      config,
+      cachedAt: Date.now()
+    }
+  });
 }
 
 async function ensureCurrentLockState(reason) {
@@ -1224,6 +1293,43 @@ function normalizePixImageSource(value) {
   return `data:image/png;base64,${normalizedValue}`;
 }
 
+function normalizeExtensionConfig(config) {
+  const rawConfig = config && typeof config === "object" && !Array.isArray(config) ? config : {};
+
+  return {
+    version: Number(rawConfig.version || 1),
+    pixEnabled: rawConfig.pixEnabled !== false,
+    autoUnlockAfterPaid: rawConfig.autoUnlockAfterPaid === true,
+    allowCodeRequestAfterPaid: rawConfig.allowCodeRequestAfterPaid !== false,
+    pendingProfiles: normalizePendingProfiles(rawConfig.pendingProfiles)
+  };
+}
+
+function normalizePendingProfiles(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.entries(value).reduce((result, [key, profile]) => {
+    const normalizedKey = String(key || "").trim();
+
+    if (!normalizedKey || !profile || typeof profile !== "object" || Array.isArray(profile)) {
+      return result;
+    }
+
+    result[normalizedKey] = {
+      email: String(profile.email || ""),
+      renewalDate: String(profile.renewalDate || ""),
+      monthlyPrice: String(profile.monthlyPrice || ""),
+      chargeAmountCents: Number(profile.chargeAmountCents || 0),
+      supportEmail: String(profile.supportEmail || ""),
+      supportWhatsApp: String(profile.supportWhatsApp || "")
+    };
+
+    return result;
+  }, {});
+}
+
 function mapServerError(errorCode) {
   switch (errorCode) {
     case "invalid_code":
@@ -1254,6 +1360,10 @@ function mapServerError(errorCode) {
       return "Nao foi possivel gerar a cobranca PIX.";
     case "pix_status_failed":
       return "Nao foi possivel consultar o status do PIX.";
+    case "pending_profile_not_found":
+      return "Este destinatario nao possui cobranca PIX ativa.";
+    case "extension_config_failed":
+      return "Nao foi possivel carregar a configuracao da extensao.";
     default:
       return errorCode ? `Erro do servidor: ${errorCode}` : "Falha ao comunicar com o servidor.";
   }
