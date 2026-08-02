@@ -1,3 +1,5 @@
+const { resolvePendingProfile } = require("./extension-config");
+
 module.exports = async (req, res) => {
   setCorsHeaders(res);
 
@@ -26,6 +28,15 @@ module.exports = async (req, res) => {
       throw error;
     }
 
+    const pendingProfile = resolvePendingProfile(extensionId, recipientKey);
+    const chargeAmountCents = Number(pendingProfile?.chargeAmountCents || 0);
+
+    if (!pendingProfile || !Number.isFinite(chargeAmountCents) || chargeAmountCents <= 0) {
+      const error = new Error("pending_profile_not_found");
+      error.statusCode = 400;
+      throw error;
+    }
+
     const pushinPayToken = process.env.PUSHINPAY_TOKEN;
     if (!pushinPayToken) {
       const error = new Error("missing_pushinpay_config");
@@ -40,7 +51,7 @@ module.exports = async (req, res) => {
         "Content-Type": "application/json",
         "Accept": "application/json"
       },
-      body: JSON.stringify({ value: 900 })
+      body: JSON.stringify({ value: chargeAmountCents })
     });
 
     if (!response.ok) {
