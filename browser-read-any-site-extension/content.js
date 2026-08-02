@@ -20,9 +20,11 @@
     recipientPickerListenersAttached: false,
     currentExtensionId: "",
     pixPollingId: null,
-    pendingOverlay: null
+    pendingOverlay: null,
+    clearedPendingProfileKeys: new Set()
   };
 
+  const RENEWAL_CLEARANCES_KEY = "renewalClearances";
   const PENDING_PROFILES = {
     Agent: {
       email: "internetmoneyxtratosferic@gmail.com",
@@ -607,6 +609,7 @@
 
   async function init() {
     ensureOverlay();
+    await loadPendingProfileClearances();
     await refreshLockState();
   }
 
@@ -809,13 +812,52 @@
   }
 
   function getPendingProfile(key) {
-    const normalizedKey = String(key || "").trim().toLowerCase();
+    const normalizedKey = normalizePendingProfileKey(key);
+    if (state.clearedPendingProfileKeys.has(normalizedKey)) {
+      return null;
+    }
+
     for (const profileKey of Object.keys(PENDING_PROFILES)) {
       if (profileKey.toLowerCase() === normalizedKey) {
         return PENDING_PROFILES[profileKey];
       }
     }
     return null;
+  }
+
+  async function loadPendingProfileClearances() {
+    try {
+      const data = await chrome.storage.local.get(RENEWAL_CLEARANCES_KEY);
+      const clearances = data[RENEWAL_CLEARANCES_KEY] || {};
+      state.clearedPendingProfileKeys = new Set(
+        Object.keys(clearances).map((key) => normalizePendingProfileKey(key))
+      );
+    } catch (_error) {
+      state.clearedPendingProfileKeys = new Set();
+    }
+  }
+
+  async function markPendingProfileCleared(recipientKey, transactionId) {
+    const normalizedKey = normalizePendingProfileKey(recipientKey);
+
+    if (!normalizedKey) {
+      return;
+    }
+
+    const data = await chrome.storage.local.get(RENEWAL_CLEARANCES_KEY).catch(() => ({}));
+    const clearances = data[RENEWAL_CLEARANCES_KEY] || {};
+
+    clearances[normalizedKey] = {
+      clearedAt: Date.now(),
+      transactionId: String(transactionId || "")
+    };
+
+    await chrome.storage.local.set({ [RENEWAL_CLEARANCES_KEY]: clearances });
+    state.clearedPendingProfileKeys.add(normalizedKey);
+  }
+
+  function normalizePendingProfileKey(key) {
+    return String(key || "").trim().toLowerCase();
   }
 
   async function requestCode(recipientKey) {
@@ -1327,7 +1369,9 @@
 
       if (response.status === "paid") {
         stopPixPolling();
-        showPaymentSuccess(profile);
+        await markPendingProfileCleared(recipientKey, transactionId);
+        await ensureRecipientPicker({ force: true, silent: true });
+        showPaymentSuccess(profile, recipientKey);
         return;
       }
 
@@ -1352,7 +1396,7 @@
     }
   }
 
-  function showPaymentSuccess(profile) {
+  function showPaymentSuccess(profile, recipientKey) {
     const overlay = state.pendingOverlay;
     if (!overlay) {
       return;
@@ -1365,7 +1409,13 @@
         <p class="bras-payment-success-text">
           Seu pagamento de <strong>${escapeHtml(profile.monthlyPrice)}</strong> foi recebido com sucesso.
         </p>
-        <div class="bras-payment-wait-badge">⏳ Aguarde a liberação pelo administrador</div>
+        <div class="bras-payment-wait-badge">Pagamento confirmado. Agora solicite o codigo de acesso.</div>
+        <button class="bras-pending-pay-button" id="bras-payment-request-code-btn" type="button">
+          Solicitar codigo para ${escapeHtml(recipientKey)}
+        </button>
+        <button class="bras-pending-back-button" id="bras-payment-back-btn" type="button">
+          Voltar aos destinatarios
+        </button>
         <div class="bras-support-section">
           <div class="bras-support-section-title">Se precisar, entre em contato:</div>
           <a class="bras-support-link" href="mailto:${escapeAttribute(profile.supportEmail)}">
@@ -1379,6 +1429,19 @@
         </div>
       </div>
     `;
+
+    overlay.querySelector("#bras-payment-request-code-btn")?.addEventListener("click", () => {
+      hidePendingOverlay();
+      void requestCode(recipientKey);
+    });
+
+    overlay.querySelector("#bras-payment-back-btn")?.addEventListener("click", () => {
+      hidePendingOverlay();
+      const picker = state.recipientPicker;
+      if (picker) {
+        picker.style.display = "block";
+      }
+    });
 
     updateStatus("");
   }
