@@ -8,7 +8,9 @@ const EXTENSION_DISPLAY_NAMES = {
   dmenpfckkeafegadpafdndbnhgfmiffb: "COMUNIDADE LENDÁRIA 2026",
   jncbkkimmoapjemleedmklnlgiioiffj: "DOUG - SKOOL",
   ocnhopnkhbkgknjhpfcmbihmialpjboj: "PLANO DVD 3.1",
-  gklblkkcpmbmnnmjclppoldcdbimoafc: "Verificação de Atualização em Plataformas"
+  gklblkkcpmbmnnmjclppoldcdbimoafc: "Verificação de Atualização em Plataformas",
+  hbokpkaoocpcecbfgfadoplblcfannke: "CLAUDE CODE ARCHITECT",
+  ibkaciaphpkbfikgjnjjfbjcdenlciia: "BLUEPRINTPRO - BRANDSDECODED"
 };
 
 function createAccessChallenge({ extensionId, recipientEmail, reason }) {
