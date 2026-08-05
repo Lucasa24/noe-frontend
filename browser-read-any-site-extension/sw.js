@@ -647,6 +647,11 @@ async function requestAccessCode(state, config) {
       maskedRecipientEmail: response.recipientEmail || maskEmail(state.recipientEmail)
     };
 
+    const storage = await chrome.storage.local.get("localActivityMap");
+    const localActivityMap = storage.localActivityMap || {};
+    localActivityMap[state.recipientKey || ""] = new Date().toISOString();
+    await chrome.storage.local.set({ localActivityMap });
+
     await saveLockState(updatedState);
     await updateBadge(updatedState);
     return updatedState;
@@ -700,9 +705,29 @@ async function listRecipients() {
       };
     }
 
+    const storage = await chrome.storage.local.get("localActivityMap");
+    const localActivityMap = storage.localActivityMap || {};
+    const baseRecipients = Array.isArray(response.recipients) ? response.recipients : [];
+
+    const mergedRecipients = baseRecipients.map((r) => {
+      let mergedLastSentAt = r.lastSentAt;
+      const localSentAt = localActivityMap[r.key];
+
+      if (localSentAt) {
+        if (!mergedLastSentAt || new Date(localSentAt) > new Date(mergedLastSentAt)) {
+          mergedLastSentAt = localSentAt;
+        }
+      }
+
+      return {
+        ...r,
+        lastSentAt: mergedLastSentAt
+      };
+    });
+
     return {
       ok: true,
-      recipients: Array.isArray(response.recipients) ? response.recipients : []
+      recipients: mergedRecipients
     };
   } catch (error) {
     return {
