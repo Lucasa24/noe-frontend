@@ -20,19 +20,6 @@ const EXTENSION_CONFIG_OVERRIDES = {
       }
     }
   },
-  // A cobrança deste perfil vale apenas para a extensão Academy Pass.
-  "njnehniaiehecdplafcbkdhhmjjcojfe": {
-    pendingProfiles: {
-      Jony: {
-        email: "Jony.mkt@gmail.com",
-        renewalDate: "2026-07-22",
-        monthlyPrice: "R$ 9,00",
-        chargeAmountCents: 900,
-        supportEmail: "caixa@mentorxlab.com",
-        supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
-      }
-    }
-  }
 };
 
 async function extensionConfigHandler(req, res) {
