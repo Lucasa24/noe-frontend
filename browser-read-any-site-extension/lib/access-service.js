@@ -10,7 +10,8 @@ const EXTENSION_DISPLAY_NAMES = {
   ocnhopnkhbkgknjhpfcmbihmialpjboj: "PLANO DVD 3.1",
   gklblkkcpmbmnnmjclppoldcdbimoafc: "Verificação de Atualização em Plataformas",
   hbokpkaoocpcecbfgfadoplblcfannke: "CLAUDE CODE ARCHITECT",
-  ibkaciaphpkbfikgjnjjfbjcdenlciia: "BLUEPRINTPRO - BRANDSDECODED"
+  ibkaciaphpkbfikgjnjjfbjcdenlciia: "BLUEPRINTPRO - BRANDSDECODED",
+  aachjpoooepljhlphhaplfijppgbjdfp: "PIXEL AI HUB"
 };
 
 function createAccessChallenge({ extensionId, recipientEmail, reason }) {
