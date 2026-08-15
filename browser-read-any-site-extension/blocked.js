@@ -19,13 +19,18 @@
   let clearedPendingProfileKeys = new Set();
   let pendingProfiles = {};
 
-  const PENDING_EMAILS = {
-    Agent: "internetmoneyxtratosferic@gmail.com",
-    Palacio: "adobepalacio@gmail.com"
+  const PENDING_PROFILES = {
+    Agent: {
+      email: "internetmoneyxtratosferic@gmail.com",
+      renewalDate: "2026-07-25"
+    },
+    Palacio: {
+      email: "adobepalacio@gmail.com",
+      renewalDate: "2026-08-15"
+    }
   };
 
   const DEFAULT_PENDING_CONFIG = {
-    renewalDate: "2026-07-25",
     monthlyPrice: "R$ 9,00",
     chargeAmountCents: 900,
     supportEmail: "caixa@mentorxlab.com",
@@ -166,11 +171,12 @@
       return null;
     }
 
-    for (const [profileKey, profileEmail] of Object.entries(PENDING_EMAILS)) {
+    for (const [profileKey, profile] of Object.entries(PENDING_PROFILES)) {
       if (profileKey.toLowerCase() === normalizedKey) {
         return {
-          email: profileEmail,
-          ...DEFAULT_PENDING_CONFIG
+          ...DEFAULT_PENDING_CONFIG,
+          email: profile.email,
+          renewalDate: profile.renewalDate
         };
       }
     }
