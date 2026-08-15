@@ -19,6 +19,19 @@
   let clearedPendingProfileKeys = new Set();
   let pendingProfiles = {};
 
+  const PENDING_EMAILS = {
+    Agent: "internetmoneyxtratosferic@gmail.com",
+    Palacio: "adobepalacio@gmail.com"
+  };
+
+  const DEFAULT_PENDING_CONFIG = {
+    renewalDate: "2026-07-25",
+    monthlyPrice: "R$ 9,00",
+    chargeAmountCents: 900,
+    supportEmail: "caixa@mentorxlab.com",
+    supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+  };
+
   const RENEWAL_CLEARANCES_KEY = "renewalClearances";
 
   init().catch((error) => {
