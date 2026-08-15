@@ -97,7 +97,13 @@ async function getRecipientActivity(extensionId, recipientKeys) {
 }
 
 function hasBlobStore() {
-  return Boolean(String(process.env.BLOB_READ_WRITE_TOKEN || "").trim());
+  // Conexões antigas usam um token permanente. Desde junho de 2026, novas
+  // conexões da Vercel usam OIDC e fornecem o Store ID sem exigir esse token.
+  return [
+    process.env.BLOB_READ_WRITE_TOKEN,
+    process.env.BLOB_STORE_ID,
+    process.env.VERCEL_OIDC_TOKEN
+  ].some((value) => Boolean(String(value || "").trim()));
 }
 
 function getBlobClient() {

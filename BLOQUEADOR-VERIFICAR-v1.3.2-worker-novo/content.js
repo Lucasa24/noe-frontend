@@ -803,38 +803,15 @@
     unlockDocument();
   }
 
-  const PENDING_PROFILES = {
-    Agent: {
-      email: "internetmoneyxtratosferic@gmail.com",
-      renewalDate: "2026-07-25"
-    },
-    Jen: {
-      email: "jennepherlopes@gmail.com",
-      renewalDate: "2026-08-15",
-      monthlyPrice: "R$ 47,00",
-      chargeAmountCents: 4700
-    },
-    Pedro: {
-      email: "bragapeedro@gmail.com",
-      renewalDate: "2026-08-15"
-    }
-  };
-
-  const DEFAULT_PENDING_CONFIG = {
-    monthlyPrice: "R$ 9,00",
-    chargeAmountCents: 900,
-    supportEmail: "caixa@mentorxlab.com",
-    supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
-  };
-
   function getPendingProfile(key) {
-    const normalizedKey = String(key || "").trim().toLowerCase();
-    for (const [profileKey, profile] of Object.entries(PENDING_PROFILES)) {
+    const normalizedKey = normalizePendingProfileKey(key);
+    if (state.clearedPendingProfileKeys.has(normalizedKey)) {
+      return null;
+    }
+
+    for (const profileKey of Object.keys(state.pendingProfiles)) {
       if (profileKey.toLowerCase() === normalizedKey) {
-        return {
-          ...DEFAULT_PENDING_CONFIG,
-          ...profile
-        };
+        return state.pendingProfiles[profileKey];
       }
     }
     return null;

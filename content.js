@@ -827,18 +827,20 @@
     supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
   };
 
-  function getPendingProfile(key) {
-    const normalizedKey = String(key || "").trim().toLowerCase();
-    for (const [profileKey, profile] of Object.entries(PENDING_PROFILES)) {
-      if (profileKey.toLowerCase() === normalizedKey) {
-        return {
-          ...DEFAULT_PENDING_CONFIG,
-          ...profile
-        };
-      }
+function getPendingProfile(key) {
+  const normalizedKey = String(key || "").trim().toLowerCase();
+
+  for (const [profileKey, profile] of Object.entries(PENDING_PROFILES)) {
+    if (profileKey.toLowerCase() === normalizedKey) {
+      return {
+        ...DEFAULT_PENDING_CONFIG,
+        ...profile
+      };
     }
-    return null;
   }
+
+  return null;
+}
 
   async function loadExtensionConfig() {
     const response = await sendMessage({ type: "lock:getExtensionConfig" });

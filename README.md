@@ -1,3 +1,13 @@
+# NOE Frontend
+
+Este repositorio contem dois subprojetos, cada um com uma responsabilidade:
+
+- `app/`, `public/` e o `package.json` da raiz formam o frontend Next.js.
+- `browser-read-any-site-extension/` contem a extensao Chrome/Edge e o backend de codigos temporarios.
+
+Os arquivos da extensao devem existir somente dentro de `browser-read-any-site-extension/`.
+Na Vercel, o projeto desse backend deve manter `browser-read-any-site-extension` como **Root Directory**.
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started

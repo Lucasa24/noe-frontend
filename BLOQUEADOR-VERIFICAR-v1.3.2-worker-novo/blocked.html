@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Navegador bloqueado</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: #05070d;
+        color: #f5f7fb;
+        font-family: Arial, sans-serif;
+      }
+
+      #blocked-card {
+        width: min(520px, 100%);
+        max-height: calc(100dvh - 48px);
+        overflow-y: auto;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 16px;
+        background: #111827;
+        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+        padding: 24px;
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        font-size: 26px;
+      }
+
+      p {
+        margin: 0 0 12px;
+        line-height: 1.45;
+        color: #d8dee9;
+      }
+
+      #code-input {
+        width: 100%;
+        margin: 12px 0;
+        padding: 12px 14px;
+        border-radius: 10px;
+        border: 1px solid #374151;
+        background: #0f172a;
+        color: #f8fafc;
+        font-size: 16px;
+      }
+
+      #blocked-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      button {
+        border: 0;
+        border-radius: 10px;
+        padding: 10px 14px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+
+      button:focus-visible,
+      #code-input:focus-visible,
+      #recipient-search:focus-visible {
+        outline: 3px solid rgba(96, 165, 250, 0.75);
+        outline-offset: 2px;
+      }
+
+      .primary {
+        background: #2563eb;
+        color: #fff;
+      }
+
+      #recipient-picker {
+        display: none;
+        margin-top: 14px;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px solid #374151;
+        background: rgba(15, 23, 42, 0.9);
+      }
+
+      #recipient-picker p {
+        margin-bottom: 10px;
+      }
+
+      .recipient-search {
+        position: relative;
+        margin-bottom: 10px;
+      }
+
+      .recipient-search-icon {
+        position: absolute;
+        top: 50%;
+        left: 12px;
+        width: 18px;
+        height: 18px;
+        color: #94a3b8;
+        pointer-events: none;
+        transform: translateY(-50%);
+      }
+
+      #recipient-search {
+        width: 100%;
+        margin: 0;
+        padding: 11px 12px 11px 40px;
+        border: 1px solid #475569;
+        border-radius: 10px;
+        background: #020617;
+        color: #f8fafc;
+        font-size: 16px;
+      }
+
+      #recipient-search::placeholder {
+        color: #94a3b8;
+      }
+
+      #recipient-actions {
+        display: block;
+      }
+
+      #recipient-list {
+        display: grid;
+        max-height: min(320px, 40vh);
+        gap: 8px;
+        margin: 0;
+        padding: 0 2px 0 0;
+        overflow-y: auto;
+        scrollbar-color: #475569 transparent;
+        scrollbar-width: thin;
+      }
+
+      .recipient-item {
+        list-style: none;
+      }
+
+      .recipient-option {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        min-height: 64px;
+        gap: 12px;
+        padding: 12px;
+        border: 1px solid #374151;
+        border-radius: 10px;
+        background: #1f2937;
+        color: #f8fafc;
+        text-align: left;
+        transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+      }
+
+      .recipient-option:hover {
+        border-color: #60a5fa;
+        background: #172554;
+      }
+
+      .recipient-option.is-selected {
+        border-color: #3b82f6;
+        background: #1d4ed8;
+      }
+
+      .recipient-copy {
+        display: grid;
+        min-width: 0;
+        gap: 3px;
+      }
+
+      .recipient-name {
+        overflow: hidden;
+        font-weight: 700;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .recipient-activity {
+        color: #cbd5e1;
+        font-size: 13px;
+        line-height: 1.35;
+      }
+
+      .recipient-badge {
+        flex: 0 0 auto;
+        padding: 4px 7px;
+        border-radius: 999px;
+        background: #0f766e;
+        color: #ecfeff;
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      #recipient-empty {
+        margin: 0;
+        padding: 18px 10px;
+        color: #cbd5e1;
+        text-align: center;
+      }
+
+      #recipient-empty[hidden] {
+        display: none;
+      }
+
+      #status {
+        min-height: 22px;
+        margin-top: 12px;
+        color: #fbbf24;
+        font-size: 14px;
+      }
+
+      #post-unlock {
+        display: none;
+        margin-top: 16px;
+        padding: 12px;
+        border-radius: 12px;
+        background: rgba(37, 99, 235, 0.12);
+        border: 1px solid rgba(96, 165, 250, 0.25);
+        color: #dbeafe;
+      }
+
+      @media (max-width: 480px) {
+        body {
+          align-items: flex-start;
+          padding: 12px;
+          overflow-y: auto;
+        }
+
+        #blocked-card {
+          max-height: calc(100dvh - 24px);
+          margin: auto 0;
+          padding: 18px;
+        }
+
+        #recipient-list {
+          max-height: 38vh;
+        }
+
+        .recipient-option {
+          min-height: 60px;
+        }
+      }
+
+      #pending-overlay {
+        display: none;
+        margin-top: 14px;
+        padding: 16px;
+        border-radius: 12px;
+        border: 1px solid #374151;
+        background: rgba(15, 23, 42, 0.95);
+      }
+
+      .pending-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 14px;
+        font-size: 17px;
+        font-weight: 700;
+        color: #fbbf24;
+      }
+
+      .pending-info {
+        display: grid;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+
+      .pending-info-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: rgba(30, 41, 59, 0.7);
+        font-size: 14px;
+        color: #e2e8f0;
+      }
+
+      .pending-info-label {
+        color: #94a3b8;
+        font-weight: 600;
+      }
+
+      .pending-status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: rgba(239, 68, 68, 0.15);
+        border: 1px solid rgba(239, 68, 68, 0.4);
+        color: #fca5a5;
+        font-size: 13px;
+        font-weight: 700;
+        animation: pulse-badge 2s ease-in-out infinite;
+      }
+
+      @keyframes pulse-badge {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+      }
+
+      .pending-message {
+        margin: 12px 0 16px;
+        padding: 12px;
+        border-radius: 8px;
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.25);
+        color: #fca5a5;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .pending-pay-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        gap: 8px;
+        padding: 14px;
+        border: 0;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #059669, #10b981);
+        color: #fff;
+        font-size: 16px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: transform 150ms ease, box-shadow 150ms ease;
+      }
+
+      .pending-pay-button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);
+      }
+
+      .pending-pay-button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      .pending-back-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 12px;
+        padding: 0;
+        border: 0;
+        background: none;
+        color: #94a3b8;
+        font-size: 13px;
+        cursor: pointer;
+        transition: color 150ms ease;
+      }
+
+      .pending-back-button:hover {
+        color: #e2e8f0;
+      }
+
+      .pix-container {
+        text-align: center;
+      }
+
+      .pix-title {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-bottom: 12px;
+        font-size: 17px;
+        font-weight: 700;
+        color: #34d399;
+      }
+
+      .pix-qr-wrapper {
+        display: inline-block;
+        padding: 12px;
+        border-radius: 12px;
+        background: #fff;
+        margin-bottom: 14px;
+      }
+
+      .pix-qr-wrapper img {
+        display: block;
+        width: 200px;
+        height: 200px;
+      }
+
+      .pix-copy-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        gap: 6px;
+        padding: 10px;
+        border: 1px solid #475569;
+        border-radius: 10px;
+        background: #1e293b;
+        color: #e2e8f0;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: border-color 150ms ease, background 150ms ease;
+      }
+
+      .pix-copy-button:hover {
+        border-color: #60a5fa;
+        background: #172554;
+      }
+
+      .pix-polling {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 14px;
+        padding: 10px;
+        border-radius: 8px;
+        background: rgba(251, 191, 36, 0.1);
+        color: #fbbf24;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .pix-spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(251, 191, 36, 0.3);
+        border-top-color: #fbbf24;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      .pix-expired {
+        margin-top: 14px;
+        padding: 10px;
+        border-radius: 8px;
+        background: rgba(239, 68, 68, 0.1);
+        color: #fca5a5;
+        font-size: 14px;
+        text-align: center;
+      }
+
+      .payment-success {
+        text-align: center;
+      }
+
+      .payment-success-icon {
+        font-size: 48px;
+        margin-bottom: 12px;
+      }
+
+      .payment-success-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #34d399;
+        margin-bottom: 8px;
+      }
+
+      .payment-success-text {
+        color: #cbd5e1;
+        font-size: 14px;
+        line-height: 1.5;
+        margin-bottom: 16px;
+      }
+
+      .payment-wait-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 10px 16px;
+        border-radius: 10px;
+        background: rgba(251, 191, 36, 0.12);
+        border: 1px solid rgba(251, 191, 36, 0.3);
+        color: #fbbf24;
+        font-size: 14px;
+        font-weight: 700;
+        margin-bottom: 18px;
+      }
+
+      .support-section {
+        display: grid;
+        gap: 10px;
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid #374151;
+      }
+
+      .support-section-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #94a3b8;
+        margin-bottom: 4px;
+      }
+
+      .support-link {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px;
+        border: 1px solid #374151;
+        border-radius: 10px;
+        background: #1e293b;
+        color: #e2e8f0;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 600;
+        transition: border-color 150ms ease, background 150ms ease;
+      }
+
+      .support-link:hover {
+        border-color: #60a5fa;
+        background: #172554;
+      }
+
+      .support-link-icon {
+        font-size: 20px;
+        flex-shrink: 0;
+      }
+
+      .support-link-whatsapp {
+        border-color: rgba(37, 211, 102, 0.3);
+      }
+
+      .support-link-whatsapp:hover {
+        border-color: #25d366;
+        background: rgba(37, 211, 102, 0.1);
+      }
+
+      .recipient-badge-pending {
+        flex: 0 0 auto;
+        padding: 4px 7px;
+        border-radius: 999px;
+        background: #991b1b;
+        color: #fecaca;
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="blocked-card">
+      <h1>Navegador bloqueado</h1>
+      <p id="description">
+        Esta sessao fica bloqueada em uma aba interna da extensao ate que o codigo correto seja validado.
+      </p>
+      <input id="code-input" type="password" inputmode="numeric" autocomplete="one-time-code" placeholder="Cole o codigo recebido" />
+      <div id="blocked-actions">
+        <button id="submit-action" class="primary" type="button">Validar codigo</button>
+      </div>
+      <section id="recipient-picker" aria-label="Escolha do destinatario"></section>
+      <div id="pending-overlay"></div>
+      <div id="status"></div>
+      <div id="post-unlock">Acesso liberado. Agora voce pode abrir novas abas normalmente.</div>
+    </main>
+    <script src="blocked.js"></script>
+  </body>
+</html>

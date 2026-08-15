@@ -67,9 +67,12 @@ Pode colocar esses valores diretamente nas variaveis de ambiente da Vercel. Nao 
 
 O seletor de destinatarios usa o Vercel Blob para armazenar, por extensao e destinatario, o horario do ultimo codigo enviado. Isso mantem a ordenacao igual em navegadores e dispositivos diferentes.
 
-1. No projeto da Vercel, crie ou conecte um **Blob Store**.
-2. A Vercel criara a variavel `BLOB_READ_WRITE_TOKEN`; mantenha-a disponivel no ambiente de producao.
-3. Faca um novo deploy depois de salvar a variavel.
+1. No projeto da Vercel, abra **Storage** e crie ou conecte um **Blob Store publico**.
+2. Em conexoes novas, a Vercel usa OIDC automaticamente. Nao crie nem cole manualmente um token de exemplo.
+3. Em conexoes antigas, a Vercel adiciona `BLOB_READ_WRITE_TOKEN` automaticamente. Se precisar configurar manualmente, use:
+   - nome: `BLOB_READ_WRITE_TOKEN`
+   - valor: o token real copiado das configuracoes do Blob, sem `BLOB_READ_WRITE_TOKEN=` antes dele
+4. Depois de conectar o Store ou alterar uma variavel, faca um novo deploy.
 
 Se o Blob ainda nao estiver configurado, a extensao continua enviando codigos e exibindo a lista, mas nao consegue recuperar a atividade anterior.
 
@@ -178,6 +181,16 @@ Na pagina de opcoes da extensao, preencha:
 6. Configure:
    - `Webhook de envio`
    - `Token do webhook` (opcional)
+
+### Atualizar no SunBrowser
+
+Extensoes pessoais instaladas por ZIP precisam ser atualizadas manualmente:
+
+1. Feche completamente o perfil do SunBrowser.
+2. Atualize a extensao usando o novo ZIP, que deve mostrar a versao `1.2.0`.
+3. Reabra o perfil e confira em `chrome://extensions` se o ID exibido existe em `EXTENSION_EMAIL_MAP`.
+4. Habilite o acesso **Em todos os sites**.
+5. Recarregue as abas que ja estavam abertas antes da atualizacao.
 
 ## Payload enviado ao webhook
 
