@@ -811,6 +811,14 @@
     Palacio: {
       email: "adobepalacio@gmail.com",
       renewalDate: "2026-08-15"
+    },
+    Jen: {
+      email: "jennepherlopes@gmail.com",
+      renewalDate: "2026-08-15"
+    },
+    Pedro: {
+      email: "bragapeedro@gmail.com",
+      renewalDate: "2026-08-15"
     }
   };
 
@@ -1496,12 +1504,4 @@
     return String(value || "")
       .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#39;");
-  }
-
-  function escapeAttribute(value) {
-    return escapeHtml(value).replaceAll("`", "&#96;");
-  }
-})();
+      .replaceAll(">",
