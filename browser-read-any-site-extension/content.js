@@ -814,7 +814,9 @@
     },
     Jen: {
       email: "jennepherlopes@gmail.com",
-      renewalDate: "2026-08-15"
+      renewalDate: "2026-08-15",
+      monthlyPrice: "R$ 47,00",
+      chargeAmountCents: 4700
     },
     Pedro: {
       email: "bragapeedro@gmail.com",
@@ -835,8 +837,7 @@
       if (profileKey.toLowerCase() === normalizedKey) {
         return {
           ...DEFAULT_PENDING_CONFIG,
-          email: profile.email,
-          renewalDate: profile.renewalDate
+          ...profile
         };
       }
     }
@@ -1504,4 +1505,12 @@
     return String(value || "")
       .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
-      .replaceAll(">",
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  function escapeAttribute(value) {
+    return escapeHtml(value).replaceAll("`", "&#96;");
+  }
+})();
