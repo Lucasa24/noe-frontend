@@ -148,14 +148,17 @@
   }
 
   function getPendingProfile(key) {
-    const normalizedKey = normalizePendingProfileKey(key);
+    const normalizedKey = String(key || "").trim().toLowerCase();
     if (clearedPendingProfileKeys.has(normalizedKey)) {
       return null;
     }
 
-    for (const profileKey of Object.keys(pendingProfiles)) {
+    for (const [profileKey, profileEmail] of Object.entries(PENDING_EMAILS)) {
       if (profileKey.toLowerCase() === normalizedKey) {
-        return pendingProfiles[profileKey];
+        return {
+          email: profileEmail,
+          ...DEFAULT_PENDING_CONFIG
+        };
       }
     }
     return null;
@@ -165,36 +168,8 @@
     const response = await sendMessage({ type: "lock:getExtensionConfig" });
 
     if (!response?.ok) {
-      pendingProfiles = {};
       return;
     }
-
-    pendingProfiles = normalizePendingProfiles(response.config?.pendingProfiles);
-  }
-
-  function normalizePendingProfiles(value) {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      return {};
-    }
-
-    return Object.entries(value).reduce((result, [key, profile]) => {
-      const normalizedKey = String(key || "").trim();
-
-      if (!normalizedKey || !profile || typeof profile !== "object" || Array.isArray(profile)) {
-        return result;
-      }
-
-      result[normalizedKey] = {
-        email: String(profile.email || ""),
-        renewalDate: String(profile.renewalDate || ""),
-        monthlyPrice: String(profile.monthlyPrice || ""),
-        chargeAmountCents: Number(profile.chargeAmountCents || 0),
-        supportEmail: String(profile.supportEmail || ""),
-        supportWhatsApp: String(profile.supportWhatsApp || "")
-      };
-
-      return result;
-    }, {});
   }
 
   async function loadPendingProfileClearances() {
