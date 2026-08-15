@@ -803,15 +803,27 @@
     unlockDocument();
   }
 
-  function getPendingProfile(key) {
-    const normalizedKey = normalizePendingProfileKey(key);
-    if (state.clearedPendingProfileKeys.has(normalizedKey)) {
-      return null;
-    }
+  const PENDING_EMAILS = {
+    Agent: "internetmoneyxtratosferic@gmail.com",
+    Palacio: "adobepalacio@gmail.com"
+  };
 
-    for (const profileKey of Object.keys(state.pendingProfiles)) {
+  const DEFAULT_PENDING_CONFIG = {
+    renewalDate: "2026-07-25",
+    monthlyPrice: "R$ 9,00",
+    chargeAmountCents: 900,
+    supportEmail: "caixa@mentorxlab.com",
+    supportWhatsApp: "http://wa.me/5591984272483?text=Olá,%20gostaria%20de%20consultar%20as%20opções%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+  };
+
+  function getPendingProfile(key) {
+    const normalizedKey = String(key || "").trim().toLowerCase();
+    for (const [profileKey, profileEmail] of Object.entries(PENDING_EMAILS)) {
       if (profileKey.toLowerCase() === normalizedKey) {
-        return state.pendingProfiles[profileKey];
+        return {
+          email: profileEmail,
+          ...DEFAULT_PENDING_CONFIG
+        };
       }
     }
     return null;
