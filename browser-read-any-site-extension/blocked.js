@@ -29,9 +29,11 @@
       renewalDate: "2026-08-15"
     },
     Jen: {
-      email: "jennepherlopes@gmail.com",
-      renewalDate: "2026-08-15"
-    },
+  email: "jennepherlopes@gmail.com",
+  renewalDate: "2026-08-15",
+  monthlyPrice: "R$ 47,00",
+  chargeAmountCents: 4700
+},
     Pedro: {
       email: "bragapeedro@gmail.com",
       renewalDate: "2026-08-15"
