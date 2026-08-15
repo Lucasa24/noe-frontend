@@ -24,10 +24,6 @@
       email: "internetmoneyxtratosferic@gmail.com",
       renewalDate: "2026-07-25"
     },
-    Palacio: {
-      email: "adobepalacio@gmail.com",
-      renewalDate: "2026-08-15"
-    },
     Jen: {
       email: "jennepherlopes@gmail.com",
       renewalDate: "2026-08-15",
