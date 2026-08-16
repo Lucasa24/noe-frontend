@@ -17,6 +17,16 @@ const EXTENSION_CONFIG_OVERRIDES = {
         chargeAmountCents: 900,
         supportEmail: "caixa@mentorxlab.com",
         supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+      },
+      // Pedro: cobrança agendada para 16/09. A gestão de data no pix-charge.js
+      // impede a cobrança antes do renewalDate (2026-09-16).
+      Pedro: {
+        email: "bragapeedro@gmail.com",
+        renewalDate: "2026-09-16",
+        monthlyPrice: "R$ 9,00",
+        chargeAmountCents: 900,
+        supportEmail: "caixa@mentorxlab.com",
+        supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
       }
     }
   },

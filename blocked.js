@@ -35,10 +35,6 @@
       renewalDate: "2026-08-16",
       monthlyPrice: "R$ 47,00",
       chargeAmountCents: 4700
-    },
-    Pedro: {
-      email: "bragapeedro@gmail.com",
-      renewalDate: "2026-08-15"
     }
   };
 

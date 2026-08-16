@@ -37,6 +37,21 @@ module.exports = async (req, res) => {
       throw error;
     }
 
+    // Gestão de data: só cobra a partir do renewalDate. Perfis com renewalDate
+    // futura (ex.: Pedro 2026-09-16) só recebem cobrança a partir do dia marcado.
+    const renewalDate = String(pendingProfile.renewalDate || "").trim();
+    if (renewalDate) {
+      const renewal = new Date(renewalDate + "T00:00:00");
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (!Number.isNaN(renewal.getTime()) && today < renewal) {
+        const error = new Error("charge_not_due_yet");
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+
     const pushinPayToken = process.env.PUSHINPAY_TOKEN;
     if (!pushinPayToken) {
       const error = new Error("missing_pushinpay_config");
