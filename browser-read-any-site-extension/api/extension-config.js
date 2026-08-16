@@ -35,6 +35,7 @@ const EXTENSION_CONFIG_OVERRIDES = {
       },
       Andressa: {
         email: "andressamichaelsen16@gmail.com",
+        renewalDate: "2026-08-16",
         monthlyPrice: "R$ 47,00",
         chargeAmountCents: 4700,
         supportEmail: "caixa@mentorxlab.com",
@@ -54,6 +55,7 @@ const EXTENSION_CONFIG_OVERRIDES = {
       },
       Andressa: {
         email: "andressamichaelsen16@gmail.com",
+        renewalDate: "2026-08-16",
         monthlyPrice: "R$ 47,00",
         chargeAmountCents: 4700,
         supportEmail: "caixa@mentorxlab.com",
