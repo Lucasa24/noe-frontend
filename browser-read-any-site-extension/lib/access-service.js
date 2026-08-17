@@ -12,7 +12,8 @@ const EXTENSION_DISPLAY_NAMES = {
   hbokpkaoocpcecbfgfadoplblcfannke: "CLAUDE CODE ARCHITECT",
   ibkaciaphpkbfikgjnjjfbjcdenlciia: "BLUEPRINTPRO - BRANDSDECODED",
   aachjpoooepljhlphhaplfijppgbjdfp: "PIXEL AI HUB",
-  kjadaimbcapjhdfeafmopnbfdbgofdko: "comunidade subido"
+  kjadaimbcapjhdfeafmopnbfdbgofdko: "comunidade subido",
+  nicnjmokndbjnpjlikgmnfkihkklobce: "CURSOS - DVD"
 };
 
 function createAccessChallenge({ extensionId, recipientEmail, reason }) {
