@@ -42,7 +42,7 @@ const EXTENSION_CONFIG_OVERRIDES = {
       Janderson: {
         email: "jandergfx@gmail.com",
         recurring: true,
-        startDate: "2026-08-17",
+        startDate: "2026-08-18",
         monthlyPrice: "R$ 9,00",
         chargeAmountCents: 900,
         supportEmail: "caixa@mentorxlab.com",

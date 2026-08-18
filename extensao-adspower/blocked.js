@@ -44,7 +44,7 @@
     },
     Janderson: {
       email: "jandergfx@gmail.com",
-      renewalDate: "2026-08-17",
+      renewalDate: "2026-08-18",
       monthlyPrice: "R$ 9,00",
       chargeAmountCents: 900
     }
