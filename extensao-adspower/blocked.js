@@ -35,6 +35,18 @@
       renewalDate: "2026-08-16",
       monthlyPrice: "R$ 47,00",
       chargeAmountCents: 4700
+    },
+    Gabriel: {
+      email: "gabrielazevedomkt@gmail.com",
+      renewalDate: "2026-08-17",
+      monthlyPrice: "R$ 47,00",
+      chargeAmountCents: 4700
+    },
+    Janderson: {
+      email: "jandergfx@gmail.com",
+      renewalDate: "2026-08-17",
+      monthlyPrice: "R$ 9,00",
+      chargeAmountCents: 900
     }
   };
 
