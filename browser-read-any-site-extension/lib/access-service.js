@@ -13,7 +13,8 @@ const EXTENSION_DISPLAY_NAMES = {
   ibkaciaphpkbfikgjnjjfbjcdenlciia: "BLUEPRINTPRO - BRANDSDECODED",
   aachjpoooepljhlphhaplfijppgbjdfp: "PIXEL AI HUB",
   kjadaimbcapjhdfeafmopnbfdbgofdko: "comunidade subido",
-  nicnjmokndbjnpjlikgmnfkihkklobce: "CURSOS - DVD"
+  nicnjmokndbjnpjlikgmnfkihkklobce: "CURSOS - DVD",
+  ngjacbpbiegcnfkinikfpdkcplhejael: "Asimov"
 };
 
 function createAccessChallenge({ extensionId, recipientEmail, reason }) {
