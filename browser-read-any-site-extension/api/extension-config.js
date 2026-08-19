@@ -8,11 +8,12 @@ const DEFAULT_EXTENSION_CONFIG = {
 
 const EXTENSION_CONFIG_OVERRIDES = {
   // Cobrança específica da extensão em que o destinatário Agent existe.
+  // Agent: cobrança cancelada (imediata) e reprogramada para 18/09/2026 (hoje + 1 mês).
   "jncbkkimmoapjemleedmklnlgiioiffj": {
     pendingProfiles: {
       Agent: {
         email: "internetmoneyxtratosferic@gmail.com",
-        renewalDate: "2026-07-25",
+        renewalDate: "2026-09-18",
         monthlyPrice: "R$ 9,00",
         chargeAmountCents: 900,
         supportEmail: "caixa@mentorxlab.com",
@@ -108,6 +109,21 @@ const EXTENSION_CONFIG_OVERRIDES = {
         startDate: "2026-08-17",
         monthlyPrice: "R$ 47,00",
         chargeAmountCents: 4700,
+        supportEmail: "caixa@mentorxlab.com",
+        supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+      }
+    }
+  },
+  // Cobrança de R$ 9,00 para o Leônidas na extensão COMUNIDADE LENDÁRIA 2026.
+  // Leônidas: cobrança cancelada (recorrência removida) e reprogramada para
+  // 19/09/2026 (hoje 19/08 + 1 mês).
+  "dmenpfckkeafegadpafdndbnhgfmiffb": {
+    pendingProfiles: {
+      Leônidas: {
+        email: "leonidascaldeira15@gmail.com",
+        renewalDate: "2026-09-19",
+        monthlyPrice: "R$ 9,00",
+        chargeAmountCents: 900,
         supportEmail: "caixa@mentorxlab.com",
         supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
       }
