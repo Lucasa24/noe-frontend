@@ -22,7 +22,7 @@
   const PENDING_PROFILES = {
     Agent: {
       email: "internetmoneyxtratosferic@gmail.com",
-      renewalDate: "2026-07-25"
+      renewalDate: "2026-09-18"
     },
     Jen: {
       email: "jennepherlopes@gmail.com",
@@ -193,10 +193,23 @@
 
     for (const [profileKey, profile] of Object.entries(PENDING_PROFILES)) {
       if (profileKey.toLowerCase() === normalizedKey) {
-        return {
+        const merged = {
           ...DEFAULT_PENDING_CONFIG,
           ...profile
         };
+        // Só bloqueia quando o vencimento já chegou. Cobranças com renewalDate
+        // futura (ex.: Agent 2026-09-18, Leônidas 2026-09-19) ficam sem
+        // pendência até a data marcada.
+        const renewalDate = String(merged.renewalDate || "").trim();
+        if (renewalDate) {
+          const renewal = new Date(renewalDate + "T00:00:00");
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          if (!Number.isNaN(renewal.getTime()) && today < renewal) {
+            return null;
+          }
+        }
+        return merged;
       }
     }
     return null;
