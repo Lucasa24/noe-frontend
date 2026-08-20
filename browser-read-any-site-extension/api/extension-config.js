@@ -72,6 +72,16 @@ const EXTENSION_CONFIG_OVERRIDES = {
         supportEmail: "caixa@mentorxlab.com",
         supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
       },
+      // Ronan: mensalidade R$ 47,00 com recorrência automática (somar 1 mês).
+      "Ron*n": {
+        email: "ronandeassis3@gmail.com",
+        recurring: true,
+        startDate: "2026-08-20",
+        monthlyPrice: "R$ 47,00",
+        chargeAmountCents: 4700,
+        supportEmail: "caixa@mentorxlab.com",
+        supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+      },
       // Gabriel: mensalidade R$ 47,00 com recorrência automática (somar 1 mês).
       Gabriel: {
         email: "gabrielazevedomkt@gmail.com",
@@ -97,6 +107,16 @@ const EXTENSION_CONFIG_OVERRIDES = {
       Andressa: {
         email: "andressamichaelsen16@gmail.com",
         renewalDate: "2026-08-16",
+        monthlyPrice: "R$ 47,00",
+        chargeAmountCents: 4700,
+        supportEmail: "caixa@mentorxlab.com",
+        supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+      },
+      // Ronan: mensalidade R$ 47,00 com recorrência automática (somar 1 mês).
+      "Ron*n": {
+        email: "ronandeassis3@gmail.com",
+        recurring: true,
+        startDate: "2026-08-20",
         monthlyPrice: "R$ 47,00",
         chargeAmountCents: 4700,
         supportEmail: "caixa@mentorxlab.com",
