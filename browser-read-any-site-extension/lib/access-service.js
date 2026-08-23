@@ -12,6 +12,7 @@ const EXTENSION_DISPLAY_NAMES = {
   hbokpkaoocpcecbfgfadoplblcfannke: "CLAUDE CODE ARCHITECT",
   ibkaciaphpkbfikgjnjjfbjcdenlciia: "BLUEPRINTPRO - BRANDSDECODED",
   ebfndfgcpnomfmbnpfhnghbemgogoehl: "Rhawk.pro",
+  bioajcjmagbibhnleajecienfednodib: "Combo Flowgrammers Pro",
   kjadaimbcapjhdfeafmopnbfdbgofdko: "comunidade subido",
   nicnjmokndbjnpjlikgmnfkihkklobce: "CURSOS - DVD",
   ngjacbpbiegcnfkinikfpdkcplhejael: "Asimov"
