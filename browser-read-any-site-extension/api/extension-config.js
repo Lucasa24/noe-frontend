@@ -48,15 +48,6 @@ const EXTENSION_CONFIG_OVERRIDES = {
         chargeAmountCents: 900,
         supportEmail: "caixa@mentorxlab.com",
         supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
-      },
-      Troy: {
-        email: "jonatafernando02@gmail.com",
-        recurring: true,
-        startDate: "2026-08-23",
-        monthlyPrice: "R$ 9,00",
-        chargeAmountCents: 900,
-        supportEmail: "caixa@mentorxlab.com",
-        supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
       }
     }
   },
@@ -100,11 +91,47 @@ const EXTENSION_CONFIG_OVERRIDES = {
         chargeAmountCents: 4700,
         supportEmail: "caixa@mentorxlab.com",
         supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+      },
+      Troy: {
+        email: "jonatafernando02@gmail.com",
+        recurring: true,
+        startDate: "2026-08-23",
+        monthlyPrice: "R$ 9,00",
+        chargeAmountCents: 900,
+        supportEmail: "caixa@mentorxlab.com",
+        supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
       }
     }
   },
   "gklblkkcpmbmnnmjclppoldcdbimoafc": {
     pendingProfiles: {
+      Mary: {
+        email: "herlegacyspain@gmail.com",
+        recurring: true,
+        startDate: "2026-08-23",
+        monthlyPrice: "R$ 9,00",
+        chargeAmountCents: 900,
+        supportEmail: "caixa@mentorxlab.com",
+        supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+      },
+      Will: {
+        email: "wisdom.sats89@gmail.com",
+        recurring: true,
+        startDate: "2026-08-23",
+        monthlyPrice: "R$ 9,00",
+        chargeAmountCents: 900,
+        supportEmail: "caixa@mentorxlab.com",
+        supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+      },
+      Troy: {
+        email: "jonatafernando02@gmail.com",
+        recurring: true,
+        startDate: "2026-08-23",
+        monthlyPrice: "R$ 9,00",
+        chargeAmountCents: 900,
+        supportEmail: "caixa@mentorxlab.com",
+        supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+      },
       Jen: {
         email: "jennepherlopes@gmail.com",
         renewalDate: "2026-08-15",
@@ -148,6 +175,15 @@ const EXTENSION_CONFIG_OVERRIDES = {
   // 19/09/2026 (hoje 19/08 + 1 mês).
   "dmenpfckkeafegadpafdndbnhgfmiffb": {
     pendingProfiles: {
+      Mary: {
+        email: "herlegacyspain@gmail.com",
+        recurring: true,
+        startDate: "2026-08-23",
+        monthlyPrice: "R$ 9,00",
+        chargeAmountCents: 900,
+        supportEmail: "caixa@mentorxlab.com",
+        supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+      },
       Leônidas: {
         email: "leonidascaldeira15@gmail.com",
         renewalDate: "2026-09-19",
@@ -170,16 +206,25 @@ const EXTENSION_CONFIG_OVERRIDES = {
         chargeAmountCents: 900,
         supportEmail: "caixa@mentorxlab.com",
         supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
-      },
-      Mary: {
-        email: "herlegacyspain@gmail.com",
+      }
+    }
+  },
+  // Cobrança mensal de R$ 9,00 para o X.V.
+  "ebfndfgcpnomfmbnpfhnghbemgogoehl": {
+    pendingProfiles: {
+      "X.V": {
+        email: "Jpzx2004@proton.me",
         recurring: true,
         startDate: "2026-08-23",
         monthlyPrice: "R$ 9,00",
         chargeAmountCents: 900,
         supportEmail: "caixa@mentorxlab.com",
         supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
-      },
+      }
+    }
+  },
+  "kjlkomgkandjgpmecnfnindkkgdjadpe": {
+    pendingProfiles: {
       Will: {
         email: "wisdom.sats89@gmail.com",
         recurring: true,
@@ -191,11 +236,10 @@ const EXTENSION_CONFIG_OVERRIDES = {
       }
     }
   },
-  // Cobrança mensal de R$ 47,00 para o X.V e o Troy.
-  "ebfndfgcpnomfmbnpfhnghbemgogoehl": {
+  "ibkaciaphpkbfikgjnjjfbjcdenlciia": {
     pendingProfiles: {
-      "X.V": {
-        email: "Jpzx2004@proton.me",
+      Will: {
+        email: "wisdom.sats89@gmail.com",
         recurring: true,
         startDate: "2026-08-23",
         monthlyPrice: "R$ 9,00",
