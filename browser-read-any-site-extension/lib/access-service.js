@@ -11,7 +11,7 @@ const EXTENSION_DISPLAY_NAMES = {
   gklblkkcpmbmnnmjclppoldcdbimoafc: "Verificação de Atualização em Plataformas",
   hbokpkaoocpcecbfgfadoplblcfannke: "CLAUDE CODE ARCHITECT",
   ibkaciaphpkbfikgjnjjfbjcdenlciia: "BLUEPRINTPRO - BRANDSDECODED",
-  aachjpoooepljhlphhaplfijppgbjdfp: "PIXEL AI HUB",
+  ebfndfgcpnomfmbnpfhnghbemgogoehl: "Rhawk.pro",
   kjadaimbcapjhdfeafmopnbfdbgofdko: "comunidade subido",
   nicnjmokndbjnpjlikgmnfkihkklobce: "CURSOS - DVD",
   ngjacbpbiegcnfkinikfpdkcplhejael: "Asimov"
