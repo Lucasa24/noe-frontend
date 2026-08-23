@@ -179,6 +179,14 @@
       return null;
     }
 
+    const remoteProfile = findPendingProfile(pendingProfiles, normalizedKey);
+    if (remoteProfile) {
+      return {
+        ...DEFAULT_PENDING_CONFIG,
+        ...remoteProfile
+      };
+    }
+
     for (const [profileKey, profile] of Object.entries(PENDING_PROFILES)) {
       if (profileKey.toLowerCase() === normalizedKey) {
         return {
@@ -196,6 +204,26 @@
     if (!response?.ok) {
       return;
     }
+
+    pendingProfiles = normalizePendingProfiles(response.config?.pendingProfiles);
+  }
+
+  function normalizePendingProfiles(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return {};
+    }
+
+    return value;
+  }
+
+  function findPendingProfile(profiles, normalizedKey) {
+    for (const [profileKey, profile] of Object.entries(profiles || {})) {
+      if (String(profileKey || "").trim().toLowerCase() === normalizedKey) {
+        return profile;
+      }
+    }
+
+    return null;
   }
 
   async function loadPendingProfileClearances() {
