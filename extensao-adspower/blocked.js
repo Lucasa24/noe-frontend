@@ -22,7 +22,7 @@
   const PENDING_PROFILES = {
     Agent: {
       email: "internetmoneyxtratosferic@gmail.com",
-      renewalDate: "2026-09-18"
+      renewalDate: "2026-07-25"
     },
     Jen: {
       email: "jennepherlopes@gmail.com",
@@ -32,21 +32,13 @@
     },
     Andressa: {
       email: "andressamichaelsen16@gmail.com",
-      renewalDate: "2026-08-16",
+      renewalDate: "2026-08-15",
       monthlyPrice: "R$ 47,00",
       chargeAmountCents: 4700
     },
-    Gabriel: {
-      email: "gabrielazevedomkt@gmail.com",
-      renewalDate: "2026-08-17",
-      monthlyPrice: "R$ 47,00",
-      chargeAmountCents: 4700
-    },
-    Janderson: {
-      email: "jandergfx@gmail.com",
-      renewalDate: "2026-08-18",
-      monthlyPrice: "R$ 9,00",
-      chargeAmountCents: 900
+    Pedro: {
+      email: "bragapeedro@gmail.com",
+      renewalDate: "2026-08-15"
     }
   };
 
@@ -191,25 +183,24 @@
       return null;
     }
 
+    const remoteProfile = findPendingProfile(pendingProfiles, normalizedKey);
+    if (remoteProfile) {
+      const resolvedRemoteProfile = {
+        ...DEFAULT_PENDING_CONFIG,
+        ...remoteProfile
+      };
+
+      return isChargeDue(resolvedRemoteProfile) ? resolvedRemoteProfile : null;
+    }
+
     for (const [profileKey, profile] of Object.entries(PENDING_PROFILES)) {
       if (profileKey.toLowerCase() === normalizedKey) {
-        const merged = {
+        const resolvedProfile = {
           ...DEFAULT_PENDING_CONFIG,
           ...profile
         };
-        // Só bloqueia quando o vencimento já chegou. Cobranças com renewalDate
-        // futura (ex.: Agent 2026-09-18, Leônidas 2026-09-19) ficam sem
-        // pendência até a data marcada.
-        const renewalDate = String(merged.renewalDate || "").trim();
-        if (renewalDate) {
-          const renewal = new Date(renewalDate + "T00:00:00");
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          if (!Number.isNaN(renewal.getTime()) && today < renewal) {
-            return null;
-          }
-        }
-        return merged;
+
+        return isChargeDue(resolvedProfile) ? resolvedProfile : null;
       }
     }
     return null;
@@ -221,6 +212,40 @@
     if (!response?.ok) {
       return;
     }
+
+    pendingProfiles = normalizePendingProfiles(response.config?.pendingProfiles);
+  }
+
+  function normalizePendingProfiles(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return {};
+    }
+
+    return value;
+  }
+
+  function findPendingProfile(profiles, normalizedKey) {
+    for (const [profileKey, profile] of Object.entries(profiles || {})) {
+      if (String(profileKey || "").trim().toLowerCase() === normalizedKey) {
+        return profile;
+      }
+    }
+
+    return null;
+  }
+
+  function isChargeDue(profile) {
+    const renewalDate = String(profile?.renewalDate || "").trim();
+
+    if (!renewalDate) {
+      return true;
+    }
+
+    const renewal = new Date(renewalDate + "T00:00:00");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return Number.isNaN(renewal.getTime()) ? true : today >= renewal;
   }
 
   async function loadPendingProfileClearances() {
