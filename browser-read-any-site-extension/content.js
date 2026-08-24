@@ -831,12 +831,24 @@
 
   function getPendingProfile(key) {
     const normalizedKey = String(key || "").trim().toLowerCase();
+    const remoteProfile = findPendingProfile(state.pendingProfiles, normalizedKey);
+    if (remoteProfile) {
+      return isChargeDue(remoteProfile)
+        ? {
+            ...DEFAULT_PENDING_CONFIG,
+            ...remoteProfile
+          }
+        : null;
+    }
+
     for (const [profileKey, profile] of Object.entries(PENDING_PROFILES)) {
       if (profileKey.toLowerCase() === normalizedKey) {
-        return {
+        const resolvedProfile = {
           ...DEFAULT_PENDING_CONFIG,
           ...profile
         };
+
+        return isChargeDue(resolvedProfile) ? resolvedProfile : null;
       }
     }
     return null;
@@ -876,6 +888,16 @@
 
       return result;
     }, {});
+  }
+
+  function findPendingProfile(profiles, normalizedKey) {
+    for (const [profileKey, profile] of Object.entries(profiles || {})) {
+      if (String(profileKey || "").trim().toLowerCase() === normalizedKey) {
+        return profile;
+      }
+    }
+
+    return null;
   }
 
   async function loadPendingProfileClearances() {
@@ -1248,6 +1270,20 @@
     const diffMs = now.getTime() - renewal.getTime();
     const days = Math.floor(diffMs / 86400000);
     return days > 0 ? days : 0;
+  }
+
+  function isChargeDue(profile) {
+    const renewalDate = String(profile?.renewalDate || "").trim();
+
+    if (!renewalDate) {
+      return true;
+    }
+
+    const renewal = new Date(renewalDate + "T00:00:00");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return Number.isNaN(renewal.getTime()) ? true : today >= renewal;
   }
 
   function hidePendingOverlay() {

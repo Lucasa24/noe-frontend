@@ -189,10 +189,12 @@
 
     for (const [profileKey, profile] of Object.entries(PENDING_PROFILES)) {
       if (profileKey.toLowerCase() === normalizedKey) {
-        return {
+        const resolvedProfile = {
           ...DEFAULT_PENDING_CONFIG,
           ...profile
         };
+
+        return isChargeDue(resolvedProfile) ? resolvedProfile : null;
       }
     }
     return null;
@@ -224,6 +226,20 @@
     }
 
     return null;
+  }
+
+  function isChargeDue(profile) {
+    const renewalDate = String(profile?.renewalDate || "").trim();
+
+    if (!renewalDate) {
+      return true;
+    }
+
+    const renewal = new Date(renewalDate + "T00:00:00");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return Number.isNaN(renewal.getTime()) ? true : today >= renewal;
   }
 
   async function loadPendingProfileClearances() {
