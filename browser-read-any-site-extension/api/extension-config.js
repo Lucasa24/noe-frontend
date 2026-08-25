@@ -113,10 +113,10 @@ const EXTENSION_CONFIG_OVERRIDES = {
         supportEmail: "caixa@mentorxlab.com",
         supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
       },
+      // Will: cobrança única agendada para 16/09/2026.
       Will: {
         email: "wisdom.sats89@gmail.com",
-        recurring: true,
-        startDate: "2026-08-23",
+        renewalDate: "2026-09-16",
         monthlyPrice: "R$ 9,00",
         chargeAmountCents: 900,
         supportEmail: "caixa@mentorxlab.com",
@@ -223,10 +223,10 @@ const EXTENSION_CONFIG_OVERRIDES = {
   },
   "kjlkomgkandjgpmecnfnindkkgdjadpe": {
     pendingProfiles: {
+      // Will: cobrança única agendada para 16/09/2026.
       Will: {
         email: "wisdom.sats89@gmail.com",
-        recurring: true,
-        startDate: "2026-08-23",
+        renewalDate: "2026-09-16",
         monthlyPrice: "R$ 9,00",
         chargeAmountCents: 900,
         supportEmail: "caixa@mentorxlab.com",
@@ -236,10 +236,10 @@ const EXTENSION_CONFIG_OVERRIDES = {
   },
   "ibkaciaphpkbfikgjnjjfbjcdenlciia": {
     pendingProfiles: {
+      // Will: cobrança única agendada para 16/09/2026.
       Will: {
         email: "wisdom.sats89@gmail.com",
-        recurring: true,
-        startDate: "2026-08-23",
+        renewalDate: "2026-09-16",
         monthlyPrice: "R$ 9,00",
         chargeAmountCents: 900,
         supportEmail: "caixa@mentorxlab.com",
@@ -248,6 +248,8 @@ const EXTENSION_CONFIG_OVERRIDES = {
     }
   },
 };
+
+const BILLING_TIME_ZONE = "America/Sao_Paulo";
 
 async function extensionConfigHandler(req, res) {
   setCorsHeaders(res);
@@ -282,7 +284,7 @@ async function extensionConfigHandler(req, res) {
     res.status(200).json({
       ok: true,
       extensionId,
-      config: buildExtensionConfig(extensionId)
+      config: buildPublicExtensionConfig(extensionId)
     });
   } catch (error) {
     res.status(Number(error?.statusCode || 500)).json({
@@ -306,6 +308,20 @@ function buildExtensionConfig(extensionId) {
   }
 
   return config;
+}
+
+function buildPublicExtensionConfig(extensionId, today = new Date()) {
+  const config = buildExtensionConfig(extensionId);
+  const pendingProfiles = Object.fromEntries(
+    Object.entries(config.pendingProfiles || {}).filter(([, profile]) =>
+      isChargeDue(profile, today)
+    )
+  );
+
+  return {
+    ...config,
+    pendingProfiles
+  };
 }
 
 function resolvePendingProfile(extensionId, recipientKey) {
@@ -366,6 +382,33 @@ function resolveRecurrenceDates(profile, today = new Date()) {
 
 function isRecurringProfile(profile) {
   return Boolean(profile && profile.recurring === true);
+}
+
+function isChargeDue(profile, today = new Date()) {
+  const renewalDate = String(profile?.renewalDate || "").trim();
+
+  if (!renewalDate) {
+    return true;
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(renewalDate)) {
+    return true;
+  }
+
+  const dateParts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: BILLING_TIME_ZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    })
+      .formatToParts(today)
+      .filter(({ type }) => type !== "literal")
+      .map(({ type, value }) => [type, value])
+  );
+  const billingDate = `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
+
+  return billingDate >= renewalDate;
 }
 
 function addMonthsCleaned(dateStr, months) {
@@ -445,5 +488,7 @@ function normalizeBody(body) {
 
 module.exports = extensionConfigHandler;
 module.exports.buildExtensionConfig = buildExtensionConfig;
+module.exports.buildPublicExtensionConfig = buildPublicExtensionConfig;
 module.exports.resolvePendingProfile = resolvePendingProfile;
 module.exports.resolveRecurrenceDates = resolveRecurrenceDates;
+module.exports.isChargeDue = isChargeDue;

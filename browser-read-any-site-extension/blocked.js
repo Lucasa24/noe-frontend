@@ -181,10 +181,12 @@
 
     const remoteProfile = findPendingProfile(pendingProfiles, normalizedKey);
     if (remoteProfile) {
-      return {
+      const resolvedRemoteProfile = {
         ...DEFAULT_PENDING_CONFIG,
         ...remoteProfile
       };
+
+      return isChargeDue(resolvedRemoteProfile) ? resolvedRemoteProfile : null;
     }
 
     for (const [profileKey, profile] of Object.entries(PENDING_PROFILES)) {
