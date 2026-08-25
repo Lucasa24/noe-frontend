@@ -9,6 +9,7 @@ const EXTENSION_DISPLAY_NAMES = {
   jncbkkimmoapjemleedmklnlgiioiffj: "DOUG - SKOOL",
   ocnhopnkhbkgknjhpfcmbihmialpjboj: "PLANO DVD 3.1",
   gklblkkcpmbmnnmjclppoldcdbimoafc: "Verificação de Atualização em Plataformas",
+  kjlkomgkandjgpmecnfnindkkgdjadpe: "Autodark",
   hbokpkaoocpcecbfgfadoplblcfannke: "CLAUDE CODE ARCHITECT",
   ibkaciaphpkbfikgjnjjfbjcdenlciia: "BLUEPRINTPRO - BRANDSDECODED",
   ebfndfgcpnomfmbnpfhnghbemgogoehl: "Rhawk.pro",

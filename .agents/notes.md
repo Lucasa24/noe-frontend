@@ -46,7 +46,7 @@ chave `EXTENSION_EMAIL_MAP` no arquivo é o JSON
 | `jncbkkimmoapjemleedmklnlgiioiffj` | **DOUG - SKOOL** |
 | `ebfndfgcpnomfmbnpfhnghbemgogoehl` | sem nome no código |
 | `ngjacbpbiegcnfkinikfpdkcplhejael` | sem nome no código |
-| `kjlkomgkandjgpmecnfnindkkgdjadpe` | sem nome no código |
+| `kjlkomgkandjgpmecnfnindkkgdjadpe` | **Autodark** |
 | `fbonkoeoabechghdcokphbmpejooaogh` | sem nome no código (teste) |
 | `ibkaciaphpkbfikgjnjjfbjcdenlciia` | **BLUEPRINTPRO - BRANDSDECODED** |
 | `hbokpkaoocpcecbfgfadoplblcfannke` | **CLAUDE CODE ARCHITECT** |
