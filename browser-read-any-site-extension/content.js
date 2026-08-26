@@ -22,6 +22,7 @@
     pixPollingId: null,
     pendingOverlay: null,
     clearedPendingProfileKeys: new Set(),
+    pendingProfileClearanceExpiresAt: new Map(),
     pendingProfiles: {}
   };
 
@@ -831,6 +832,7 @@
 
   function getPendingProfile(key) {
     const normalizedKey = String(key || "").trim().toLowerCase();
+    if (isPendingProfileCleared(normalizedKey)) return null;
     const remoteProfile = findPendingProfile(state.pendingProfiles, normalizedKey);
     if (remoteProfile) {
       return isChargeDue(remoteProfile)
@@ -904,11 +906,17 @@
     try {
       const data = await chrome.storage.local.get(RENEWAL_CLEARANCES_KEY);
       const clearances = data[RENEWAL_CLEARANCES_KEY] || {};
+      state.pendingProfileClearanceExpiresAt = new Map(
+        Object.entries(clearances).map(([key, clearance]) => [normalizePendingProfileKey(key), Number(clearance?.nextDueAt || 0)])
+      );
       state.clearedPendingProfileKeys = new Set(
-        Object.keys(clearances).map((key) => normalizePendingProfileKey(key))
+        Array.from(state.pendingProfileClearanceExpiresAt.entries())
+          .filter(([, nextDueAt]) => !Number.isFinite(nextDueAt) || nextDueAt > Date.now())
+          .map(([key]) => key)
       );
     } catch (_error) {
       state.clearedPendingProfileKeys = new Set();
+      state.pendingProfileClearanceExpiresAt = new Map();
     }
   }
 
@@ -922,17 +930,41 @@
     const data = await chrome.storage.local.get(RENEWAL_CLEARANCES_KEY).catch(() => ({}));
     const clearances = data[RENEWAL_CLEARANCES_KEY] || {};
 
+    const paidAt = Date.now();
+    const nextDueAt = addOneCalendarMonth(paidAt);
     clearances[normalizedKey] = {
-      clearedAt: Date.now(),
+      clearedAt: paidAt,
+      nextDueAt,
       transactionId: String(transactionId || "")
     };
 
     await chrome.storage.local.set({ [RENEWAL_CLEARANCES_KEY]: clearances });
+    state.pendingProfileClearanceExpiresAt.set(normalizedKey, nextDueAt);
     state.clearedPendingProfileKeys.add(normalizedKey);
   }
 
   function normalizePendingProfileKey(key) {
     return String(key || "").trim().toLowerCase();
+  }
+
+  function isPendingProfileCleared(normalizedKey) {
+    if (!state.clearedPendingProfileKeys.has(normalizedKey)) return false;
+    const nextDueAt = state.pendingProfileClearanceExpiresAt.get(normalizedKey);
+    if (Number.isFinite(nextDueAt) && nextDueAt <= Date.now()) {
+      state.clearedPendingProfileKeys.delete(normalizedKey);
+      state.pendingProfileClearanceExpiresAt.delete(normalizedKey);
+      return false;
+    }
+    return true;
+  }
+
+  function addOneCalendarMonth(timestamp) {
+    const date = new Date(timestamp);
+    const day = date.getDate();
+    date.setDate(1);
+    date.setMonth(date.getMonth() + 1);
+    date.setDate(Math.min(day, new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()));
+    return date.getTime();
   }
 
   async function requestCode(recipientKey) {

@@ -1,3 +1,5 @@
+const { recordPaymentConfirmation } = require("../lib/billing-state");
+
 module.exports = async (req, res) => {
   setCorsHeaders(res);
 
@@ -46,6 +48,13 @@ module.exports = async (req, res) => {
     }
 
     const data = await response.json();
+
+    if (data.status === "paid") {
+      await recordPaymentConfirmation(
+        transactionId,
+        data.paidAt || data.paid_at || data.updatedAt || data.updated_at || new Date()
+      );
+    }
 
     res.status(200).json({
       ok: true,

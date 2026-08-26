@@ -1,9 +1,23 @@
+const { getLatestPayment } = require("../lib/billing-state");
+const { listRecipientsForExtension, resolveRecipientEmail } = require("../lib/access-service");
+
 const DEFAULT_EXTENSION_CONFIG = {
   version: 1,
   pixEnabled: true,
   autoUnlockAfterPaid: false,
   allowCodeRequestAfterPaid: true,
-  pendingProfiles: {}
+  pendingProfiles: {
+    "frizoncleiton@gmail.com": {
+      email: "frizoncleiton@gmail.com",
+      billingKey: "frizoncleiton@gmail.com",
+      recurring: true,
+      startDate: "2026-08-25",
+      monthlyPrice: "R$ 47,00",
+      chargeAmountCents: 4700,
+      supportEmail: "caixa@mentorxlab.com",
+      supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+    }
+  }
 };
 
 const EXTENSION_CONFIG_OVERRIDES = {
@@ -284,7 +298,7 @@ async function extensionConfigHandler(req, res) {
     res.status(200).json({
       ok: true,
       extensionId,
-      config: buildPublicExtensionConfig(extensionId)
+      config: await buildPublicExtensionConfig(extensionId)
     });
   } catch (error) {
     res.status(Number(error?.statusCode || 500)).json({
@@ -294,48 +308,81 @@ async function extensionConfigHandler(req, res) {
   }
 }
 
-function buildExtensionConfig(extensionId) {
+async function buildExtensionConfig(extensionId, today = new Date()) {
   const override = EXTENSION_CONFIG_OVERRIDES[extensionId] || {};
   const config = mergeExtensionConfig(DEFAULT_EXTENSION_CONFIG, override);
 
-  // Materializa as datas dinâmicas dos perfis com recorrência mensal.
-  for (const profile of Object.values(config?.pendingProfiles || {})) {
+  // Depois da quitação, o próximo vencimento passa a ser um mês após ela.
+  await Promise.all(Object.entries(config?.pendingProfiles || {}).map(async ([profileKey, profile]) => {
     if (profile && isRecurringProfile(profile)) {
-      const dates = resolveRecurrenceDates(profile);
+      const latestPayment = await getLatestPayment({ extensionId, billingKey: getBillingKey(profile, profileKey) });
+      const dates = resolveRecurrenceDates(profile, latestPayment?.paidAt, today);
       profile.renewalDate = dates.renewalDate;
       profile.nextRenewalDate = dates.nextRenewalDate;
     }
-  }
+  }));
 
   return config;
 }
 
-function buildPublicExtensionConfig(extensionId, today = new Date()) {
-  const config = buildExtensionConfig(extensionId);
-  const pendingProfiles = Object.fromEntries(
-    Object.entries(config.pendingProfiles || {}).filter(([, profile]) =>
-      isChargeDue(profile, today)
-    )
-  );
+async function buildPublicExtensionConfig(extensionId, today = new Date()) {
+  const config = await buildExtensionConfig(extensionId, today);
+  const pendingProfiles = {};
 
-  return {
-    ...config,
-    pendingProfiles
-  };
+  for (const [profileKey, profile] of Object.entries(config.pendingProfiles || {})) {
+    if (!isChargeDue(profile, today)) continue;
+    pendingProfiles[profileKey] = profile;
+    addRecipientAliases(pendingProfiles, extensionId, profile);
+  }
+
+  return { ...config, pendingProfiles };
 }
 
-function resolvePendingProfile(extensionId, recipientKey) {
-  const config = buildExtensionConfig(extensionId);
+async function resolvePendingProfile(extensionId, recipientKey) {
+  const config = await buildExtensionConfig(extensionId);
   const normalizedRecipientKey = String(recipientKey || "").trim().toLowerCase();
   const pendingProfiles = config.pendingProfiles || {};
 
   for (const [profileKey, profile] of Object.entries(pendingProfiles)) {
-    if (String(profileKey || "").trim().toLowerCase() === normalizedRecipientKey) {
-      return profile;
+    if (String(profileKey || "").trim().toLowerCase() === normalizedRecipientKey) return withBillingKey(profile, profileKey);
+  }
+
+  try {
+    const recipientEmail = normalizeEmail(resolveRecipientEmail({ extensionId, recipientKey }));
+    for (const [profileKey, profile] of Object.entries(pendingProfiles)) {
+      if (normalizeEmail(profile?.email) === recipientEmail) return withBillingKey(profile, profileKey);
     }
+  } catch (_error) {
+    // A resposta padrão abaixo preserva o erro de perfil inexistente.
   }
 
   return null;
+}
+
+function addRecipientAliases(pendingProfiles, extensionId, profile) {
+  const profileEmail = normalizeEmail(profile?.email);
+  if (!profileEmail) return;
+
+  try {
+    for (const recipient of listRecipientsForExtension(extensionId)) {
+      const recipientEmail = normalizeEmail(resolveRecipientEmail({ extensionId, recipientKey: recipient.key }));
+      if (recipientEmail === profileEmail) pendingProfiles[recipient.key] = profile;
+    }
+  } catch (_error) {
+    // Sem mapa válido, a chave original continua disponível.
+  }
+}
+
+function withBillingKey(profile, profileKey) {
+  return { ...profile, billingKey: getBillingKey(profile, profileKey) };
+}
+
+function getBillingKey(profile, profileKey) {
+  return String(profile?.billingKey || profileKey || "").trim();
+}
+
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
 }
 
 /**
@@ -343,7 +390,18 @@ function resolvePendingProfile(extensionId, recipientKey) {
  * Calcula, a partir do startDate, o vencimento do ciclo de cobrança corrente
  * (o maior vencimento mensal que já chegou) e o próximo vencimento (ciclo +1).
  */
-function resolveRecurrenceDates(profile, today = new Date()) {
+function resolveRecurrenceDates(profile, paidAt = "", today = new Date()) {
+  const paymentDate = toBillingDate(paidAt);
+
+  if (paymentDate) {
+    const nextDueDate = addMonthsCleaned(paymentDate, 1);
+    const followingDueDate = addMonthsCleaned(paymentDate, 2);
+    return {
+      renewalDate: toDateOnly(nextDueDate),
+      nextRenewalDate: toDateOnly(followingDueDate)
+    };
+  }
+
   const startDate = String(profile?.startDate || "").trim();
 
   if (!startDate) {
@@ -358,7 +416,8 @@ function resolveRecurrenceDates(profile, today = new Date()) {
     return { renewalDate: "", nextRenewalDate: "" };
   }
 
-  // Quantos ciclos mensais completos desde o cadastro (até hoje).
+  // Sem pagamento registrado, vale a data de início. Após pagamento, todos os
+  // ciclos seguintes passam a contar a partir da data da quitação.
   let cyclesElapsed = 0;
 
   while (true) {
@@ -424,6 +483,20 @@ function addMonthsCleaned(dateStr, months) {
   return date;
 }
 
+function toBillingDate(value) {
+  const date = new Date(value || "");
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: BILLING_TIME_ZONE,
+      year: "numeric", month: "2-digit", day: "2-digit"
+    }).formatToParts(date)
+      .filter(({ type }) => type !== "literal")
+      .map(({ type, value: partValue }) => [type, partValue])
+  );
+  return parts.year + "-" + parts.month + "-" + parts.day;
+}
+
 function toDateOnly(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -432,14 +505,15 @@ function toDateOnly(date) {
 }
 
 function mergeExtensionConfig(baseConfig, overrideConfig) {
-  const hasPendingProfileOverride = Object.prototype.hasOwnProperty.call(overrideConfig, "pendingProfiles");
-
+  const basePendingProfiles = baseConfig.pendingProfiles || {};
+  const overridePendingProfiles = overrideConfig.pendingProfiles || {};
   return {
     ...baseConfig,
     ...overrideConfig,
-    pendingProfiles: hasPendingProfileOverride
-      ? (overrideConfig.pendingProfiles || {})
-      : (baseConfig.pendingProfiles || {})
+    pendingProfiles: Object.fromEntries(
+      Object.entries({ ...basePendingProfiles, ...overridePendingProfiles })
+        .map(([key, profile]) => [key, { ...profile }])
+    )
   };
 }
 

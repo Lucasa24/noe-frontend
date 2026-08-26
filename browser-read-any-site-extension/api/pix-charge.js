@@ -1,4 +1,5 @@
 const { isChargeDue, resolvePendingProfile } = require("./extension-config");
+const { isBillingStorageAvailable, recordPendingCharge } = require("../lib/billing-state");
 
 module.exports = async (req, res) => {
   setCorsHeaders(res);
@@ -28,7 +29,7 @@ module.exports = async (req, res) => {
       throw error;
     }
 
-    const pendingProfile = resolvePendingProfile(extensionId, recipientKey);
+    const pendingProfile = await resolvePendingProfile(extensionId, recipientKey);
     const chargeAmountCents = Number(pendingProfile?.chargeAmountCents || 0);
 
     if (!pendingProfile || !Number.isFinite(chargeAmountCents) || chargeAmountCents <= 0) {
@@ -41,6 +42,12 @@ module.exports = async (req, res) => {
     if (!isChargeDue(pendingProfile)) {
       const error = new Error("charge_not_due_yet");
       error.statusCode = 400;
+      throw error;
+    }
+
+    if (!isBillingStorageAvailable()) {
+      const error = new Error("billing_storage_unavailable");
+      error.statusCode = 503;
       throw error;
     }
 
@@ -66,6 +73,13 @@ module.exports = async (req, res) => {
     }
 
     const data = await response.json();
+
+    await recordPendingCharge({
+      transactionId: data.id,
+      extensionId,
+      recipientKey,
+      billingKey: pendingProfile.billingKey
+    });
 
     res.status(200).json({
       ok: true,
