@@ -16,6 +16,16 @@ const DEFAULT_EXTENSION_CONFIG = {
       chargeAmountCents: 4700,
       supportEmail: "caixa@mentorxlab.com",
       supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+    },
+    "julioccou@gmail.com": {
+      email: "julioccou@gmail.com",
+      billingKey: "julioccou@gmail.com",
+      recurring: true,
+      startDate: "2026-08-26",
+      monthlyPrice: "R$ 9,00",
+      chargeAmountCents: 900,
+      supportEmail: "caixa@mentorxlab.com",
+      supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
     }
   }
 };
