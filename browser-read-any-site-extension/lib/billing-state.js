@@ -199,7 +199,10 @@ function getPool() {
 
 function getBillingDatabaseUrl() {
   return String(
-    process.env.BILLING_DATABASE_URL || process.env.DATABASE_URL || ""
+    process.env.BILLING_DATABASE_POSTGRES_URL ||
+      process.env.BILLING_DATABASE_URL ||
+      process.env.DATABASE_URL ||
+      ""
   ).trim();
 }
 
