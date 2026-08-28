@@ -36,7 +36,7 @@ module.exports = async (req, res) => {
     const reason = String(body.reason || "startup").trim();
     const contentKey = String(body.contentKey || "").trim();
     const recipientKey = isContentSelectorEnabled(extensionId)
-      ? resolveContentRecipientKey({ extensionId, contentKey })
+      ? resolveContentRecipientKey({ extensionId, contentKey, recipientKey: body.recipientKey })
       : String(body.recipientKey || "").trim();
     const recipientEmails = resolveRecipientTargets({
       extensionId,

@@ -13,6 +13,7 @@
   let accessContents = [];
   let contentConfigError = "";
   let contentQuery = "";
+  let recipientQuery = "";
   let selectedContentKey = "";
   let contentPickerListenersAttached = false;
   let currentExtensionId = "";
@@ -48,6 +49,7 @@
   };
 
   const RENEWAL_CLEARANCES_KEY = "renewalClearances";
+  const MESSAGE_RESPONSE_TIMEOUT_MS = 30000;
 
   init().catch((error) => {
     updateStatus(`Falha ao iniciar o bloqueio: ${error.message}`);
@@ -232,7 +234,21 @@
       .map((item) => ({
         key: String(item?.key || "").trim(),
         label: String(item?.label || "").trim(),
-        available: item?.available === true
+        available: item?.available === true,
+        recipients: normalizeContentRecipients(item?.recipients)
+      }))
+      .filter((item) => item.key && item.label);
+  }
+
+  function normalizeContentRecipients(value) {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .map((item) => ({
+        key: String(item?.key || "").trim(),
+        label: String(item?.label || "").trim()
       }))
       .filter((item) => item.key && item.label);
   }
@@ -334,21 +350,23 @@
     return date.getTime();
   }
 
-  async function requestCode(contentKey) {
+  async function requestCode(contentKey, recipientKey) {
     const content = accessContents.find((item) => item.key === contentKey);
+    const recipient = content?.recipients.find((item) => item.key === recipientKey);
 
-    if (!content?.available) {
-      updateStatus("Este conteúdo ainda não está liberado para solicitar código.");
+    if (!content || !recipient) {
+      updateStatus("Escolha um destinatário autorizado para solicitar o código.");
       return;
     }
 
     selectedContentKey = contentKey;
     renderContentPicker();
-    updateStatus(`Enviando código para ${content.label}...`);
+    updateStatus(`Enviando código para ${recipient.label}...`);
 
     const response = await sendMessage({
       type: "lock:sendCode",
-      contentKey
+      contentKey,
+      recipientKey
     });
 
     if (!response?.ok) {
@@ -398,23 +416,32 @@
       return;
     }
 
-    if (!picker.querySelector("#recipient-search")) {
-      picker.innerHTML = `
-        <p>Escolha o conteúdo:</p>
-        <div class="recipient-search">
-          <svg class="recipient-search-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="6"></circle>
-            <path d="m16 16 4 4"></path>
-          </svg>
-          <input id="recipient-search" type="search" autocomplete="off" aria-label="Buscar conteúdo" placeholder="Buscar conteúdo..." />
-        </div>
-        <div id="recipient-actions">
-          <ul id="recipient-list" aria-label="Conteúdos"></ul>
-          <p id="recipient-empty" role="status" aria-live="polite" hidden>Nenhum conteúdo encontrado.</p>
-        </div>
-      `;
-      attachContentPickerListeners(picker);
+    const selectedContent = accessContents.find((item) => item.key === selectedContentKey);
+
+    if (selectedContent) {
+      renderRecipientPicker(picker, selectedContent);
+      return;
     }
+
+    renderContentsPicker(picker);
+  }
+
+  function renderContentsPicker(picker) {
+    picker.innerHTML = `
+      <p>Escolha o conteúdo:</p>
+      <div class="recipient-search">
+        <svg class="recipient-search-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="6"></circle>
+          <path d="m16 16 4 4"></path>
+        </svg>
+        <input id="recipient-search" type="search" autocomplete="off" aria-label="Buscar conteúdo" placeholder="Buscar conteúdo..." />
+      </div>
+      <div id="recipient-actions">
+        <ul id="recipient-list" aria-label="Conteúdos"></ul>
+        <p id="recipient-empty" role="status" aria-live="polite" hidden>Nenhum conteúdo encontrado.</p>
+      </div>
+    `;
+    attachContentPickerListeners(picker);
 
     const searchInput = picker.querySelector("#recipient-search");
     const list = picker.querySelector("#recipient-list");
@@ -430,27 +457,76 @@
     list.innerHTML = visibleContents.map((item) => {
       const key = String(item.key || "");
       const label = String(item.label || key);
-      const isSelected = key === selectedContentKey;
 
       return `
         <li class="recipient-item">
           <button
-            class="recipient-option${isSelected ? " is-selected" : ""}"
+            class="recipient-option"
             type="button"
             data-content-key="${escapeAttribute(key)}"
-            aria-pressed="${isSelected ? "true" : "false"}"
-            ${item.available ? "" : "disabled"}
+            aria-label="Escolher ${escapeAttribute(label)}"
           >
             <span class="recipient-copy">
               <span class="recipient-name">${escapeHtml(label)}</span>
-              <span class="recipient-activity">${item.available ? "Clique para solicitar o código" : "Acesso ainda não liberado"}</span>
+              <span class="recipient-activity">Clique para escolher um destinatário</span>
             </span>
-            ${item.available ? "" : '<span class="recipient-badge-pending">Em breve</span>'}
           </button>
         </li>
       `;
     }).join("");
     emptyState.hidden = visibleContents.length > 0;
+    picker.style.display = "block";
+  }
+
+  function renderRecipientPicker(picker, content) {
+    const recipients = Array.isArray(content.recipients) ? content.recipients : [];
+
+    picker.innerHTML = `
+      <button id="content-back" class="content-back-button" type="button">← Voltar aos conteúdos</button>
+      <p>Escolha o destinatário para <strong>${escapeHtml(content.label)}</strong>:</p>
+      <div class="recipient-search">
+        <svg class="recipient-search-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="6"></circle>
+          <path d="m16 16 4 4"></path>
+        </svg>
+        <input id="recipient-search" type="search" autocomplete="off" aria-label="Buscar destinatário" placeholder="Buscar destinatário..." />
+      </div>
+      <div id="recipient-actions">
+        <ul id="recipient-list" aria-label="Destinatários"></ul>
+        <p id="recipient-empty" role="status" aria-live="polite" hidden>Nenhum destinatário encontrado.</p>
+        <p id="recipient-unavailable" role="status" ${recipients.length > 0 ? "hidden" : ""}>Nenhum destinatário está liberado para este conteúdo.</p>
+      </div>
+    `;
+    attachContentPickerListeners(picker);
+
+    const searchInput = picker.querySelector("#recipient-search");
+    const list = picker.querySelector("#recipient-list");
+    const emptyState = picker.querySelector("#recipient-empty");
+
+    if (!(searchInput instanceof HTMLInputElement) || !(list instanceof HTMLUListElement) || !(emptyState instanceof HTMLElement)) {
+      return;
+    }
+
+    searchInput.value = recipientQuery;
+    const visibleRecipients = filterRecipients(recipients, recipientQuery);
+
+    list.innerHTML = visibleRecipients.map((item) => `
+      <li class="recipient-item">
+        <button
+          class="recipient-option"
+          type="button"
+          data-content-key="${escapeAttribute(content.key)}"
+          data-recipient-key="${escapeAttribute(item.key)}"
+          aria-label="Enviar código para ${escapeAttribute(item.label)}"
+        >
+          <span class="recipient-copy">
+            <span class="recipient-name">${escapeHtml(item.label)}</span>
+            <span class="recipient-activity">Clique para enviar o código</span>
+          </span>
+        </button>
+      </li>
+    `).join("");
+    emptyState.hidden = recipients.length === 0 || visibleRecipients.length > 0;
     picker.style.display = "block";
   }
 
@@ -463,7 +539,11 @@
       const target = event.target;
 
       if (target instanceof HTMLInputElement && target.id === "recipient-search") {
-        contentQuery = target.value;
+        if (selectedContentKey) {
+          recipientQuery = target.value;
+        } else {
+          contentQuery = target.value;
+        }
         renderContentPicker();
       }
     });
@@ -472,6 +552,28 @@
       const target = event.target;
 
       if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      const backButton = target.closest("#content-back");
+
+      if (backButton instanceof HTMLButtonElement && picker.contains(backButton)) {
+        selectedContentKey = "";
+        recipientQuery = "";
+        renderContentPicker();
+        updateStatus("Escolha um conteúdo abaixo para solicitar um novo código.");
+        return;
+      }
+
+      const recipientButton = target.closest("button[data-recipient-key]");
+
+      if (recipientButton instanceof HTMLButtonElement && picker.contains(recipientButton)) {
+        const contentKey = recipientButton.getAttribute("data-content-key");
+        const recipientKey = recipientButton.getAttribute("data-recipient-key");
+
+        if (contentKey && recipientKey) {
+          void requestCode(contentKey, recipientKey);
+        }
         return;
       }
 
@@ -487,13 +589,18 @@
         return;
       }
 
-      void requestCode(String(key || ""));
+      selectedContentKey = String(key || "");
+      recipientQuery = "";
+      renderContentPicker();
+
+      const content = accessContents.find((item) => item.key === selectedContentKey);
+      updateStatus(`Escolha o destinatário para ${content?.label || "este conteúdo"}.`);
     });
 
     picker.addEventListener("keydown", (event) => {
       const target = event.target;
 
-      if (!(target instanceof HTMLButtonElement) || !target.matches("button[data-content-key]")) {
+      if (!(target instanceof HTMLButtonElement) || !target.matches("button[data-content-key], button[data-recipient-key]")) {
         return;
       }
 
@@ -507,6 +614,16 @@
   }
 
   function filterContents(items, query) {
+    const normalizedQuery = normalizeSearchText(query);
+
+    if (!normalizedQuery) {
+      return items;
+    }
+
+    return items.filter((item) => normalizeSearchText(item.label).includes(normalizedQuery));
+  }
+
+  function filterRecipients(items, query) {
     const normalizedQuery = normalizeSearchText(query);
 
     if (!normalizedQuery) {
@@ -568,6 +685,8 @@
     picker.style.display = "none";
     picker.textContent = "";
     contentQuery = "";
+    recipientQuery = "";
+    selectedContentKey = "";
   }
 
   function setUnlockedMode(unlocked, siteAccessGranted = true) {
@@ -612,17 +731,41 @@
 
   function sendMessage(message) {
     return new Promise((resolve) => {
-      chrome.runtime.sendMessage(message, (response) => {
-        if (chrome.runtime.lastError) {
-          resolve({
-            ok: false,
-            error: chrome.runtime.lastError.message || "Falha ao comunicar com a extensao."
-          });
+      let settled = false;
+      const finish = (response) => {
+        if (settled) {
           return;
         }
 
+        settled = true;
+        globalThis.clearTimeout(timeoutId);
         resolve(response);
-      });
+      };
+      const timeoutId = globalThis.setTimeout(() => {
+        finish({
+          ok: false,
+          error: "A extensão não respondeu em 30 segundos. Recarregue-a e tente novamente."
+        });
+      }, MESSAGE_RESPONSE_TIMEOUT_MS);
+
+      try {
+        chrome.runtime.sendMessage(message, (response) => {
+          if (chrome.runtime.lastError) {
+            finish({
+              ok: false,
+              error: chrome.runtime.lastError.message || "Falha ao comunicar com a extensao."
+            });
+            return;
+          }
+
+          finish(response);
+        });
+      } catch (error) {
+        finish({
+          ok: false,
+          error: error instanceof Error ? error.message : "Falha ao comunicar com a extensao."
+        });
+      }
     });
   }
 
@@ -897,7 +1040,9 @@
 
     overlay.querySelector("#payment-request-code-btn")?.addEventListener("click", () => {
       hidePendingOverlay();
-      void requestCode(recipientKey);
+      selectedContentKey = "";
+      renderContentPicker();
+      updateStatus("Escolha um conteúdo e depois um destinatário para solicitar o código.");
     });
 
     overlay.querySelector("#payment-back-btn")?.addEventListener("click", () => {

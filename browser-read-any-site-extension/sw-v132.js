@@ -1426,8 +1426,26 @@ function normalizeAccessContents(value) {
       key,
       label,
       url: String(item?.url || "").trim(),
-      available: item?.available === true
+      available: item?.available === true,
+      recipients: normalizeContentRecipients(item?.recipients)
     });
+    return result;
+  }, []);
+}
+
+function normalizeContentRecipients(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.reduce((result, item) => {
+    const key = String(item?.key || "").trim();
+    const label = String(item?.label || "").trim();
+
+    if (key && label) {
+      result.push({ key, label });
+    }
+
     return result;
   }, []);
 }
@@ -1477,6 +1495,8 @@ function mapServerError(errorCode) {
       return "Este conteúdo ainda não está liberado para solicitar código.";
     case "authorized_recipient_not_configured":
       return "O destinatário autorizado para este conteúdo ainda não foi configurado no servidor.";
+    case "recipient_not_allowed_for_content":
+      return "Este destinatário não está autorizado para o conteúdo selecionado.";
     case "invalid_extension_email_map":
       return "O mapa de emails por extensao esta invalido no servidor.";
     case "missing_parameters":

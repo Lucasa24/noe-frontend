@@ -35,15 +35,23 @@ function getPublicAccessContents(extensionId) {
     return [];
   }
 
-  return ACCESS_CONTENTS.map(({ key, label, url, allowedRecipientNames }) => ({
-    key,
-    label,
-    url: url || "",
-    available: allowedRecipientNames.length > 0
-  }));
+  return ACCESS_CONTENTS.map(({ key, label, url, allowedRecipientNames }) => {
+    const recipients = getAllowedRecipients(extensionId, allowedRecipientNames);
+
+    return {
+      key,
+      label,
+      url: url || "",
+      available: recipients.length > 0,
+      recipients: recipients.map(({ key: recipientKey, label: recipientLabel }) => ({
+        key: recipientKey,
+        label: recipientLabel
+      }))
+    };
+  });
 }
 
-function resolveContentRecipientKey({ extensionId, contentKey }) {
+function resolveContentRecipientKey({ extensionId, contentKey, recipientKey }) {
   if (!isContentSelectorEnabled(extensionId)) {
     return "";
   }
@@ -58,15 +66,34 @@ function resolveContentRecipientKey({ extensionId, contentKey }) {
     throw createError("content_unavailable", 403);
   }
 
-  const allowedNames = new Set(content.allowedRecipientNames.map(normalizeName));
-  const recipient = listRecipientsForExtension(extensionId)
-    .find((item) => allowedNames.has(normalizeName(item.key)));
+  const recipients = getAllowedRecipients(extensionId, content.allowedRecipientNames);
+  const requestedRecipientKey = normalizeName(recipientKey);
+  const recipient = requestedRecipientKey
+    ? recipients.find((item) => normalizeName(item.key) === requestedRecipientKey)
+    : recipients[0];
 
   if (!recipient?.key) {
+    if (requestedRecipientKey) {
+      throw createError("recipient_not_allowed_for_content", 403);
+    }
+
     throw createError("authorized_recipient_not_configured", 500);
   }
 
   return recipient.key;
+}
+
+function getAllowedRecipients(extensionId, allowedRecipientNames) {
+  const allowedNames = new Set((Array.isArray(allowedRecipientNames) ? allowedRecipientNames : [])
+    .map(normalizeName)
+    .filter(Boolean));
+
+  if (allowedNames.size === 0) {
+    return [];
+  }
+
+  return listRecipientsForExtension(extensionId)
+    .filter((item) => allowedNames.has(normalizeName(item.key)));
 }
 
 function normalizeName(value) {
