@@ -1,5 +1,6 @@
 const { getLatestPayment } = require("../lib/billing-state");
 const { listRecipientsForExtension, resolveRecipientEmail } = require("../lib/access-service");
+const { getPublicAccessContents } = require("../lib/content-access");
 
 const DEFAULT_EXTENSION_CONFIG = {
   version: 1,
@@ -332,7 +333,10 @@ async function buildExtensionConfig(extensionId, today = new Date()) {
     }
   }));
 
-  return config;
+  return {
+    ...config,
+    accessContents: getPublicAccessContents(extensionId)
+  };
 }
 
 async function buildPublicExtensionConfig(extensionId, today = new Date()) {

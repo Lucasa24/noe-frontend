@@ -7,6 +7,10 @@ const DEFAULT_WEBHOOK_URL = "https://noe-frontend.vercel.app/api/send-code";
 const DEFAULT_WEBHOOK_TOKEN = "b4b7f9f9e7c64f3d9c1a8d2f6e3b7a91";
 const BLOCKED_PAGE_PATH = "blocked.html";
 const TEMP_DISABLE_BROWSER_LOCK = false;
+const ALLOWED_WHILE_LOCKED_ORIGINS = new Set([
+  "https://zoom.us",
+  "https://us05web.zoom.us"
+]);
 
 chrome.runtime.onInstalled.addListener(() => {
   void bootstrapLock("installed");
@@ -86,7 +90,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       }
 
       if (message?.type === "lock:sendCode") {
-        sendResponse(await sendAccessCode(message.recipientKey));
+        sendResponse(await sendAccessCode(message.contentKey, message.recipientKey));
         return;
       }
 
@@ -150,6 +154,7 @@ async function bootstrapLock(reason) {
     sessionId,
     extensionId: chrome.runtime.id,
     recipientKey: "",
+    contentKey: "",
     recipientEmail: "",
     maskedRecipientEmail: "",
     challengeToken: "",
@@ -461,7 +466,7 @@ async function verifyAccessCode(code) {
   }
 }
 
-async function sendAccessCode(recipientKey) {
+async function sendAccessCode(contentKey, recipientKey = "") {
   const config = await getAuthConfig();
   const siteAccessGranted = await hasRequiredSiteAccess();
 
@@ -493,6 +498,7 @@ async function sendAccessCode(recipientKey) {
     unlockedAt: null,
     reason: "manual_request",
     recipientKey: String(recipientKey || ""),
+    contentKey: String(contentKey || ""),
     sendStatus: "pending",
     lastError: ""
   };
@@ -629,7 +635,8 @@ async function requestAccessCode(state, config) {
     const response = await postJson(config.webhookUrl, {
       extensionId: state.extensionId,
       reason: state.reason,
-      recipientKey: state.recipientKey || ""
+      recipientKey: state.recipientKey || "",
+      contentKey: state.contentKey || ""
     }, config.webhookToken);
 
     if (!response.ok || !response.challengeToken) {
@@ -1120,7 +1127,12 @@ function isAllowedWhileLocked(url, state = null, tab = null) {
   }
 
   return normalizedUrl === normalizeUrl(getBlockedPageUrl())
-    || isPendingHostAccessUrl(normalizedUrl, state);
+    || isPendingHostAccessUrl(normalizedUrl, state)
+    || isAllowedWhileLockedOrigin(normalizedUrl);
+}
+
+function isAllowedWhileLockedOrigin(url) {
+  return ALLOWED_WHILE_LOCKED_ORIGINS.has(getUrlOrigin(url));
 }
 
 function isPendingHostAccessTab(tab, state) {
@@ -1178,7 +1190,8 @@ function isAllowedWithoutPendingHostAccess(url) {
   const normalizedUrl = normalizeUrl(url);
   return normalizedUrl === normalizeUrl(getBlockedPageUrl())
     || normalizedUrl === normalizeUrl(chrome.runtime.getURL("options.html"))
-    || isExtensionsManagerUrl(normalizedUrl);
+    || isExtensionsManagerUrl(normalizedUrl)
+    || isAllowedWhileLockedOrigin(normalizedUrl);
 }
 
 function isExtensionsManagerUrl(url) {
@@ -1369,6 +1382,12 @@ function mapServerError(errorCode) {
       return "Selecione um destinatario antes de enviar o codigo.";
     case "recipient_not_found":
       return "O destinatario selecionado nao existe no servidor.";
+    case "content_not_found":
+      return "O conteúdo selecionado não existe no servidor.";
+    case "content_unavailable":
+      return "Este conteúdo ainda não está liberado para solicitar código.";
+    case "authorized_recipient_not_configured":
+      return "O destinatário autorizado para este conteúdo ainda não foi configurado no servidor.";
     case "invalid_extension_email_map":
       return "O mapa de emails por extensao esta invalido no servidor.";
     case "missing_parameters":
