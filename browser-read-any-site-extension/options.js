@@ -27,10 +27,8 @@ async function init() {
     webhookToken: DEFAULT_WEBHOOK_TOKEN
   };
   const resolvedConfig = {
-    webhookUrl: config.webhookUrl || defaultConfig.webhookUrl,
-    webhookToken: Object.prototype.hasOwnProperty.call(config, "webhookToken")
-      ? config.webhookToken
-      : defaultConfig.webhookToken
+    webhookUrl: String(config.webhookUrl || defaultConfig.webhookUrl).trim(),
+    webhookToken: String(config.webhookToken || defaultConfig.webhookToken).trim()
   };
 
   if (!config.webhookUrl && !Object.prototype.hasOwnProperty.call(config, "webhookToken")) {

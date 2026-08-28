@@ -11,6 +11,7 @@
   let permissionPollId = null;
   let contentPickerReady = false;
   let accessContents = [];
+  let contentConfigError = "";
   let contentQuery = "";
   let selectedContentKey = "";
   let contentPickerListenersAttached = false;
@@ -79,7 +80,7 @@
     await refreshLockState();
   }
 
-  function applyLockState(lockState) {
+  async function applyLockState(lockState) {
     currentExtensionId = lockState?.extensionId || currentExtensionId;
     hidePendingOverlay();
     if (lockState?.tempLockDisabled) {
@@ -117,7 +118,9 @@
       return;
     }
 
-    void ensureContentPicker();
+    if (!(await ensureContentPicker())) {
+      return;
+    }
 
     if (lockState.sendStatus === "failed") {
       updateStatus(`Falha ao enviar o codigo: ${lockState.lastError || "erro desconhecido"}`);
@@ -171,7 +174,7 @@
       return;
     }
 
-    applyLockState(response?.state || { unlocked: true });
+    await applyLockState(response?.state || { unlocked: true });
   }
 
   function getPendingProfile(key) {
@@ -208,11 +211,16 @@
 
     if (!response?.ok) {
       accessContents = [];
-      return;
+      contentConfigError = response?.error || "Não foi possível carregar os conteúdos.";
+      return false;
     }
 
     pendingProfiles = normalizePendingProfiles(response.config?.pendingProfiles);
     accessContents = normalizeAccessContents(response.config?.accessContents);
+    contentConfigError = accessContents.length > 0
+      ? ""
+      : response?.error || "A configuração recebida não possui conteúdos.";
+    return accessContents.length > 0;
   }
 
   function normalizeAccessContents(value) {
@@ -348,7 +356,7 @@
       return;
     }
 
-    applyLockState(response?.state || null);
+    await applyLockState(response?.state || null);
     await ensureContentPicker({ force: true, silent: true });
 
     if (elements.input) {
@@ -364,7 +372,7 @@
     const picker = elements.recipientPicker;
 
     if (!picker) {
-      return;
+      return false;
     }
 
     if (!silent) {
@@ -374,12 +382,13 @@
     if (accessContents.length === 0) {
       contentPickerReady = false;
       hideContentPicker();
-      updateStatus("Nenhum conteúdo foi configurado para este acesso.");
-      return;
+      updateStatus(contentConfigError || "Nenhum conteúdo foi configurado para este acesso.");
+      return false;
     }
 
     contentPickerReady = true;
     renderContentPicker();
+    return true;
   }
 
   function renderContentPicker() {
@@ -619,7 +628,7 @@
 
   async function refreshLockState() {
     const response = await sendMessage({ type: "lock:getState" });
-    applyLockState(response);
+    await applyLockState(response);
   }
 
   function startPermissionPolling() {
@@ -631,7 +640,7 @@
       const response = await sendMessage({ type: "lock:getState" });
 
       if (response?.siteAccessGranted !== false) {
-        applyLockState(response);
+        await applyLockState(response);
       }
     }, 2000);
   }

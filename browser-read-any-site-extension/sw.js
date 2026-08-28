@@ -7,6 +7,8 @@ const DEFAULT_WEBHOOK_URL = "https://noe-frontend.vercel.app/api/send-code";
 const DEFAULT_WEBHOOK_TOKEN = "b4b7f9f9e7c64f3d9c1a8d2f6e3b7a91";
 const BLOCKED_PAGE_PATH = "blocked.html";
 const TEMP_DISABLE_BROWSER_LOCK = false;
+const EXTENSION_CONFIG_CACHE_SCHEMA_VERSION = 2;
+const CONTENT_SELECTOR_EXTENSION_ID = "nicnjmokndbjnpjlikgmnfkihkklobce";
 const ALLOWED_WHILE_LOCKED_ORIGINS = new Set([
   "https://zoom.us",
   "https://us05web.zoom.us"
@@ -29,7 +31,7 @@ chrome.tabs.onCreated.addListener((tab) => {
     return;
   }
 
-  void enforceLockedTab(tab.id, tabUrl);
+  void enforceLockedTab(tab.id, tabUrl).catch(() => undefined);
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
@@ -43,7 +45,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     return;
   }
 
-  void enforceLockedTab(tabId, tabUrl);
+  void enforceLockedTab(tabId, tabUrl).catch(() => undefined);
 });
 
 chrome.tabs.onActivated.addListener((activeInfo) => {
@@ -176,10 +178,8 @@ async function getAuthConfig() {
   const data = await chrome.storage.local.get(AUTH_CONFIG_KEY);
   const config = data[AUTH_CONFIG_KEY] || {};
   return {
-    webhookUrl: config.webhookUrl || DEFAULT_WEBHOOK_URL,
-    webhookToken: Object.prototype.hasOwnProperty.call(config, "webhookToken")
-      ? config.webhookToken
-      : DEFAULT_WEBHOOK_TOKEN
+    webhookUrl: String(config.webhookUrl || DEFAULT_WEBHOOK_URL).trim(),
+    webhookToken: String(config.webhookToken || DEFAULT_WEBHOOK_TOKEN).trim()
   };
 }
 
@@ -561,9 +561,34 @@ async function createPixCharge(extensionId, recipientKey) {
 }
 
 async function getExtensionConfig() {
-  const config = await getAuthConfig();
+  const configuredAuth = await getAuthConfig();
+  let result = await requestRemoteExtensionConfig(configuredAuth);
 
-  if (!config.webhookUrl) {
+  if (!result.ok && isContentSelectorExtension() && !isDefaultAuthConfig(configuredAuth)) {
+    const defaultAuth = getDefaultAuthConfig();
+    const fallbackResult = await requestRemoteExtensionConfig(defaultAuth);
+
+    if (fallbackResult.ok) {
+      await chrome.storage.local.set({ [AUTH_CONFIG_KEY]: defaultAuth });
+      result = {
+        ...fallbackResult,
+        source: "default_recovery"
+      };
+    } else {
+      result = fallbackResult;
+    }
+  }
+
+  if (!result.ok) {
+    return getCachedExtensionConfig(result.error);
+  }
+
+  await saveExtensionConfigCache(result.config);
+  return result;
+}
+
+async function requestRemoteExtensionConfig(config) {
+  if (!config?.webhookUrl) {
     return {
       ok: false,
       error: "Configure o webhook antes de carregar a configuracao da extensao."
@@ -577,11 +602,20 @@ async function getExtensionConfig() {
     }, config.webhookToken);
 
     if (!response.ok || !response.config) {
-      return await getCachedExtensionConfig(mapServerError(response.error));
+      return {
+        ok: false,
+        error: mapServerError(response.error)
+      };
     }
 
     const normalizedConfig = normalizeExtensionConfig(response.config);
-    await saveExtensionConfigCache(normalizedConfig);
+
+    if (isContentSelectorExtension() && normalizedConfig.accessContents.length === 0) {
+      return {
+        ok: false,
+        error: "A configuração de conteúdos não está disponível no servidor."
+      };
+    }
 
     return {
       ok: true,
@@ -589,10 +623,28 @@ async function getExtensionConfig() {
       config: normalizedConfig
     };
   } catch (error) {
-    return getCachedExtensionConfig(
-      error instanceof Error ? error.message : "Nao foi possivel carregar a configuracao da extensao."
-    );
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar a configuracao da extensao."
+    };
   }
+}
+
+function getDefaultAuthConfig() {
+  return {
+    webhookUrl: DEFAULT_WEBHOOK_URL,
+    webhookToken: DEFAULT_WEBHOOK_TOKEN
+  };
+}
+
+function isDefaultAuthConfig(config) {
+  const defaultConfig = getDefaultAuthConfig();
+  return config?.webhookUrl === defaultConfig.webhookUrl
+    && config?.webhookToken === defaultConfig.webhookToken;
+}
+
+function isContentSelectorExtension() {
+  return chrome.runtime.id === CONTENT_SELECTOR_EXTENSION_ID;
 }
 
 async function checkPixStatus(transactionId) {
@@ -746,14 +798,26 @@ async function listRecipients() {
 
 async function getCachedExtensionConfig(errorMessage) {
   const data = await chrome.storage.local.get(EXTENSION_CONFIG_CACHE_KEY).catch(() => ({}));
-  const cachedConfig = data[EXTENSION_CONFIG_CACHE_KEY]?.config || null;
+  const cachedEntry = data[EXTENSION_CONFIG_CACHE_KEY] || null;
+  const cachedConfig = cachedEntry?.schemaVersion === EXTENSION_CONFIG_CACHE_SCHEMA_VERSION
+    ? cachedEntry.config
+    : null;
 
   if (cachedConfig) {
+    const normalizedConfig = normalizeExtensionConfig(cachedConfig);
+
+    if (isContentSelectorExtension() && normalizedConfig.accessContents.length === 0) {
+      return {
+        ok: false,
+        error: errorMessage || "A configuração de conteúdos não está disponível no servidor."
+      };
+    }
+
     return {
       ok: true,
       source: "cache",
       error: errorMessage,
-      config: normalizeExtensionConfig(cachedConfig)
+      config: normalizedConfig
     };
   }
 
@@ -767,6 +831,7 @@ async function saveExtensionConfigCache(config) {
   await chrome.storage.local.set({
     [EXTENSION_CONFIG_CACHE_KEY]: {
       config,
+      schemaVersion: EXTENSION_CONFIG_CACHE_SCHEMA_VERSION,
       cachedAt: Date.now()
     }
   });
@@ -839,7 +904,7 @@ async function enforceLockedBrowser(state) {
     .map((tab) => tab.id);
 
   if (tabsToClose.length > 0) {
-    await chrome.tabs.remove(tabsToClose);
+    await chrome.tabs.remove(tabsToClose).catch(() => undefined);
   }
 }
 
@@ -1339,8 +1404,32 @@ function normalizeExtensionConfig(config) {
     pixEnabled: rawConfig.pixEnabled !== false,
     autoUnlockAfterPaid: rawConfig.autoUnlockAfterPaid === true,
     allowCodeRequestAfterPaid: rawConfig.allowCodeRequestAfterPaid !== false,
-    pendingProfiles: normalizePendingProfiles(rawConfig.pendingProfiles)
+    pendingProfiles: normalizePendingProfiles(rawConfig.pendingProfiles),
+    accessContents: normalizeAccessContents(rawConfig.accessContents)
   };
+}
+
+function normalizeAccessContents(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.reduce((result, item) => {
+    const key = String(item?.key || "").trim();
+    const label = String(item?.label || "").trim();
+
+    if (!key || !label) {
+      return result;
+    }
+
+    result.push({
+      key,
+      label,
+      url: String(item?.url || "").trim(),
+      available: item?.available === true
+    });
+    return result;
+  }, []);
 }
 
 function normalizePendingProfiles(value) {
