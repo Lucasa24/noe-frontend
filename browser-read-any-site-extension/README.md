@@ -53,6 +53,7 @@ CODE_TTL_MINUTES=10
 ALLOWED_EXTENSION_IDS=
 EXTENSION_EMAIL_MAP={"abcdefghijklmnopabcdefghijklmnop":{"andre":"andre@gmail.com","maria":"maria@gmail.com"},"qrstuvwxyzabcdefqrstuvwxyzabcdef":"email2@gmail.com"}
 BLOB_READ_WRITE_TOKEN=vercel_blob_rw_seu_token
+BILLING_DATABASE_URL=postgresql://usuario:senha@host/banco
 WHATSAPP_PROVIDER=meta
 WHATSAPP_TOKEN=seu-token-da-meta
 WHATSAPP_PHONE_NUMBER_ID=seu-phone-number-id
@@ -62,6 +63,14 @@ WHATSAPP_TEMPLATE_LANGUAGE=pt_BR
 ```
 
 Pode colocar esses valores diretamente nas variaveis de ambiente da Vercel. Nao envie o arquivo `.env` para o repositorio.
+
+### Cobranças PIX
+
+As cobranças e confirmações de pagamento usam PostgreSQL, via
+`BILLING_DATABASE_URL`. Ao conectar um banco Neon pela Vercel com o prefixo
+`BILLING_DATABASE`, essa variável é criada automaticamente. O backend cria as
+tabelas necessárias no primeiro uso. `DATABASE_URL` continua como alternativa
+para instalações já configuradas.
 
 ### Atividade recente dos destinatarios
 

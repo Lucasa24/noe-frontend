@@ -1,6 +1,7 @@
-const crypto = require("crypto");
+const { Pool } = require("pg");
 
-const BILLING_PREFIX = "billing-state/v1";
+let pool;
+let schemaReadyPromise;
 
 /**
  * Persiste a relação entre um PIX criado e o perfil que será renovado. O
@@ -13,7 +14,7 @@ async function recordPendingCharge({ transactionId, extensionId, recipientKey, b
   const normalizedRecipientKey = String(recipientKey || "").trim();
   const normalizedBillingKey = String(billingKey || normalizedRecipientKey).trim();
 
-  if (!normalizedTransactionId || !normalizedExtensionId || !normalizedBillingKey || !hasBlobStore()) {
+  if (!normalizedTransactionId || !normalizedExtensionId || !normalizedBillingKey || !hasBillingDatabase()) {
     return null;
   }
 
@@ -25,11 +26,30 @@ async function recordPendingCharge({ transactionId, extensionId, recipientKey, b
     createdAt: new Date().toISOString()
   };
 
-  const { put } = getBlobClient();
-  await put(
-    buildChargePath(normalizedTransactionId),
-    JSON.stringify(record),
-    blobWriteOptions()
+  await ensureBillingSchema();
+  await getPool().query(
+    `
+      insert into public.extension_billing_charges (
+        transaction_id,
+        extension_id,
+        recipient_key,
+        billing_key,
+        created_at
+      )
+      values ($1, $2, $3, $4, $5)
+      on conflict (transaction_id) do update
+        set extension_id = excluded.extension_id,
+            recipient_key = excluded.recipient_key,
+            billing_key = excluded.billing_key,
+            created_at = excluded.created_at
+    `,
+    [
+      record.transactionId,
+      record.extensionId,
+      record.recipientKey,
+      record.billingKey,
+      record.createdAt
+    ]
   );
 
   return record;
@@ -42,7 +62,7 @@ async function recordPendingCharge({ transactionId, extensionId, recipientKey, b
 async function recordPaymentConfirmation(transactionId, paidAt = new Date()) {
   const charge = await getPendingCharge(transactionId);
 
-  if (!charge || !hasBlobStore()) {
+  if (!charge || !hasBillingDatabase()) {
     return null;
   }
 
@@ -55,11 +75,29 @@ async function recordPaymentConfirmation(transactionId, paidAt = new Date()) {
     paidAt: confirmedAt
   };
 
-  const { put } = getBlobClient();
-  await put(
-    buildPaymentPath(charge.extensionId, charge.billingKey),
-    JSON.stringify(record),
-    blobWriteOptions()
+  await ensureBillingSchema();
+  await getPool().query(
+    `
+      insert into public.extension_billing_payments (
+        extension_id,
+        billing_key,
+        recipient_key,
+        transaction_id,
+        paid_at
+      )
+      values ($1, $2, $3, $4, $5)
+      on conflict (extension_id, billing_key) do update
+        set recipient_key = excluded.recipient_key,
+            transaction_id = excluded.transaction_id,
+            paid_at = excluded.paid_at
+    `,
+    [
+      record.extensionId,
+      record.billingKey,
+      record.recipientKey,
+      record.transactionId,
+      record.paidAt
+    ]
   );
 
   return record;
@@ -69,11 +107,26 @@ async function getLatestPayment({ extensionId, billingKey }) {
   const normalizedExtensionId = String(extensionId || "").trim();
   const normalizedBillingKey = String(billingKey || "").trim();
 
-  if (!normalizedExtensionId || !normalizedBillingKey || !hasBlobStore()) {
+  if (!normalizedExtensionId || !normalizedBillingKey || !hasBillingDatabase()) {
     return null;
   }
 
-  const record = await getJsonAtPath(buildPaymentPath(normalizedExtensionId, normalizedBillingKey));
+  await ensureBillingSchema();
+  const result = await getPool().query(
+    `
+      select
+        extension_id as "extensionId",
+        recipient_key as "recipientKey",
+        billing_key as "billingKey",
+        transaction_id as "transactionId",
+        paid_at as "paidAt"
+      from public.extension_billing_payments
+      where extension_id = $1 and billing_key = $2
+      limit 1
+    `,
+    [normalizedExtensionId, normalizedBillingKey]
+  );
+  const record = result.rows[0] || null;
   const paidAt = toIsoTimestamp(record?.paidAt);
 
   if (
@@ -94,72 +147,102 @@ async function getLatestPayment({ extensionId, billingKey }) {
 async function getPendingCharge(transactionId) {
   const normalizedTransactionId = String(transactionId || "").trim();
 
-  if (!normalizedTransactionId || !hasBlobStore()) {
+  if (!normalizedTransactionId || !hasBillingDatabase()) {
     return null;
   }
 
-  const record = await getJsonAtPath(buildChargePath(normalizedTransactionId));
+  await ensureBillingSchema();
+  const result = await getPool().query(
+    `
+      select
+        transaction_id as "transactionId",
+        extension_id as "extensionId",
+        recipient_key as "recipientKey",
+        billing_key as "billingKey",
+        created_at as "createdAt"
+      from public.extension_billing_charges
+      where transaction_id = $1
+      limit 1
+    `,
+    [normalizedTransactionId]
+  );
+  const record = result.rows[0] || null;
 
-  if (record?.transactionId !== normalizedTransactionId) {
-    return null;
+  return record?.transactionId === normalizedTransactionId ? record : null;
+}
+
+function hasBillingDatabase() {
+  return Boolean(getBillingDatabaseUrl());
+}
+
+function getPool() {
+  if (pool) {
+    return pool;
   }
 
-  return record;
-}
+  const connectionString = sanitizeDatabaseUrl(getBillingDatabaseUrl());
 
-async function getJsonAtPath(pathname) {
-  const { list } = getBlobClient();
-  const { blobs = [] } = await list({ prefix: pathname });
-  const blob = blobs.find((item) => item.pathname === pathname);
-
-  if (!blob) {
-    return null;
+  if (!connectionString) {
+    throw new Error("billing_database_unavailable");
   }
 
-  const response = await fetch(blob.url, { cache: "no-store" });
+  pool = new Pool({
+    connectionString,
+    ssl: { rejectUnauthorized: false },
+    max: 2,
+    connectionTimeoutMillis: 10_000,
+    idleTimeoutMillis: 10_000
+  });
 
-  if (!response.ok) {
-    return null;
+  return pool;
+}
+
+function getBillingDatabaseUrl() {
+  return String(
+    process.env.BILLING_DATABASE_URL || process.env.DATABASE_URL || ""
+  ).trim();
+}
+
+function sanitizeDatabaseUrl(raw) {
+  try {
+    const url = new URL(raw);
+    url.searchParams.delete("sslmode");
+    url.searchParams.delete("sslrootcert");
+    return url.toString();
+  } catch (_error) {
+    return raw;
+  }
+}
+
+async function ensureBillingSchema() {
+  if (!schemaReadyPromise) {
+    schemaReadyPromise = Promise.all([
+      getPool().query(`
+        create table if not exists public.extension_billing_charges (
+          transaction_id text primary key,
+          extension_id text not null,
+          recipient_key text not null,
+          billing_key text not null,
+          created_at timestamptz not null default now()
+        )
+      `),
+      getPool().query(`
+        create table if not exists public.extension_billing_payments (
+          extension_id text not null,
+          billing_key text not null,
+          recipient_key text not null,
+          transaction_id text not null,
+          paid_at timestamptz not null,
+          primary key (extension_id, billing_key)
+        )
+      `)
+    ]).catch((error) => {
+      schemaReadyPromise = null;
+      throw error;
+    });
   }
 
-  return response.json();
-}
-
-function blobWriteOptions() {
-  return {
-    access: "public",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    contentType: "application/json",
-    cacheControlMaxAge: 0
-  };
-}
-
-function hasBlobStore() {
-  return [
-    process.env.BLOB_READ_WRITE_TOKEN,
-    process.env.BLOB_STORE_ID,
-    process.env.VERCEL_OIDC_TOKEN
-  ].some((value) => Boolean(String(value || "").trim()));
-}
-
-function getBlobClient() {
-  return require("@vercel/blob");
-}
-
-function buildChargePath(transactionId) {
-  return `${BILLING_PREFIX}/charges/${hashValue(transactionId)}.json`;
-}
-
-function buildPaymentPath(extensionId, billingKey) {
-  return `${BILLING_PREFIX}/payments/${hashValue(extensionId)}/${hashValue(billingKey)}.json`;
-}
-
-function hashValue(value) {
-  return crypto
-    .createHash("sha256")
-    .update(String(value || ""), "utf8")
-    .digest("hex");
+  return schemaReadyPromise;
 }
 
 function toIsoTimestamp(value) {
@@ -168,10 +251,8 @@ function toIsoTimestamp(value) {
 }
 
 module.exports = {
-  buildChargePath,
-  buildPaymentPath,
   getLatestPayment,
-  isBillingStorageAvailable: hasBlobStore,
+  isBillingStorageAvailable: hasBillingDatabase,
   recordPaymentConfirmation,
   recordPendingCharge,
   toIsoTimestamp
