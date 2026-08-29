@@ -10,7 +10,7 @@ const ACCESS_CONTENTS = [
     key: "comunidade-growth-hackers",
     label: "Comunidade Growth Hackers",
     url: "https://comunidadegrowthhackers.cademi.com.br/",
-    allowedRecipientNames: ["andre"]
+    allowedRecipientNames: ["andre", "~ Solicitar Ativação com Adm"]
   },
   {
     key: "dtc-viral-lab",

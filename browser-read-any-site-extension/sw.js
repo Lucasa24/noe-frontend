@@ -9,6 +9,11 @@ const BLOCKED_PAGE_PATH = "blocked.html";
 const TEMP_DISABLE_BROWSER_LOCK = false;
 const EXTENSION_CONFIG_CACHE_SCHEMA_VERSION = 3;
 const CONTENT_SELECTOR_EXTENSION_ID = "nicnjmokndbjnpjlikgmnfkihkklobce";
+const COURSES_DVD_EXTENSION_ID = "jamchgcokehlhclhjgooeihlhnoblmji";
+const COURSES_DVD_ACCESS_URL = `chrome-extension://${COURSES_DVD_EXTENSION_ID}/src/access/access.html`;
+const COURSES_DVD_ACCESS_MESSAGE = "browser-read:set-content-access";
+const SCOPED_BLOCK_RULE_ID = 9101;
+const SCOPED_ALLOW_RULE_ID = 9102;
 const ALLOWED_WHILE_LOCKED_ORIGINS = new Set([
   "https://zoom.us",
   "https://us05web.zoom.us"
@@ -163,6 +168,9 @@ async function bootstrapLock(reason) {
     extensionId: chrome.runtime.id,
     recipientKey: "",
     contentKey: "",
+    allowedContentUrl: "",
+    allowedContentOrigin: "",
+    allowedContentLabel: "",
     recipientEmail: "",
     maskedRecipientEmail: "",
     challengeToken: "",
@@ -231,7 +239,7 @@ async function handleSiteAccessPolicyChange() {
   }
 
   if (nextState.unlocked) {
-    const restoredState = await restoreTabsAfterUnlock(nextState);
+    const restoredState = await enforceScopedBrowser(nextState);
 
     if (restoredState !== nextState) {
       await saveLockState(restoredState);
@@ -298,6 +306,10 @@ function buildSiteAccessLockedState(state, config) {
     challengeToken: "",
     expiresAt: null,
     recipientKey: "",
+    contentKey: "",
+    allowedContentUrl: "",
+    allowedContentOrigin: "",
+    allowedContentLabel: "",
     recipientEmail: "",
     maskedRecipientEmail: "",
     sendStatus: config?.webhookUrl ? "idle" : "not_configured",
@@ -427,6 +439,13 @@ async function verifyAccessCode(code) {
     };
   }
 
+  if (!isValidSelectedAccessState(state)) {
+    return {
+      ok: false,
+      error: "Escolha novamente o conteudo e o destinatario antes de validar o codigo."
+    };
+  }
+
   try {
     const verifyUrl = buildSiblingApiUrl(config.webhookUrl, "verify-code");
     const response = await postJson(verifyUrl, {
@@ -453,12 +472,9 @@ async function verifyAccessCode(code) {
 
     await saveLockState(updatedState);
     await updateBadge(updatedState);
+    const restoredState = await enforceScopedBrowser(updatedState);
 
-    const restoredState = await restoreTabsAfterUnlock(updatedState);
-
-    if (restoredState !== updatedState) {
-      await saveLockState(restoredState);
-    }
+    await saveLockState(restoredState);
 
     return {
       ok: true,
@@ -497,6 +513,18 @@ async function sendAccessCode(contentKey, recipientKey = "") {
     };
   }
 
+  let selectedAccess;
+
+  try {
+    selectedAccess = await resolveSelectedContentAccess(contentKey, recipientKey);
+    await syncCoursesDvdContentAccess(selectedAccess, recipientKey);
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Nao foi possivel preparar o acesso exclusivo ao conteudo."
+    };
+  }
+
   const baseState = await ensureCurrentLockState("manual_request");
   const nextState = {
     ...baseState,
@@ -505,6 +533,9 @@ async function sendAccessCode(contentKey, recipientKey = "") {
     reason: "manual_request",
     recipientKey: String(recipientKey || ""),
     contentKey: String(contentKey || ""),
+    allowedContentUrl: selectedAccess.url,
+    allowedContentOrigin: selectedAccess.origin,
+    allowedContentLabel: selectedAccess.label,
     sendStatus: "pending",
     lastError: ""
   };
@@ -563,6 +594,66 @@ async function createPixCharge(extensionId, recipientKey) {
       ok: false,
       error: error instanceof Error ? error.message : "Nao foi possivel gerar a cobranca PIX."
     };
+  }
+}
+
+async function resolveSelectedContentAccess(contentKey, recipientKey) {
+  const normalizedContentKey = String(contentKey || "").trim();
+  const normalizedRecipientKey = String(recipientKey || "").trim();
+  const configResult = await getExtensionConfig();
+
+  if (!configResult?.ok) {
+    throw new Error(configResult?.error || "Nao foi possivel carregar os conteudos autorizados.");
+  }
+
+  const contents = Array.isArray(configResult.config?.accessContents)
+    ? configResult.config.accessContents
+    : [];
+  const content = contents.find((item) => item.key === normalizedContentKey);
+  const recipientAllowed = Array.isArray(content?.recipients)
+    && content.recipients.some((item) => item.key === normalizedRecipientKey);
+
+  if (!content?.available || !recipientAllowed) {
+    throw new Error("Este destinatario nao esta autorizado para o conteudo escolhido.");
+  }
+
+  let parsedUrl;
+
+  try {
+    parsedUrl = new URL(String(content.url || "").trim());
+  } catch (_error) {
+    throw new Error("O dominio deste conteudo nao foi configurado corretamente.");
+  }
+
+  if (parsedUrl.protocol !== "https:" && parsedUrl.protocol !== "http:") {
+    throw new Error("O dominio deste conteudo nao e valido para navegacao.");
+  }
+
+  return {
+    key: normalizedContentKey,
+    label: String(content.label || normalizedContentKey),
+    url: parsedUrl.href,
+    origin: parsedUrl.origin
+  };
+}
+
+async function syncCoursesDvdContentAccess(selectedAccess, recipientKey) {
+  try {
+    const response = await chrome.runtime.sendMessage(COURSES_DVD_EXTENSION_ID, {
+      type: COURSES_DVD_ACCESS_MESSAGE,
+      payload: {
+        contentKey: selectedAccess.key,
+        contentLabel: selectedAccess.label,
+        contentUrl: selectedAccess.url,
+        recipientKey: String(recipientKey || "").trim()
+      }
+    });
+
+    if (response?.ok !== true) {
+      throw new Error(response?.error || "courses_dvd_sync_failed");
+    }
+  } catch (_error) {
+    throw new Error("Atualize e mantenha ativa a extensao Cursos DVD para liberar este conteudo.");
   }
 }
 
@@ -879,9 +970,16 @@ async function enforceLockedBrowser(state) {
 
   const siteAccessGranted = await hasRequiredSiteAccess();
 
-  if (!state || (state.unlocked && siteAccessGranted)) {
+  if (!state) {
     return;
   }
+
+  if (state.unlocked && siteAccessGranted) {
+    await enforceScopedBrowser(state);
+    return;
+  }
+
+  await clearScopedNetworkRules();
 
   const blockedUrl = getBlockedPageUrl();
   const tabs = await chrome.tabs.query({});
@@ -942,7 +1040,14 @@ async function enforceLockedTab(tabId, tabUrl) {
   const state = await ensureCurrentLockState("startup");
   const siteAccessGranted = await hasRequiredSiteAccess();
 
-  if (!state || (state.unlocked && siteAccessGranted)) {
+  if (!state) {
+    return;
+  }
+
+  if (state.unlocked && siteAccessGranted) {
+    if (!isAllowedAfterUnlock(tabUrl, state)) {
+      await chrome.tabs.update(tabId, { url: COURSES_DVD_ACCESS_URL, active: true }).catch(() => undefined);
+    }
     return;
   }
 
@@ -1194,12 +1299,142 @@ async function restoreTabsAfterUnlock(state) {
   };
 }
 
+async function enforceScopedBrowser(state) {
+  if (!isValidSelectedAccessState(state)) {
+    const config = await getAuthConfig();
+    const relockedState = buildSiteAccessLockedState(state, config);
+    await saveLockState(relockedState);
+    await updateBadge(relockedState);
+    await enforceLockedBrowser(relockedState);
+    return relockedState;
+  }
+
+  try {
+    await configureScopedNetworkRules(state);
+  } catch (_error) {
+    const config = await getAuthConfig();
+    const relockedState = buildSiteAccessLockedState(state, config);
+    await saveLockState(relockedState);
+    await updateBadge(relockedState);
+    await enforceLockedBrowser(relockedState);
+    return relockedState;
+  }
+
+  const tabs = await chrome.tabs.query({});
+
+  await Promise.all(tabs.map(async (tab) => {
+    if (typeof tab.id !== "number") {
+      return;
+    }
+
+    const url = tab.pendingUrl || tab.url || "";
+
+    if (isAllowedAfterUnlock(url, state)) {
+      return;
+    }
+
+    await chrome.tabs.update(tab.id, {
+      url: COURSES_DVD_ACCESS_URL
+    }).catch(() => undefined);
+  }));
+
+  return {
+    ...state,
+    restorableTabs: [],
+    restoredTabsAt: Date.now()
+  };
+}
+
 function getBlockedPageUrl() {
   return chrome.runtime.getURL(BLOCKED_PAGE_PATH);
 }
 
 function isBlockedPageUrl(url) {
   return normalizeUrl(url) === normalizeUrl(getBlockedPageUrl());
+}
+
+async function clearScopedNetworkRules() {
+  if (!chrome.declarativeNetRequest?.updateDynamicRules) {
+    return;
+  }
+
+  await chrome.declarativeNetRequest.updateDynamicRules({
+    removeRuleIds: [SCOPED_BLOCK_RULE_ID, SCOPED_ALLOW_RULE_ID]
+  });
+}
+
+async function configureScopedNetworkRules(state) {
+  if (!chrome.declarativeNetRequest?.updateDynamicRules) {
+    throw new Error("dynamic_network_rules_unavailable");
+  }
+
+  const escapedOrigin = String(state.allowedContentOrigin || "")
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  if (!escapedOrigin) {
+    throw new Error("allowed_origin_missing");
+  }
+
+  await chrome.declarativeNetRequest.updateDynamicRules({
+    removeRuleIds: [SCOPED_BLOCK_RULE_ID, SCOPED_ALLOW_RULE_ID],
+    addRules: [
+      {
+        id: SCOPED_BLOCK_RULE_ID,
+        priority: 1,
+        action: { type: "block" },
+        condition: {
+          regexFilter: "^https?://",
+          resourceTypes: ["main_frame"]
+        }
+      },
+      {
+        id: SCOPED_ALLOW_RULE_ID,
+        priority: 100,
+        action: { type: "allow" },
+        condition: {
+          regexFilter: `^${escapedOrigin}/`,
+          resourceTypes: ["main_frame"]
+        }
+      }
+    ]
+  });
+
+  const activeRuleIds = new Set(
+    (await chrome.declarativeNetRequest.getDynamicRules()).map((rule) => rule.id)
+  );
+
+  if (!activeRuleIds.has(SCOPED_BLOCK_RULE_ID) || !activeRuleIds.has(SCOPED_ALLOW_RULE_ID)) {
+    throw new Error("scoped_network_rules_not_applied");
+  }
+}
+
+function isCoursesDvdAccessUrl(url) {
+  return normalizeUrl(url) === normalizeUrl(COURSES_DVD_ACCESS_URL);
+}
+
+function isValidSelectedAccessState(state) {
+  const allowedUrl = String(state?.allowedContentUrl || "").trim();
+  const allowedOrigin = String(state?.allowedContentOrigin || "").trim();
+
+  return Boolean(
+    state?.contentKey
+    && state?.recipientKey
+    && allowedUrl
+    && allowedOrigin
+    && getUrlOrigin(allowedUrl) === allowedOrigin
+  );
+}
+
+function isAllowedAfterUnlock(url, state) {
+  if (isCoursesDvdAccessUrl(url)) {
+    return true;
+  }
+
+  if (!isValidSelectedAccessState(state)) {
+    return false;
+  }
+
+  return getUrlOrigin(url) === state.allowedContentOrigin;
 }
 
 function isAllowedWhileLocked(url, state = null, tab = null) {
