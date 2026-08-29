@@ -196,7 +196,7 @@ Na pagina de opcoes da extensao, preencha:
 Extensoes pessoais instaladas por ZIP precisam ser atualizadas manualmente:
 
 1. Feche completamente o perfil do SunBrowser.
-2. Atualize a extensao usando o novo ZIP, que deve mostrar a versao `1.3.4`.
+2. Atualize a extensao usando o novo ZIP, que deve mostrar a versao `1.3.5`.
 3. Reabra o perfil e confira em `chrome://extensions` se o ID exibido existe em `EXTENSION_EMAIL_MAP`.
 4. Habilite o acesso **Em todos os sites**.
 5. Recarregue as abas que ja estavam abertas antes da atualizacao.

@@ -50,6 +50,7 @@
   };
 
   const RENEWAL_CLEARANCES_KEY = "renewalClearances";
+  const EXTENSION_CONFIG_CACHE_KEY = "extensionConfigCache";
   const MESSAGE_RESPONSE_TIMEOUT_MS = 30000;
 
   init().catch((error) => {
@@ -253,25 +254,20 @@
       elements.reloadButton.textContent = "♻ Recarregando extensão...";
     }
 
-    updateStatus("Buscando conteúdos e destinatários atualizados...");
+    updateStatus("Limpando o cache e reiniciando a extensão...");
 
     try {
-      const response = await sendMessage({ type: "lock:refreshExtensionConfig" });
+      await chrome.storage.local.remove(EXTENSION_CONFIG_CACHE_KEY);
 
-      if (!applyExtensionConfig(response)) {
-        contentPickerReady = false;
-        hideContentPicker();
-        updateStatus(contentConfigError || "Não foi possível recarregar a extensão.");
-        return;
-      }
+      // O frontend pode ser atualizado antes do service worker em instalações
+      // por pasta/ZIP. Reiniciar o runtime evita a mistura de versões que
+      // devolve "unsupported_message" e descarta os destinatários novos.
+      window.setTimeout(() => window.location.reload(), 750);
+      chrome.runtime.reload();
+      return;
+    } catch (error) {
+      updateStatus(`Não foi possível reiniciar a extensão: ${error instanceof Error ? error.message : String(error)}`);
 
-      selectedContentKey = "";
-      contentQuery = "";
-      recipientQuery = "";
-      contentPickerReady = true;
-      renderContentPicker();
-      updateStatus("Extensão recarregada. Conteúdos e destinatários atualizados.");
-    } finally {
       if (elements.reloadButton) {
         elements.reloadButton.disabled = false;
         elements.reloadButton.textContent = "♻ Recarregar extensão";
