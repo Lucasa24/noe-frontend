@@ -27,11 +27,29 @@
   };
 
   const RENEWAL_CLEARANCES_KEY = "renewalClearances";
+  const ACCOUNT_MENU_BUTTON_SELECTOR = 'button[aria-label="Menu da conta"]';
 
   window.__BROWSER_READ_ANY_SITE__ = state;
 
   const style = document.createElement("style");
   style.textContent = `
+    ${ACCOUNT_MENU_BUTTON_SELECTOR} {
+      display: none !important;
+      visibility: hidden !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+      position: fixed !important;
+      left: -100000px !important;
+      width: 0 !important;
+      height: 0 !important;
+      min-width: 0 !important;
+      min-height: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border: 0 !important;
+      overflow: hidden !important;
+    }
+
     #bras-lock-overlay {
       position: fixed;
       inset: 0;
@@ -587,6 +605,8 @@
   `;
   (document.head || document.documentElement).appendChild(style);
 
+  installAccountMenuRemoval();
+
   init().catch((error) => {
     updateStatus(`Falha ao iniciar o bloqueio: ${error.message}`);
   });
@@ -604,6 +624,63 @@
     await loadPendingProfileClearances();
     await loadExtensionConfig();
     await refreshLockState();
+  }
+
+  function installAccountMenuRemoval() {
+    const removeAccountMenuButtons = (root = document) => {
+      if (root instanceof Element && root.matches(ACCOUNT_MENU_BUTTON_SELECTOR)) {
+        root.remove();
+        return;
+      }
+
+      if (typeof root.querySelectorAll !== "function") {
+        return;
+      }
+
+      root.querySelectorAll(ACCOUNT_MENU_BUTTON_SELECTOR).forEach((button) => button.remove());
+    };
+
+    removeAccountMenuButtons();
+
+    const accountMenuObserver = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === "attributes") {
+          removeAccountMenuButtons(mutation.target);
+          continue;
+        }
+
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            removeAccountMenuButtons(node);
+          }
+        });
+      }
+    });
+
+    accountMenuObserver.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["aria-label"]
+    });
+
+    const blockAccountMenuInteraction = (event) => {
+      const target = event.target instanceof Element
+        ? event.target.closest(ACCOUNT_MENU_BUTTON_SELECTOR)
+        : null;
+
+      if (!target) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      target.remove();
+    };
+
+    ["pointerdown", "mousedown", "touchstart", "click"].forEach((eventName) => {
+      document.addEventListener(eventName, blockAccountMenuInteraction, true);
+    });
   }
 
   function ensureOverlay() {
