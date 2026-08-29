@@ -7,7 +7,7 @@ const DEFAULT_WEBHOOK_URL = "https://noe-frontend.vercel.app/api/send-code";
 const DEFAULT_WEBHOOK_TOKEN = "b4b7f9f9e7c64f3d9c1a8d2f6e3b7a91";
 const BLOCKED_PAGE_PATH = "blocked.html";
 const TEMP_DISABLE_BROWSER_LOCK = false;
-const EXTENSION_CONFIG_CACHE_SCHEMA_VERSION = 2;
+const EXTENSION_CONFIG_CACHE_SCHEMA_VERSION = 3;
 const CONTENT_SELECTOR_EXTENSION_ID = "nicnjmokndbjnpjlikgmnfkihkklobce";
 const ALLOWED_WHILE_LOCKED_ORIGINS = new Set([
   "https://zoom.us",
@@ -87,6 +87,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       }
 
       if (message?.type === "lock:getExtensionConfig") {
+        sendResponse(await getExtensionConfig());
+        return;
+      }
+
+      if (message?.type === "lock:refreshExtensionConfig") {
+        await chrome.storage.local.remove(EXTENSION_CONFIG_CACHE_KEY);
         sendResponse(await getExtensionConfig());
         return;
       }
@@ -610,10 +616,10 @@ async function requestRemoteExtensionConfig(config) {
 
     const normalizedConfig = normalizeExtensionConfig(response.config);
 
-    if (isContentSelectorExtension() && normalizedConfig.accessContents.length === 0) {
+    if (isContentSelectorExtension() && !hasValidContentSelectorConfig(normalizedConfig)) {
       return {
         ok: false,
-        error: "A configuração de conteúdos não está disponível no servidor."
+        error: "A configuração de conteúdos ou destinatários está incompleta no servidor."
       };
     }
 
@@ -806,10 +812,10 @@ async function getCachedExtensionConfig(errorMessage) {
   if (cachedConfig) {
     const normalizedConfig = normalizeExtensionConfig(cachedConfig);
 
-    if (isContentSelectorExtension() && normalizedConfig.accessContents.length === 0) {
+    if (isContentSelectorExtension() && !hasValidContentSelectorConfig(normalizedConfig)) {
       return {
         ok: false,
-        error: errorMessage || "A configuração de conteúdos não está disponível no servidor."
+        error: errorMessage || "O cache de conteúdos e destinatários está desatualizado."
       };
     }
 
@@ -834,6 +840,22 @@ async function saveExtensionConfigCache(config) {
       schemaVersion: EXTENSION_CONFIG_CACHE_SCHEMA_VERSION,
       cachedAt: Date.now()
     }
+  });
+}
+
+function hasValidContentSelectorConfig(config) {
+  const contents = Array.isArray(config?.accessContents) ? config.accessContents : [];
+
+  if (contents.length === 0) {
+    return false;
+  }
+
+  return contents.every((content) => {
+    if (content?.available !== true) {
+      return true;
+    }
+
+    return Array.isArray(content.recipients) && content.recipients.length > 0;
   });
 }
 

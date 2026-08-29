@@ -242,6 +242,35 @@
         font-size: 14px;
       }
 
+      #reload-extension {
+        width: 100%;
+        margin-top: 14px;
+        padding: 11px 14px;
+        border: 1px solid #3b82f6;
+        border-radius: 10px;
+        background: rgba(37, 99, 235, 0.08);
+        color: #bfdbfe;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      #reload-extension:hover {
+        background: rgba(37, 99, 235, 0.18);
+        color: #eff6ff;
+      }
+
+      #reload-extension:disabled {
+        cursor: wait;
+        opacity: 0.65;
+      }
+
+      .reload-help {
+        margin: 7px 0 0;
+        color: #94a3b8;
+        font-size: 12px;
+        text-align: center;
+      }
+
       #post-unlock {
         display: none;
         margin-top: 16px;
@@ -590,6 +619,8 @@
       </div>
       <section id="recipient-picker" aria-label="Escolha do conteúdo"></section>
       <div id="pending-overlay"></div>
+      <button id="reload-extension" type="button">♻ Recarregar extensão</button>
+      <p class="reload-help">Atualiza os conteúdos, os destinatários e esta página. Atalho: Alt + Shift + R</p>
       <div id="status"></div>
       <div id="post-unlock">Acesso liberado. Agora voce pode abrir novas abas normalmente.</div>
     </main>

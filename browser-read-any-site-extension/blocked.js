@@ -3,6 +3,7 @@
     description: document.querySelector("#description"),
     input: document.querySelector("#code-input"),
     submitButton: document.querySelector("#submit-action"),
+    reloadButton: document.querySelector("#reload-extension"),
     recipientPicker: document.querySelector("#recipient-picker"),
     status: document.querySelector("#status"),
     postUnlock: document.querySelector("#post-unlock"),
@@ -74,6 +75,19 @@
 
     event.preventDefault();
     void handleSubmitCode();
+  });
+
+  elements.reloadButton?.addEventListener("click", () => {
+    void handleReloadExtension();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (!event.altKey || !event.shiftKey || event.key.toLowerCase() !== "r") {
+      return;
+    }
+
+    event.preventDefault();
+    void handleReloadExtension();
   });
 
   async function init() {
@@ -211,6 +225,10 @@
   async function loadExtensionConfig() {
     const response = await sendMessage({ type: "lock:getExtensionConfig" });
 
+    return applyExtensionConfig(response);
+  }
+
+  function applyExtensionConfig(response) {
     if (!response?.ok) {
       accessContents = [];
       contentConfigError = response?.error || "Não foi possível carregar os conteúdos.";
@@ -223,6 +241,42 @@
       ? ""
       : response?.error || "A configuração recebida não possui conteúdos.";
     return accessContents.length > 0;
+  }
+
+  async function handleReloadExtension() {
+    if (elements.reloadButton?.disabled) {
+      return;
+    }
+
+    if (elements.reloadButton) {
+      elements.reloadButton.disabled = true;
+      elements.reloadButton.textContent = "♻ Recarregando extensão...";
+    }
+
+    updateStatus("Buscando conteúdos e destinatários atualizados...");
+
+    try {
+      const response = await sendMessage({ type: "lock:refreshExtensionConfig" });
+
+      if (!applyExtensionConfig(response)) {
+        contentPickerReady = false;
+        hideContentPicker();
+        updateStatus(contentConfigError || "Não foi possível recarregar a extensão.");
+        return;
+      }
+
+      selectedContentKey = "";
+      contentQuery = "";
+      recipientQuery = "";
+      contentPickerReady = true;
+      renderContentPicker();
+      updateStatus("Extensão recarregada. Conteúdos e destinatários atualizados.");
+    } finally {
+      if (elements.reloadButton) {
+        elements.reloadButton.disabled = false;
+        elements.reloadButton.textContent = "♻ Recarregar extensão";
+      }
+    }
   }
 
   function normalizeAccessContents(value) {
