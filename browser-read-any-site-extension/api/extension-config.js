@@ -27,6 +27,46 @@ const DEFAULT_EXTENSION_CONFIG = {
       chargeAmountCents: 900,
       supportEmail: "caixa@mentorxlab.com",
       supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+    },
+    "contatopodcastsdenegocios@gmail.com": {
+      email: "contatopodcastsdenegocios@gmail.com",
+      billingKey: "contatopodcastsdenegocios@gmail.com",
+      recurring: true,
+      startDate: "2026-08-30",
+      monthlyPrice: "R$ 47,00",
+      chargeAmountCents: 4700,
+      supportEmail: "caixa@mentorxlab.com",
+      supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+    },
+    "iangabrielcopy@gmail.com": {
+      email: "iangabrielcopy@gmail.com",
+      billingKey: "iangabrielcopy@gmail.com",
+      recurring: true,
+      startDate: "2026-08-31",
+      monthlyPrice: "R$ 47,00",
+      chargeAmountCents: 4700,
+      supportEmail: "caixa@mentorxlab.com",
+      supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+    },
+    "jefersonmorais.jsm@gmail.com": {
+      email: "jefersonmorais.jsm@gmail.com",
+      billingKey: "jefersonmorais.jsm@gmail.com",
+      recurring: true,
+      startDate: "2026-08-31",
+      monthlyPrice: "R$ 9,00",
+      chargeAmountCents: 900,
+      supportEmail: "caixa@mentorxlab.com",
+      supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+    },
+    "danielenlacueva@gmail.com": {
+      email: "danielenlacueva@gmail.com",
+      billingKey: "danielenlacueva@gmail.com",
+      recurring: true,
+      startDate: "2026-08-31",
+      monthlyPrice: "R$ 9,00",
+      chargeAmountCents: 900,
+      supportEmail: "caixa@mentorxlab.com",
+      supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
     }
   }
 };
