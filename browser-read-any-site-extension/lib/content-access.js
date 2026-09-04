@@ -16,13 +16,13 @@ const ACCESS_CONTENTS = [
     key: "dtc-viral-lab",
     label: "DTC VIRAL LAB",
     // Para liberar, inclua aqui o nome do destinatário já cadastrado no servidor.
-    allowedRecipientNames: ["João", "Igor", "~ Solicitar Ativação com Adm"]
+    allowedRecipientNames: ["João", "Igor", "Wesley", "~ Solicitar Ativação com Adm"]
   },
   {
     key: "dtc-experience",
     label: "DTC EXPERIENCE",
     // O nome também precisa existir em EXTENSION_EMAIL_MAP no ambiente da Vercel.
-    allowedRecipientNames: ["João", "Igor", "~ Solicitar Ativação com Adm"]
+    allowedRecipientNames: ["João", "Igor", "Wesley", "~ Solicitar Ativação com Adm"]
   }
 ];
 
