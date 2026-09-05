@@ -144,16 +144,6 @@ const EXTENSION_CONFIG_OVERRIDES = {
         supportEmail: "caixa@mentorxlab.com",
         supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
       },
-      // Janderson: mensalidade R$ 9,00 com recorrência automática (somar 1 mês).
-      Janderson: {
-        email: "jandergfx@gmail.com",
-        recurring: true,
-        startDate: "2026-08-18",
-        monthlyPrice: "R$ 9,00",
-        chargeAmountCents: 900,
-        supportEmail: "caixa@mentorxlab.com",
-        supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
-      }
     }
   },
   // Cobrança de R$ 47,00 para os destinatários Jen e Andressa, nas duas extensões
@@ -339,6 +329,33 @@ const EXTENSION_CONFIG_OVERRIDES = {
       }
     }
   },
+  // Cobrança recorrente mensal de R$ 9,00 na extensão CLAUDE CODE ARCHITECT
+  // para os clientes Renan e Matheus. Primeiro vencimento em 05/09 (Renan) e
+  // 04/09 (Matheus); após o pagamento, a recorrência soma 1 mês à quitação.
+  "hbokpkaoocpcecbfgfadoplblcfannke": {
+    pendingProfiles: {
+      Renan: {
+        email: "renan.carturanpiffer@gmail.com",
+        recurring: true,
+        startDate: "2026-09-05",
+        monthlyPrice: "R$ 9,00",
+        chargeAmountCents: 900,
+        supportEmail: "caixa@mentorxlab.com",
+        supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+      },
+      // Matheus pertence ao mapa de destinatários da extensão CLAUDE CODE ARCHITECT.
+      Matheus: {
+        email: "drive5.2025.jd@gmail.com",
+        recurring: true,
+        startDate: "2026-09-04",
+        monthlyPrice: "R$ 9,00",
+        chargeAmountCents: 900,
+        supportEmail: "caixa@mentorxlab.com",
+        supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+      }
+    }
+  },
+
   "ibkaciaphpkbfikgjnjjfbjcdenlciia": {
     pendingProfiles: {
       // Will: cobrança única agendada para 16/09/2026.
