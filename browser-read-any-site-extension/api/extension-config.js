@@ -144,6 +144,16 @@ const EXTENSION_CONFIG_OVERRIDES = {
         supportEmail: "caixa@mentorxlab.com",
         supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
       },
+      // Douglas: mensalidade R$ 47,00 com recorrência automática (somar 1 mês).
+      Douglas: {
+        email: "douglas.rcastanho@gmail.com",
+        recurring: true,
+        startDate: "2026-09-09",
+        monthlyPrice: "R$ 47,00",
+        chargeAmountCents: 4700,
+        supportEmail: "caixa@mentorxlab.com",
+        supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+      },
     }
   },
   // Cobrança de R$ 47,00 para os destinatários Jen e Andressa, nas duas extensões
