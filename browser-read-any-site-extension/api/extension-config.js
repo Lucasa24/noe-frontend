@@ -148,7 +148,7 @@ const EXTENSION_CONFIG_OVERRIDES = {
       Douglas: {
         email: "douglas.rcastanho@gmail.com",
         recurring: true,
-        startDate: "2026-09-09",
+        startDate: "2026-09-08",
         monthlyPrice: "R$ 47,00",
         chargeAmountCents: 4700,
         supportEmail: "caixa@mentorxlab.com",
