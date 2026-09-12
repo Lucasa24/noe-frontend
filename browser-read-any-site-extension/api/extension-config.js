@@ -7,15 +7,28 @@ const BROWSER_READ_RUNTIME_IDS = new Set([
   "nfnpblbakohfcnkngbimljiehklmdcmk",
   "aachjpoooepljhlphhaplfijppgbjdfp"
 ]);
-const DEIVIS_BILLING_PROFILE = Object.freeze({
-  email: "deivisriemer4@gmail.com",
-  billingKey: "deivisriemer4@gmail.com",
-  recurring: true,
-  startDate: "2026-09-12",
-  monthlyPrice: "R$ 9,00",
-  chargeAmountCents: 900,
-  supportEmail: "caixa@mentorxlab.com",
-  supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+
+const BROWSER_READ_BILLING_PROFILES = Object.freeze({
+  Deivis: Object.freeze({
+    email: "deivisriemer4@gmail.com",
+    billingKey: "deivisriemer4@gmail.com",
+    recurring: true,
+    startDate: "2026-09-11",
+    monthlyPrice: "R$ 9,00",
+    chargeAmountCents: 900,
+    supportEmail: "caixa@mentorxlab.com",
+    supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+  }),
+  Hugo: Object.freeze({
+    email: "cibaldestudio@gmail.com",
+    billingKey: "cibaldestudio@gmail.com",
+    recurring: true,
+    startDate: "2026-09-11",
+    monthlyPrice: "R$ 9,00",
+    chargeAmountCents: 900,
+    supportEmail: "caixa@mentorxlab.com",
+    supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+  })
 });
 
 async function extensionConfigHandler(req, res) {
@@ -61,12 +74,12 @@ async function buildExtensionConfig(extensionId, today = new Date()) {
     return config;
   }
 
-  const deivisProfile = await buildDeivisProfile(extensionId, today);
+  const billingProfiles = await buildBrowserReadBillingProfiles(extensionId, today, false);
   return {
     ...config,
     pendingProfiles: {
       ...(config.pendingProfiles || {}),
-      Deivis: deivisProfile
+      ...billingProfiles
     }
   };
 }
@@ -78,28 +91,40 @@ async function buildPublicExtensionConfig(extensionId, today = new Date()) {
     return config;
   }
 
-  const deivisProfile = await buildDeivisProfile(extensionId, today);
-  const pendingProfiles = { ...(config.pendingProfiles || {}) };
-
-  if (core.isChargeDue(deivisProfile, today)) {
-    pendingProfiles.Deivis = deivisProfile;
-  } else {
-    delete pendingProfiles.Deivis;
-  }
-
-  return { ...config, pendingProfiles };
+  const billingProfiles = await buildBrowserReadBillingProfiles(extensionId, today, true);
+  return {
+    ...config,
+    pendingProfiles: {
+      ...(config.pendingProfiles || {}),
+      ...billingProfiles
+    }
+  };
 }
 
 async function resolvePendingProfile(extensionId, recipientKey) {
-  if (isBrowserReadRuntime(extensionId) && await isDeivisRecipient(extensionId, recipientKey)) {
-    return buildDeivisProfile(extensionId);
+  if (isBrowserReadRuntime(extensionId)) {
+    const matchedProfile = await findBrowserReadBillingProfile(extensionId, recipientKey);
+    if (matchedProfile) {
+      return buildBillingProfile(extensionId, matchedProfile);
+    }
   }
 
   return core.resolvePendingProfile(extensionId, recipientKey);
 }
 
-async function buildDeivisProfile(extensionId, today = new Date()) {
-  const profile = { ...DEIVIS_BILLING_PROFILE };
+async function buildBrowserReadBillingProfiles(extensionId, today, dueOnly) {
+  const entries = await Promise.all(Object.entries(BROWSER_READ_BILLING_PROFILES).map(async ([key, profile]) => {
+    const resolved = await buildBillingProfile(extensionId, profile, today);
+    if (dueOnly && !core.isChargeDue(resolved, today)) {
+      return null;
+    }
+    return [key, resolved];
+  }));
+
+  return Object.fromEntries(entries.filter(Boolean));
+}
+
+async function buildBillingProfile(extensionId, profile, today = new Date()) {
   const latestPayment = await getLatestPayment({
     extensionId,
     billingKey: profile.billingKey
@@ -108,18 +133,21 @@ async function buildDeivisProfile(extensionId, today = new Date()) {
   return { ...profile, ...dates };
 }
 
-async function isDeivisRecipient(extensionId, recipientKey) {
+async function findBrowserReadBillingProfile(extensionId, recipientKey) {
   const normalizedKey = String(recipientKey || "").trim().toLowerCase();
 
-  if (normalizedKey === "deivis") {
-    return true;
+  for (const [key, profile] of Object.entries(BROWSER_READ_BILLING_PROFILES)) {
+    if (key.toLowerCase() === normalizedKey) {
+      return profile;
+    }
   }
 
   try {
     const email = String(resolveRecipientEmail({ extensionId, recipientKey }) || "").trim().toLowerCase();
-    return email === DEIVIS_BILLING_PROFILE.email;
+    return Object.values(BROWSER_READ_BILLING_PROFILES)
+      .find((profile) => profile.email.toLowerCase() === email) || null;
   } catch (_error) {
-    return false;
+    return null;
   }
 }
 
