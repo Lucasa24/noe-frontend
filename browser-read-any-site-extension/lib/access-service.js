@@ -7,7 +7,9 @@ const BROWSER_READ_RUNTIME_IDS = new Set([
   "aachjpoooepljhlphhaplfijppgbjdfp"
 ]);
 const STATIC_BROWSER_READ_RECIPIENTS = Object.freeze({
-  Deivis: Object.freeze(["deivisriemer4@gmail.com"])
+  Deivis: Object.freeze(["deivisriemer4@gmail.com"]),
+  Hugo: Object.freeze(["cibaldestudio@gmail.com"]),
+  "~ Solicitar Ativação com Adm": Object.freeze(["lucasalvarezempresa@gmail.com"])
 });
 
 function resolveBrowserReadConfigId(extensionId) {
@@ -101,10 +103,6 @@ function resolveRecipientTargetsWithRuntimeFallback(args) {
     return core.resolveRecipientTargets(mapDisplayArgs(args));
   }
 
-  // Antes do alias de configuração, os códigos eram enviados usando o
-  // chrome.runtime.id real. Tente esse mapa primeiro para manter os
-  // destinatários já existentes funcionando; se ele não existir, use o
-  // mapa canônico compartilhado que alimenta a tela de conteúdos.
   try {
     return core.resolveRecipientTargets(args);
   } catch (runtimeError) {
@@ -127,7 +125,6 @@ module.exports = {
     return core.buildWhatsAppAlertMessage(mapDisplayArgs(args));
   },
   createAccessChallenge(args) {
-    // Keep the real chrome.runtime.id in the signed challenge.
     return core.createAccessChallenge(args);
   },
   listRecipientsForExtension(extensionId) {
@@ -141,7 +138,6 @@ module.exports = {
     return resolveRecipientTargetsWithRuntimeFallback(args);
   },
   verifyAccessChallenge(args) {
-    // Verification must use the same real runtime ID that was signed.
     return core.verifyAccessChallenge(args);
   }
 };
