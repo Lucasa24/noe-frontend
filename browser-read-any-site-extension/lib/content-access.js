@@ -4,7 +4,8 @@ const { listRecipientsForExtension } = require("./access-service");
 const CONTENT_SELECTOR_CONFIG_ID = "nicnjmokndbjnpjlikgmnfkihkklobce";
 const CONTENT_SELECTOR_EXTENSION_IDS = new Set([
   CONTENT_SELECTOR_CONFIG_ID,
-  "nfnpblbakohfcnkngbimljiehklmdcmk"
+  "nfnpblbakohfcnkngbimljiehklmdcmk",
+  "aachjpoooepljhlphhaplfijppgbjdfp"
 ]);
 
 const ACCESS_CONTENTS = [
