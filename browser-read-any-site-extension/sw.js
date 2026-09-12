@@ -9,15 +9,45 @@ const BLOCKED_PAGE_PATH = "blocked.html";
 const TEMP_DISABLE_BROWSER_LOCK = false;
 const EXTENSION_CONFIG_CACHE_SCHEMA_VERSION = 3;
 const CONTENT_SELECTOR_EXTENSION_ID = "nicnjmokndbjnpjlikgmnfkihkklobce";
+const CONTENT_SELECTOR_EXTENSION_IDS = new Set([
+  CONTENT_SELECTOR_EXTENSION_ID,
+  "nfnpblbakohfcnkngbimljiehklmdcmk",
+  "aachjpoooepljhlphhaplfijppgbjdfp"
+]);
+const PIXEL_EXTENSION_ID = "opebpmbhihaffdfogpeimddbpjhhejpk";
+const PIXEL_GATE_QUERY_MESSAGE = "browser-read:get-state";
+const PIXEL_GATE_UNLOCKED_MESSAGE = "browser-read:unlocked";
+const PIXEL_GATE_LOCKED_MESSAGE = "browser-read:locked";
 const COURSES_DVD_EXTENSION_ID = "jamchgcokehlhclhjgooeihlhnoblmji";
 const COURSES_DVD_ACCESS_URL = `chrome-extension://${COURSES_DVD_EXTENSION_ID}/src/access/access.html`;
+const COURSES_DVD_BLOCKED_URL = `chrome-extension://${COURSES_DVD_EXTENSION_ID}/blocked.html`;
 const COURSES_DVD_ACCESS_MESSAGE = "browser-read:set-content-access";
 const SCOPED_BLOCK_RULE_ID = 9101;
-const SCOPED_ALLOW_RULE_ID = 9102;
-const ALLOWED_WHILE_LOCKED_ORIGINS = new Set([
-  "https://zoom.us",
-  "https://us05web.zoom.us"
+const SCOPED_ALLOW_RULE_ID_START = 9102;
+const SCOPED_ZOOM_ENTRY_RULE_ID = SCOPED_ALLOW_RULE_ID_START + 2;
+const SCOPED_ZOOM_WEB_CLIENT_RULE_ID = SCOPED_ALLOW_RULE_ID_START + 3;
+const ZOOM_SESSION_ALLOW_RULE_ID = 9201;
+const SCOPED_RULE_IDS = [
+  SCOPED_BLOCK_RULE_ID,
+  SCOPED_ALLOW_RULE_ID_START,
+  SCOPED_ALLOW_RULE_ID_START + 1,
+  SCOPED_ZOOM_ENTRY_RULE_ID,
+  SCOPED_ZOOM_WEB_CLIENT_RULE_ID
+];
+const DTC_CONTENT_KEYS = new Set(["dtc-viral-lab", "dtc-experience"]);
+const DTC_ALLOWED_ORIGINS = ["https://dtcvirallab.com", "https://v2.aionmembers.com"];
+const DTC_ZOOM_SESSION_ORIGINS = new Set([
+  "https://us05web.zoom.us",
+  "https://app.zoom.us"
 ]);
+const DTC_ZOOM_ENTRY_REGEX = "^https://us05web\\.zoom\\.us/j/[0-9]{9,13}/?\\?pwd=[^&#\\s]+(?:&[^#]*)?(?:#.*)?$";
+const DTC_ZOOM_WEB_CLIENT_REGEX = "^https://app\\.zoom\\.us/wc/(?:join/[0-9]{9,13}|[0-9]{9,13}/join)/?\\?(?:[^#&]*&)*pwd=[^&#\\s]+(?:&[^#]*)?(?:#.*)?$";
+const CONTENT_URL_FALLBACKS = {
+  "comunidade-growth-hackers": "https://comunidadegrowthhackers.cademi.com.br/",
+  "dtc-viral-lab": "https://dtcvirallab.com/",
+  "dtc-experience": "https://v2.aionmembers.com/"
+};
+const ALLOWED_WHILE_LOCKED_ORIGINS = new Set([]);
 
 chrome.runtime.onInstalled.addListener(() => {
   void bootstrapLock("installed");
@@ -37,6 +67,7 @@ chrome.tabs.onCreated.addListener((tab) => {
   }
 
   void enforceLockedTab(tab.id, tabUrl).catch(() => undefined);
+  void maybeInjectZoomWebClientAutomation(tab.id, tabUrl).catch(() => undefined);
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
@@ -51,11 +82,18 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 
   void enforceLockedTab(tabId, tabUrl).catch(() => undefined);
+  void maybeInjectZoomWebClientAutomation(tabId, tabUrl).catch(() => undefined);
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  void revokeZoomMeetingTab(tabId).catch(() => undefined);
 });
 
 chrome.tabs.onActivated.addListener((activeInfo) => {
   void rememberTabById(activeInfo.tabId);
 });
+
+void injectZoomAutomationIntoOpenTabs().catch(() => undefined);
 
 chrome.windows.onFocusChanged.addListener((windowId) => {
   if (windowId === chrome.windows.WINDOW_ID_NONE) {
@@ -151,6 +189,30 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return true;
 });
 
+chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
+  if (sender?.id !== PIXEL_EXTENSION_ID) {
+    return false;
+  }
+
+  if (message?.type !== PIXEL_GATE_QUERY_MESSAGE) {
+    return false;
+  }
+
+  void getPublicLockState()
+    .then((state) => sendResponse({
+      ok: true,
+      unlocked: state?.unlocked === true,
+      sessionId: state?.unlocked === true ? String(state?.sessionId || "") : ""
+    }))
+    .catch((error) => sendResponse({
+      ok: false,
+      unlocked: false,
+      error: error instanceof Error ? error.message : "browser_read_state_unavailable"
+    }));
+
+  return true;
+});
+
 async function bootstrapLock(reason) {
   const config = await getAuthConfig();
   const sessionId = await getBrowserSessionId();
@@ -182,6 +244,7 @@ async function bootstrapLock(reason) {
   };
 
   await saveLockState(nextState);
+  await notifyPixelGate(false, nextState);
 
   await updateBadge(nextState);
   await enforceLockedBrowser(nextState);
@@ -227,6 +290,7 @@ async function handleSiteAccessPolicyChange() {
   if (!siteAccessGranted) {
     const relockedState = buildSiteAccessLockedState(state, config);
     await saveLockState(relockedState);
+    await notifyPixelGate(false, relockedState);
     await updateBadge(relockedState);
     await enforceLockedBrowser(relockedState);
     return;
@@ -287,6 +351,8 @@ function toPublicLockState(state, options = {}) {
     configured: Boolean(state.sendStatus !== "not_configured"),
     recipientEmail: state.maskedRecipientEmail || maskEmail(state.recipientEmail),
     extensionId: state.extensionId,
+    sessionId: String(state.sessionId || ""),
+    contentKey: String(state.contentKey || ""),
     expiresAt: state.expiresAt || null,
     sendStatus: state.sendStatus,
     lastError: state.lastError || "",
@@ -475,6 +541,7 @@ async function verifyAccessCode(code) {
     const restoredState = await enforceScopedBrowser(updatedState);
 
     await saveLockState(restoredState);
+    await notifyPixelGate(restoredState?.unlocked === true, restoredState);
 
     return {
       ok: true,
@@ -541,6 +608,7 @@ async function sendAccessCode(contentKey, recipientKey = "") {
   };
 
   await saveLockState(nextState);
+  await notifyPixelGate(false, nextState);
   await updateBadge(nextState);
 
   const updatedState = await requestAccessCode(nextState, config);
@@ -620,7 +688,8 @@ async function resolveSelectedContentAccess(contentKey, recipientKey) {
   let parsedUrl;
 
   try {
-    parsedUrl = new URL(String(content.url || "").trim());
+    const configuredUrl = String(content.url || "").trim() || CONTENT_URL_FALLBACKS[normalizedContentKey] || "";
+    parsedUrl = new URL(configuredUrl);
   } catch (_error) {
     throw new Error("O dominio deste conteudo nao foi configurado corretamente.");
   }
@@ -741,7 +810,7 @@ function isDefaultAuthConfig(config) {
 }
 
 function isContentSelectorExtension() {
-  return chrome.runtime.id === CONTENT_SELECTOR_EXTENSION_ID;
+  return CONTENT_SELECTOR_EXTENSION_IDS.has(chrome.runtime.id);
 }
 
 async function checkPixStatus(transactionId) {
@@ -1045,7 +1114,7 @@ async function enforceLockedTab(tabId, tabUrl) {
   }
 
   if (state.unlocked && siteAccessGranted) {
-    if (!isAllowedAfterUnlock(tabUrl, state)) {
+    if (!(await isAllowedTabAfterUnlock(tabId, tabUrl, state))) {
       await chrome.tabs.update(tabId, { url: COURSES_DVD_ACCESS_URL, active: true }).catch(() => undefined);
     }
     return;
@@ -1304,6 +1373,7 @@ async function enforceScopedBrowser(state) {
     const config = await getAuthConfig();
     const relockedState = buildSiteAccessLockedState(state, config);
     await saveLockState(relockedState);
+    await notifyPixelGate(false, relockedState);
     await updateBadge(relockedState);
     await enforceLockedBrowser(relockedState);
     return relockedState;
@@ -1315,6 +1385,7 @@ async function enforceScopedBrowser(state) {
     const config = await getAuthConfig();
     const relockedState = buildSiteAccessLockedState(state, config);
     await saveLockState(relockedState);
+    await notifyPixelGate(false, relockedState);
     await updateBadge(relockedState);
     await enforceLockedBrowser(relockedState);
     return relockedState;
@@ -1329,7 +1400,7 @@ async function enforceScopedBrowser(state) {
 
     const url = tab.pendingUrl || tab.url || "";
 
-    if (isAllowedAfterUnlock(url, state)) {
+    if (await isAllowedTabAfterUnlock(tab.id, url, state)) {
       return;
     }
 
@@ -1354,13 +1425,23 @@ function isBlockedPageUrl(url) {
 }
 
 async function clearScopedNetworkRules() {
-  if (!chrome.declarativeNetRequest?.updateDynamicRules) {
-    return;
+  if (chrome.declarativeNetRequest?.updateDynamicRules) {
+    await chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: SCOPED_RULE_IDS
+    });
   }
 
-  await chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: [SCOPED_BLOCK_RULE_ID, SCOPED_ALLOW_RULE_ID]
-  });
+  await clearZoomMeetingSessions();
+}
+
+function getAllowedContentOrigins(state) {
+  const primaryOrigin = String(state?.allowedContentOrigin || "").trim();
+
+  if (DTC_CONTENT_KEYS.has(String(state?.contentKey || "").trim())) {
+    return [...DTC_ALLOWED_ORIGINS];
+  }
+
+  return primaryOrigin ? [primaryOrigin] : [];
 }
 
 async function configureScopedNetworkRules(state) {
@@ -1368,48 +1449,259 @@ async function configureScopedNetworkRules(state) {
     throw new Error("dynamic_network_rules_unavailable");
   }
 
-  const escapedOrigin = String(state.allowedContentOrigin || "")
-    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-  if (!escapedOrigin) {
+  const allowedOrigins = getAllowedContentOrigins(state);
+  if (allowedOrigins.length === 0) {
     throw new Error("allowed_origin_missing");
   }
 
-  await chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: [SCOPED_BLOCK_RULE_ID, SCOPED_ALLOW_RULE_ID],
-    addRules: [
-      {
-        id: SCOPED_BLOCK_RULE_ID,
-        priority: 1,
-        action: { type: "block" },
-        condition: {
-          regexFilter: "^https?://",
-          resourceTypes: ["main_frame"]
-        }
-      },
-      {
-        id: SCOPED_ALLOW_RULE_ID,
-        priority: 100,
-        action: { type: "allow" },
-        condition: {
-          regexFilter: `^${escapedOrigin}/`,
-          resourceTypes: ["main_frame"]
-        }
+  await clearZoomMeetingSessions();
+
+  const isDtcContent = isDtcContentState(state);
+  const addRules = [
+    {
+      id: SCOPED_BLOCK_RULE_ID,
+      priority: 1,
+      action: { type: "block" },
+      condition: {
+        regexFilter: "^https?://",
+        resourceTypes: ["main_frame"]
       }
-    ]
+    },
+    ...allowedOrigins.map((origin, index) => ({
+      id: SCOPED_ALLOW_RULE_ID_START + index,
+      priority: 100,
+      action: { type: "allow" },
+      condition: {
+        regexFilter: `^${origin.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/`,
+        resourceTypes: ["main_frame"]
+      }
+    })),
+    ...(isDtcContent ? [{
+      id: SCOPED_ZOOM_ENTRY_RULE_ID,
+      priority: 200,
+      action: { type: "allow" },
+      condition: {
+        regexFilter: DTC_ZOOM_ENTRY_REGEX,
+        resourceTypes: ["main_frame"]
+      }
+    }, {
+      id: SCOPED_ZOOM_WEB_CLIENT_RULE_ID,
+      priority: 200,
+      action: { type: "allow" },
+      condition: {
+        regexFilter: DTC_ZOOM_WEB_CLIENT_REGEX,
+        resourceTypes: ["main_frame"]
+      }
+    }] : [])
+  ];
+
+  await chrome.declarativeNetRequest.updateDynamicRules({
+    removeRuleIds: SCOPED_RULE_IDS,
+    addRules
   });
 
   const activeRuleIds = new Set(
     (await chrome.declarativeNetRequest.getDynamicRules()).map((rule) => rule.id)
   );
 
-  if (!activeRuleIds.has(SCOPED_BLOCK_RULE_ID) || !activeRuleIds.has(SCOPED_ALLOW_RULE_ID)) {
+  if (!activeRuleIds.has(SCOPED_BLOCK_RULE_ID) ||
+      allowedOrigins.some((_, index) => !activeRuleIds.has(SCOPED_ALLOW_RULE_ID_START + index)) ||
+      (isDtcContent && (!activeRuleIds.has(SCOPED_ZOOM_ENTRY_RULE_ID) ||
+        !activeRuleIds.has(SCOPED_ZOOM_WEB_CLIENT_RULE_ID)))) {
     throw new Error("scoped_network_rules_not_applied");
   }
 }
 
+function isDtcContentState(state) {
+  return DTC_CONTENT_KEYS.has(String(state?.contentKey || "").trim());
+}
+
+function isValidDtcZoomMeetingUrl(url, state) {
+  if (!isDtcContentState(state)) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(String(url || "").trim());
+    const meetingId = parsed.pathname.match(/^\/j\/([0-9]{9,13})\/?$/)?.[1] || "";
+    const password = String(parsed.searchParams.get("pwd") || "").trim();
+
+    return parsed.protocol === "https:"
+      && parsed.hostname === "us05web.zoom.us"
+      && Boolean(meetingId)
+      && Boolean(password)
+      && !/[\s&#]/.test(password);
+  } catch (_error) {
+    return false;
+  }
+}
+
+async function maybeInjectZoomWebClientAutomation(tabId, url) {
+  if (typeof tabId !== "number" || !chrome.scripting?.executeScript) {
+    return false;
+  }
+
+  const state = await getPublicLockState();
+  if (!state?.unlocked || !isValidDtcZoomWebClientUrl(url, state)) {
+    return false;
+  }
+
+  await chrome.scripting.executeScript({
+    target: { tabId, allFrames: true },
+    files: ["zoom-client-main.js"],
+    world: "MAIN"
+  }).catch(() => undefined);
+  return true;
+}
+
+async function injectZoomAutomationIntoOpenTabs() {
+  if (!chrome.tabs?.query) {
+    return;
+  }
+
+  const tabs = await chrome.tabs.query({});
+  await Promise.all(tabs.map((tab) => maybeInjectZoomWebClientAutomation(
+    tab.id,
+    tab.pendingUrl || tab.url || ""
+  )));
+}
+
+async function isValidDtcZoomWebClientUrl(url, state) {
+  if (!isDtcContentState(state)) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(String(url || "").trim());
+    const routeMatch = parsed.pathname.match(
+      /^\/wc\/(?:join\/([0-9]{9,13})|([0-9]{9,13})\/join)\/?$/,
+    );
+    const meetingId = routeMatch?.[1] || routeMatch?.[2] || "";
+    const password = String(parsed.searchParams.get("pwd") || "").trim();
+
+    return parsed.protocol === "https:"
+      && parsed.hostname === "app.zoom.us"
+      && Boolean(meetingId)
+      && Boolean(password)
+      && !/[\s&#]/.test(password);
+  } catch (_error) {
+    return false;
+  }
+}
+
+function isValidDtcZoomUrl(url, state) {
+  return isValidDtcZoomMeetingUrl(url, state)
+    || isValidDtcZoomWebClientUrl(url, state);
+}
+
+async function isAllowedTabAfterUnlock(tabId, url, state) {
+  const origin = getUrlOrigin(url);
+
+  if (isAllowedAfterUnlock(url, state)) {
+    if (!DTC_ZOOM_SESSION_ORIGINS.has(origin)) {
+      await revokeZoomMeetingTab(tabId);
+    }
+    return true;
+  }
+
+  if (!isDtcContentState(state) || !DTC_ZOOM_SESSION_ORIGINS.has(origin)) {
+    await revokeZoomMeetingTab(tabId);
+    return false;
+  }
+
+  if (isValidDtcZoomUrl(url, state)) {
+    return authorizeZoomMeetingTab(tabId);
+  }
+
+  return isZoomMeetingTabAuthorized(tabId);
+}
+
+async function authorizeZoomMeetingTab(tabId) {
+  if (typeof tabId !== "number" ||
+      !chrome.declarativeNetRequest?.getSessionRules ||
+      !chrome.declarativeNetRequest?.updateSessionRules) {
+    return false;
+  }
+
+  const sessionRules = await chrome.declarativeNetRequest.getSessionRules();
+  const existingRule = sessionRules.find((rule) => rule.id === ZOOM_SESSION_ALLOW_RULE_ID);
+  const tabIds = new Set(Array.isArray(existingRule?.condition?.tabIds)
+    ? existingRule.condition.tabIds
+    : []);
+
+  tabIds.add(tabId);
+
+  await chrome.declarativeNetRequest.updateSessionRules({
+    removeRuleIds: [ZOOM_SESSION_ALLOW_RULE_ID],
+    addRules: [{
+      id: ZOOM_SESSION_ALLOW_RULE_ID,
+      priority: 300,
+      action: { type: "allow" },
+      condition: {
+        regexFilter: "^https://(us05web\\.zoom\\.us|app\\.zoom\\.us)/",
+        resourceTypes: ["main_frame"],
+        tabIds: [...tabIds]
+      }
+    }]
+  });
+
+  return true;
+}
+
+async function isZoomMeetingTabAuthorized(tabId) {
+  if (typeof tabId !== "number" || !chrome.declarativeNetRequest?.getSessionRules) {
+    return false;
+  }
+
+  const sessionRules = await chrome.declarativeNetRequest.getSessionRules();
+  const rule = sessionRules.find((candidate) => candidate.id === ZOOM_SESSION_ALLOW_RULE_ID);
+  return Array.isArray(rule?.condition?.tabIds) && rule.condition.tabIds.includes(tabId);
+}
+
+async function revokeZoomMeetingTab(tabId) {
+  if (typeof tabId !== "number" ||
+      !chrome.declarativeNetRequest?.getSessionRules ||
+      !chrome.declarativeNetRequest?.updateSessionRules) {
+    return;
+  }
+
+  const sessionRules = await chrome.declarativeNetRequest.getSessionRules();
+  const existingRule = sessionRules.find((rule) => rule.id === ZOOM_SESSION_ALLOW_RULE_ID);
+  const tabIds = (Array.isArray(existingRule?.condition?.tabIds)
+    ? existingRule.condition.tabIds
+    : []).filter((candidate) => candidate !== tabId);
+
+  if (!existingRule) {
+    return;
+  }
+
+  await chrome.declarativeNetRequest.updateSessionRules({
+    removeRuleIds: [ZOOM_SESSION_ALLOW_RULE_ID],
+    addRules: tabIds.length > 0 ? [{
+      ...existingRule,
+      condition: {
+        ...existingRule.condition,
+        tabIds
+      }
+    }] : []
+  });
+}
+
+async function clearZoomMeetingSessions() {
+  if (!chrome.declarativeNetRequest?.updateSessionRules) {
+    return;
+  }
+
+  await chrome.declarativeNetRequest.updateSessionRules({
+    removeRuleIds: [ZOOM_SESSION_ALLOW_RULE_ID]
+  }).catch(() => undefined);
+}
 function isCoursesDvdAccessUrl(url) {
   return normalizeUrl(url) === normalizeUrl(COURSES_DVD_ACCESS_URL);
+}
+
+function isCoursesDvdBlockedUrl(url) {
+  return normalizeUrl(url) === normalizeUrl(COURSES_DVD_BLOCKED_URL);
 }
 
 function isValidSelectedAccessState(state) {
@@ -1426,7 +1718,12 @@ function isValidSelectedAccessState(state) {
 }
 
 function isAllowedAfterUnlock(url, state) {
-  if (isCoursesDvdAccessUrl(url)) {
+  // A página de acesso e a página de bloqueio da extensão Cursos DVD são os
+  // únicos destinos internos permitidos após o desbloqueio. Sem isso, quando o
+  // Cursos DVD redireciona access.html -> blocked.html (usuário ainda não
+  // autorizou a leitura), esta extensão devolveria a aba para access.html,
+  // criando um loop infinito entre as duas extensões.
+  if (isCoursesDvdAccessUrl(url) || isCoursesDvdBlockedUrl(url)) {
     return true;
   }
 
@@ -1434,7 +1731,7 @@ function isAllowedAfterUnlock(url, state) {
     return false;
   }
 
-  return getUrlOrigin(url) === state.allowedContentOrigin;
+  return getAllowedContentOrigins(state).includes(getUrlOrigin(url));
 }
 
 function isAllowedWhileLocked(url, state = null, tab = null) {
@@ -1777,6 +2074,26 @@ function mapServerError(errorCode) {
     default:
       return errorCode ? `Erro do servidor: ${errorCode}` : "Falha ao comunicar com o servidor.";
   }
+}
+
+async function notifyPixelGate(unlocked, state = null) {
+  const message = {
+    type: unlocked ? PIXEL_GATE_UNLOCKED_MESSAGE : PIXEL_GATE_LOCKED_MESSAGE,
+    unlocked: Boolean(unlocked),
+    sessionId: String(state?.sessionId || ""),
+    unlockedAt: state?.unlockedAt || null
+  };
+
+  return new Promise((resolve) => {
+    try {
+      chrome.runtime.sendMessage(PIXEL_EXTENSION_ID, message, (response) => {
+        void chrome.runtime.lastError;
+        resolve(response || null);
+      });
+    } catch (_error) {
+      resolve(null);
+    }
+  });
 }
 
 function getMissingSiteAccessMessage() {
