@@ -88,6 +88,34 @@ function mergeStaticBrowserReadRecipients(extensionId, recipients) {
   return baseRecipients;
 }
 
+function resolveRecipientTargetsWithRuntimeFallback(args) {
+  const staticTargets = getStaticBrowserReadRecipientTargets(args?.extensionId, args?.recipientKey);
+  if (staticTargets?.length) {
+    return staticTargets;
+  }
+
+  const normalizedExtensionId = String(args?.extensionId || "").trim();
+  const mappedExtensionId = resolveBrowserReadConfigId(normalizedExtensionId);
+
+  if (!BROWSER_READ_RUNTIME_IDS.has(normalizedExtensionId) || mappedExtensionId === normalizedExtensionId) {
+    return core.resolveRecipientTargets(mapDisplayArgs(args));
+  }
+
+  // Antes do alias de configuração, os códigos eram enviados usando o
+  // chrome.runtime.id real. Tente esse mapa primeiro para manter os
+  // destinatários já existentes funcionando; se ele não existir, use o
+  // mapa canônico compartilhado que alimenta a tela de conteúdos.
+  try {
+    return core.resolveRecipientTargets(args);
+  } catch (runtimeError) {
+    try {
+      return core.resolveRecipientTargets(mapDisplayArgs(args));
+    } catch (_mappedError) {
+      throw runtimeError;
+    }
+  }
+}
+
 module.exports = {
   buildAdminAlertEmailMessage(args) {
     return core.buildAdminAlertEmailMessage(mapDisplayArgs(args));
@@ -107,18 +135,10 @@ module.exports = {
     return mergeStaticBrowserReadRecipients(extensionId, recipients);
   },
   resolveRecipientEmail(args) {
-    const staticTargets = getStaticBrowserReadRecipientTargets(args?.extensionId, args?.recipientKey);
-    if (staticTargets?.length) {
-      return staticTargets[0];
-    }
-    return core.resolveRecipientEmail(mapDisplayArgs(args));
+    return resolveRecipientTargetsWithRuntimeFallback(args)[0];
   },
   resolveRecipientTargets(args) {
-    const staticTargets = getStaticBrowserReadRecipientTargets(args?.extensionId, args?.recipientKey);
-    if (staticTargets?.length) {
-      return staticTargets;
-    }
-    return core.resolveRecipientTargets(mapDisplayArgs(args));
+    return resolveRecipientTargetsWithRuntimeFallback(args);
   },
   verifyAccessChallenge(args) {
     // Verification must use the same real runtime ID that was signed.
