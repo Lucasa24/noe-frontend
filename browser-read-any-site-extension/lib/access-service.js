@@ -7,6 +7,12 @@ const EXTENSION_CONFIG_ID_ALIASES = Object.freeze({
   // o chrome.runtime.id real continua sendo usado e assinado no desafio.
   nfnpblbakohfcnkngbimljiehklmdcmk: "nicnjmokndbjnpjlikgmnfkihkklobce"
 });
+const EXTENSION_AUTHORIZATION_ID_ALIASES = Object.freeze({
+  nfnpblbakohfcnkngbimljiehklmdcmk: "nicnjmokndbjnpjlikgmnfkihkklobce",
+  // ID da instalação mostrada no screenshot atual. Só vale para autorização;
+  // o mapa de destinatários próprio de aach... não é substituído globalmente.
+  aachjpoooepljhlphhaplfijppgbjdfp: "nicnjmokndbjnpjlikgmnfkihkklobce"
+});
 const EXTENSION_DISPLAY_NAMES = {
   kdiclmpfoijaodmpobpfnakglkpclijl: "comunidade invictus",
   kjclfjfidoohlndnjldcbcjomjlcgicd: "Formacao pre vendas diamond",
@@ -346,10 +352,20 @@ function assertAllowedExtension(extensionId) {
 
   const normalizedExtensionId = String(extensionId || "").trim();
   const configExtensionId = resolveExtensionConfigId(normalizedExtensionId);
+  const authorizationExtensionId = resolveAuthorizationExtensionId(normalizedExtensionId);
 
-  if (!allowList.includes(normalizedExtensionId) && !allowList.includes(configExtensionId)) {
+  if (
+    !allowList.includes(normalizedExtensionId)
+    && !allowList.includes(configExtensionId)
+    && !allowList.includes(authorizationExtensionId)
+  ) {
     throw createError("extension_not_allowed", 403);
   }
+}
+
+function resolveAuthorizationExtensionId(extensionId) {
+  const normalizedExtensionId = String(extensionId || "").trim();
+  return EXTENSION_AUTHORIZATION_ID_ALIASES[normalizedExtensionId] || normalizedExtensionId;
 }
 
 function resolveExtensionConfigId(extensionId) {
