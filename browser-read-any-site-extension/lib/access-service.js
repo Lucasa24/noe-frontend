@@ -8,10 +8,7 @@ const EXTENSION_CONFIG_ID_ALIASES = Object.freeze({
   nfnpblbakohfcnkngbimljiehklmdcmk: "nicnjmokndbjnpjlikgmnfkihkklobce"
 });
 const EXTENSION_AUTHORIZATION_ID_ALIASES = Object.freeze({
-  nfnpblbakohfcnkngbimljiehklmdcmk: "nicnjmokndbjnpjlikgmnfkihkklobce",
-  // ID da instalação mostrada no screenshot atual. Só vale para autorização;
-  // o mapa de destinatários próprio de aach... não é substituído globalmente.
-  aachjpoooepljhlphhaplfijppgbjdfp: "nicnjmokndbjnpjlikgmnfkihkklobce"
+  nfnpblbakohfcnkngbimljiehklmdcmk: "nicnjmokndbjnpjlikgmnfkihkklobce"
 });
 const EXTENSION_DISPLAY_NAMES = {
   kdiclmpfoijaodmpobpfnakglkpclijl: "comunidade invictus",
