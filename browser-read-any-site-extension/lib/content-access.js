@@ -13,7 +13,7 @@ const ACCESS_CONTENTS = [
     key: "pixel-ai-hub",
     label: "PIXEL AI HUB",
     url: "https://comunidades.app.box.com/folder/406316807301",
-    allowedRecipientNames: ["Deivis"]
+    allowedRecipientNames: ["Deivis", "~ Solicitar Ativação com Adm"]
   },
   {
     key: "comunidade-growth-hackers",
