@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Browser Read Any Site",
-  "version": "1.3.7",
+  "version": "1.3.22",
   "description": "Extensao minima com permissao de leitura em qualquer site.",
   "permissions": [
     "scripting",
@@ -25,10 +25,27 @@
         "<all_urls>"
       ],
       "js": [
-        "content.js"
+        "content.js",
+        "zoom-client.js"
       ],
       "run_at": "document_start",
       "all_frames": true
+    },
+    {
+      "matches": [
+        "https://app.zoom.us/wc/*"
+      ],
+      "js": [
+        "zoom-client-main.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "MAIN"
     }
-  ]
+  ],
+  "externally_connectable": {
+    "ids": [
+      "opebpmbhihaffdfogpeimddbpjhhejpk"
+    ]
+  }
 }
