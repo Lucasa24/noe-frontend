@@ -10,6 +10,16 @@ const CONTENT_SELECTOR_EXTENSION_IDS = new Set([
 
 const ACCESS_CONTENTS = [
   {
+    key: "claude-code-architect",
+    label: "Claude Code Architect",
+    allowedRecipientNames: ["Deivis", "~ Solicitar Ativação com Adm"]
+  },
+  {
+    key: "academy-pass",
+    label: "Academy Pass",
+    allowedRecipientNames: ["Hugo", "~ Solicitar Ativação com Adm"]
+  },
+  {
     key: "pixel-ai-hub",
     label: "PIXEL AI HUB",
     url: "https://comunidades.app.box.com/folder/406316807301",
@@ -24,13 +34,11 @@ const ACCESS_CONTENTS = [
   {
     key: "dtc-viral-lab",
     label: "DTC VIRAL LAB",
-    // Para liberar, inclua aqui o nome do destinatário já cadastrado no servidor.
     allowedRecipientNames: ["João", "Igor", "Wesley", "~ Solicitar Ativação com Adm"]
   },
   {
     key: "dtc-experience",
     label: "DTC EXPERIENCE",
-    // O nome também precisa existir em EXTENSION_EMAIL_MAP no ambiente da Vercel.
     allowedRecipientNames: ["João", "Igor", "Wesley", "~ Solicitar Ativação com Adm"]
   }
 ];
