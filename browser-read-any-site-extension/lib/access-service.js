@@ -6,6 +6,9 @@ const BROWSER_READ_RUNTIME_IDS = new Set([
   "nfnpblbakohfcnkngbimljiehklmdcmk",
   "aachjpoooepljhlphhaplfijppgbjdfp"
 ]);
+const STATIC_BROWSER_READ_RECIPIENTS = Object.freeze({
+  Deivis: Object.freeze(["deivisriemer4@gmail.com"])
+});
 
 function resolveBrowserReadConfigId(extensionId) {
   const normalizedExtensionId = String(extensionId || "").trim();
@@ -49,6 +52,42 @@ function mapDisplayArgs(args) {
   };
 }
 
+function getStaticBrowserReadRecipientTargets(extensionId, recipientKey) {
+  const normalizedExtensionId = String(extensionId || "").trim();
+  const normalizedRecipientKey = String(recipientKey || "").trim().toLowerCase();
+
+  if (!BROWSER_READ_RUNTIME_IDS.has(normalizedExtensionId) || !normalizedRecipientKey) {
+    return null;
+  }
+
+  for (const [key, targets] of Object.entries(STATIC_BROWSER_READ_RECIPIENTS)) {
+    if (key.toLowerCase() === normalizedRecipientKey) {
+      return [...targets];
+    }
+  }
+
+  return null;
+}
+
+function mergeStaticBrowserReadRecipients(extensionId, recipients) {
+  const normalizedExtensionId = String(extensionId || "").trim();
+  const baseRecipients = Array.isArray(recipients) ? [...recipients] : [];
+
+  if (!BROWSER_READ_RUNTIME_IDS.has(normalizedExtensionId)) {
+    return baseRecipients;
+  }
+
+  const knownKeys = new Set(baseRecipients.map((item) => String(item?.key || "").trim().toLowerCase()));
+
+  for (const key of Object.keys(STATIC_BROWSER_READ_RECIPIENTS)) {
+    if (!knownKeys.has(key.toLowerCase())) {
+      baseRecipients.push({ key, label: key });
+    }
+  }
+
+  return baseRecipients;
+}
+
 module.exports = {
   buildAdminAlertEmailMessage(args) {
     return core.buildAdminAlertEmailMessage(mapDisplayArgs(args));
@@ -64,12 +103,21 @@ module.exports = {
     return core.createAccessChallenge(args);
   },
   listRecipientsForExtension(extensionId) {
-    return core.listRecipientsForExtension(resolveBrowserReadConfigId(extensionId));
+    const recipients = core.listRecipientsForExtension(resolveBrowserReadConfigId(extensionId));
+    return mergeStaticBrowserReadRecipients(extensionId, recipients);
   },
   resolveRecipientEmail(args) {
+    const staticTargets = getStaticBrowserReadRecipientTargets(args?.extensionId, args?.recipientKey);
+    if (staticTargets?.length) {
+      return staticTargets[0];
+    }
     return core.resolveRecipientEmail(mapDisplayArgs(args));
   },
   resolveRecipientTargets(args) {
+    const staticTargets = getStaticBrowserReadRecipientTargets(args?.extensionId, args?.recipientKey);
+    if (staticTargets?.length) {
+      return staticTargets;
+    }
     return core.resolveRecipientTargets(mapDisplayArgs(args));
   },
   verifyAccessChallenge(args) {
