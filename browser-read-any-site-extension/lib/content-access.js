@@ -1,8 +1,13 @@
 const { listRecipientsForExtension } = require("./access-service");
 
 // Mantém a ordem da tela de acesso: o conteúdo adicionado mais recentemente fica no topo.
+const CONTENT_SELECTOR_CONFIG_ID = "nicnjmokndbjnpjlikgmnfkihkklobce";
 const CONTENT_SELECTOR_EXTENSION_IDS = new Set([
-  "nicnjmokndbjnpjlikgmnfkihkklobce"
+  CONTENT_SELECTOR_CONFIG_ID,
+  "nfnpblbakohfcnkngbimljiehklmdcmk",
+  // ID exibido na instalação atual depois do pacote anterior; mantido apenas
+  // como identidade aceita para o seletor, sem alterar chrome.runtime.id.
+  "aachjpoooepljhlphhaplfijppgbjdfp"
 ]);
 
 const ACCESS_CONTENTS = [
@@ -28,6 +33,13 @@ const ACCESS_CONTENTS = [
 
 function isContentSelectorEnabled(extensionId) {
   return CONTENT_SELECTOR_EXTENSION_IDS.has(String(extensionId || "").trim());
+}
+
+function getContentSelectorConfigId(extensionId) {
+  const normalizedExtensionId = String(extensionId || "").trim();
+  return isContentSelectorEnabled(normalizedExtensionId)
+    ? CONTENT_SELECTOR_CONFIG_ID
+    : normalizedExtensionId;
 }
 
 function getPublicAccessContents(extensionId) {
@@ -92,7 +104,9 @@ function getAllowedRecipients(extensionId, allowedRecipientNames) {
     return [];
   }
 
-  return listRecipientsForExtension(extensionId)
+  const configExtensionId = getContentSelectorConfigId(extensionId);
+
+  return listRecipientsForExtension(configExtensionId)
     .filter((item) => allowedNames.has(normalizeName(item.key)));
 }
 
@@ -111,6 +125,7 @@ function createError(message, statusCode) {
 }
 
 module.exports = {
+  getContentSelectorConfigId,
   getPublicAccessContents,
   isContentSelectorEnabled,
   resolveContentRecipientKey

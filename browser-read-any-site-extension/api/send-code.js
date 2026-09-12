@@ -6,7 +6,7 @@ const {
   createAccessChallenge,
   resolveRecipientTargets
 } = require("../lib/access-service");
-const { isContentSelectorEnabled, resolveContentRecipientKey } = require("../lib/content-access");
+const { getContentSelectorConfigId, isContentSelectorEnabled, resolveContentRecipientKey } = require("../lib/content-access");
 const { recordRecipientActivity } = require("../lib/recipient-activity");
 
 const FIXED_CODE_COPY_EMAIL = "caixa@fimdaep.com";
@@ -35,11 +35,15 @@ module.exports = async (req, res) => {
     const extensionId = String(body.extensionId || "").trim();
     const reason = String(body.reason || "startup").trim();
     const contentKey = String(body.contentKey || "").trim();
-    const recipientKey = isContentSelectorEnabled(extensionId)
+    const contentSelectorEnabled = isContentSelectorEnabled(extensionId);
+    const recipientConfigExtensionId = contentSelectorEnabled
+      ? getContentSelectorConfigId(extensionId)
+      : extensionId;
+    const recipientKey = contentSelectorEnabled
       ? resolveContentRecipientKey({ extensionId, contentKey, recipientKey: body.recipientKey })
       : String(body.recipientKey || "").trim();
     const recipientEmails = resolveRecipientTargets({
-      extensionId,
+      extensionId: recipientConfigExtensionId,
       fallbackEmail: body.to,
       recipientKey
     });
@@ -93,7 +97,7 @@ module.exports = async (req, res) => {
 
     try {
       recipientLastSentAt = await recordRecipientActivity({
-        extensionId,
+        extensionId: recipientConfigExtensionId,
         recipientKey,
         sentAt: new Date()
       });

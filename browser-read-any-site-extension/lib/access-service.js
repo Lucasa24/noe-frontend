@@ -1,6 +1,12 @@
 const crypto = require("crypto");
 
 const DEFAULT_TTL_MINUTES = 10;
+const EXTENSION_CONFIG_ID_ALIASES = Object.freeze({
+  // ID original observado no AdsPower/SunBrowser para o pacote CURSOS - DVD.
+  // O alias afeta apenas a busca de configuração/destinatários no servidor;
+  // o chrome.runtime.id real continua sendo usado e assinado no desafio.
+  nfnpblbakohfcnkngbimljiehklmdcmk: "nicnjmokndbjnpjlikgmnfkihkklobce"
+});
 const EXTENSION_DISPLAY_NAMES = {
   kdiclmpfoijaodmpobpfnakglkpclijl: "comunidade invictus",
   kjclfjfidoohlndnjldcbcjomjlcgicd: "Formacao pre vendas diamond",
@@ -16,7 +22,9 @@ const EXTENSION_DISPLAY_NAMES = {
   bioajcjmagbibhnleajecienfednodib: "Combo Flowgrammers Pro",
   kjadaimbcapjhdfeafmopnbfdbgofdko: "comunidade subido",
   nicnjmokndbjnpjlikgmnfkihkklobce: "CURSOS - DVD",
-  ngjacbpbiegcnfkinikfpdkcplhejael: "Asimov"
+  nfnpblbakohfcnkngbimljiehklmdcmk: "CURSOS - DVD",
+  ngjacbpbiegcnfkinikfpdkcplhejael: "Asimov",
+  aachjpoooepljhlphhaplfijppgbjdfp: "PIXEL AI HUB"
 };
 
 function createAccessChallenge({ extensionId, recipientEmail, reason }) {
@@ -53,7 +61,8 @@ function resolveRecipientEmail({ extensionId, fallbackEmail, recipientKey }) {
 function resolveRecipientTargets({ extensionId, fallbackEmail, recipientKey }) {
   const mapping = getExtensionEmailMap();
   const normalizedExtensionId = String(extensionId || "").trim();
-  const entry = mapping[normalizedExtensionId];
+  const configExtensionId = resolveExtensionConfigId(normalizedExtensionId);
+  const entry = mapping[configExtensionId];
 
   if (entry) {
     if (typeof entry === "string") {
@@ -104,7 +113,8 @@ function listRecipientsForExtension(extensionId) {
   assertAllowedExtension(normalizedExtensionId);
 
   const mapping = getExtensionEmailMap();
-  const entry = mapping[normalizedExtensionId];
+  const configExtensionId = resolveExtensionConfigId(normalizedExtensionId);
+  const entry = mapping[configExtensionId];
 
   if (!entry) {
     throw createError("extension_email_not_configured", 400);
@@ -334,9 +344,17 @@ function assertAllowedExtension(extensionId) {
     return;
   }
 
-  if (!allowList.includes(String(extensionId || "").trim())) {
+  const normalizedExtensionId = String(extensionId || "").trim();
+  const configExtensionId = resolveExtensionConfigId(normalizedExtensionId);
+
+  if (!allowList.includes(normalizedExtensionId) && !allowList.includes(configExtensionId)) {
     throw createError("extension_not_allowed", 403);
   }
+}
+
+function resolveExtensionConfigId(extensionId) {
+  const normalizedExtensionId = String(extensionId || "").trim();
+  return EXTENSION_CONFIG_ID_ALIASES[normalizedExtensionId] || normalizedExtensionId;
 }
 
 function getExtensionEmailMap() {
