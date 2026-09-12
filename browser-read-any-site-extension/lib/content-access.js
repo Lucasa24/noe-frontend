@@ -4,10 +4,7 @@ const { listRecipientsForExtension } = require("./access-service");
 const CONTENT_SELECTOR_CONFIG_ID = "nicnjmokndbjnpjlikgmnfkihkklobce";
 const CONTENT_SELECTOR_EXTENSION_IDS = new Set([
   CONTENT_SELECTOR_CONFIG_ID,
-  "nfnpblbakohfcnkngbimljiehklmdcmk",
-  // ID exibido na instalação atual depois do pacote anterior; mantido apenas
-  // como identidade aceita para o seletor, sem alterar chrome.runtime.id.
-  "aachjpoooepljhlphhaplfijppgbjdfp"
+  "nfnpblbakohfcnkngbimljiehklmdcmk"
 ]);
 
 const ACCESS_CONTENTS = [
