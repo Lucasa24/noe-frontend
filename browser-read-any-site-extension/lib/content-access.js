@@ -10,6 +10,12 @@ const CONTENT_SELECTOR_EXTENSION_IDS = new Set([
 
 const ACCESS_CONTENTS = [
   {
+    key: "pixel-ai-hub",
+    label: "PIXEL AI HUB",
+    url: "https://comunidades.app.box.com/folder/406316807301",
+    allowedRecipientNames: ["Deivis"]
+  },
+  {
     key: "comunidade-growth-hackers",
     label: "Comunidade Growth Hackers",
     url: "https://comunidadegrowthhackers.cademi.com.br/",
