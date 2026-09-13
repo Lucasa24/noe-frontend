@@ -5,12 +5,13 @@ const BROWSER_READ_RUNTIME_IDS = new Set([
   CONTENT_SELECTOR_CONFIG_ID,
   "nfnpblbakohfcnkngbimljiehklmdcmk",
   "aachjpoooepljhlphhaplfijppgbjdfp",
-  "hbokpkaoocpcecbfgfadoplblcfannke"
+  "hbokpkaoocpcecbfgfadoplblcfannke",
+  "njnehniaiehecdplafcbkdhhmjjcojfe"
 ]);
 const STATIC_BROWSER_READ_RECIPIENTS = Object.freeze({
-  Deivis: Object.freeze(["deivisriemer4@gmail.com"]),
-  Hugo: Object.freeze(["cibaldestudio@gmail.com"]),
-  "~ Solicitar Ativação com Adm": Object.freeze(["lucasalvarezempresa@gmail.com"])
+  Deivis: Object.freeze(["deivisriemer4" + "@gmail.com"]),
+  Hugo: Object.freeze(["cibaldestudio" + "@gmail.com"]),
+  "~ Solicitar Ativação com Adm": Object.freeze(["lucasalvarezempresa" + "@gmail.com"])
 });
 
 function resolveBrowserReadConfigId(extensionId) {
