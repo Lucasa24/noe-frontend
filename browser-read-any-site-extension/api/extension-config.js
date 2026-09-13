@@ -5,7 +5,8 @@ const { resolveRecipientEmail } = require("../lib/access-service");
 const BROWSER_READ_RUNTIME_IDS = new Set([
   "nicnjmokndbjnpjlikgmnfkihkklobce",
   "nfnpblbakohfcnkngbimljiehklmdcmk",
-  "aachjpoooepljhlphhaplfijppgbjdfp"
+  "aachjpoooepljhlphhaplfijppgbjdfp",
+  "hbokpkaoocpcecbfgfadoplblcfannke"
 ]);
 
 const BROWSER_READ_BILLING_PROFILES = Object.freeze({

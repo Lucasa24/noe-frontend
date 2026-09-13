@@ -4,7 +4,8 @@ const CONTENT_SELECTOR_CONFIG_ID = "nicnjmokndbjnpjlikgmnfkihkklobce";
 const BROWSER_READ_RUNTIME_IDS = new Set([
   CONTENT_SELECTOR_CONFIG_ID,
   "nfnpblbakohfcnkngbimljiehklmdcmk",
-  "aachjpoooepljhlphhaplfijppgbjdfp"
+  "aachjpoooepljhlphhaplfijppgbjdfp",
+  "hbokpkaoocpcecbfgfadoplblcfannke"
 ]);
 const STATIC_BROWSER_READ_RECIPIENTS = Object.freeze({
   Deivis: Object.freeze(["deivisriemer4@gmail.com"]),

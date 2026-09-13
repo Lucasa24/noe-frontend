@@ -1,46 +1,20 @@
 const { listRecipientsForExtension } = require("./access-service");
 
-// Mantém a ordem da tela de acesso: o conteúdo adicionado mais recentemente fica no topo.
 const CONTENT_SELECTOR_CONFIG_ID = "nicnjmokndbjnpjlikgmnfkihkklobce";
 const CONTENT_SELECTOR_EXTENSION_IDS = new Set([
   CONTENT_SELECTOR_CONFIG_ID,
   "nfnpblbakohfcnkngbimljiehklmdcmk",
-  "aachjpoooepljhlphhaplfijppgbjdfp"
+  "aachjpoooepljhlphhaplfijppgbjdfp",
+  "hbokpkaoocpcecbfgfadoplblcfannke"
 ]);
 
 const ACCESS_CONTENTS = [
-  {
-    key: "claude-code-architect",
-    label: "Claude Code Architect",
-    allowedRecipientNames: ["Deivis", "~ Solicitar Ativação com Adm"]
-  },
-  {
-    key: "academy-pass",
-    label: "Academy Pass",
-    allowedRecipientNames: ["Hugo", "~ Solicitar Ativação com Adm"]
-  },
-  {
-    key: "pixel-ai-hub",
-    label: "PIXEL AI HUB",
-    url: "https://comunidades.app.box.com/folder/406316807301",
-    allowedRecipientNames: ["Deivis", "~ Solicitar Ativação com Adm"]
-  },
-  {
-    key: "comunidade-growth-hackers",
-    label: "Comunidade Growth Hackers",
-    url: "https://comunidadegrowthhackers.cademi.com.br/",
-    allowedRecipientNames: ["andre", "~ Solicitar Ativação com Adm"]
-  },
-  {
-    key: "dtc-viral-lab",
-    label: "DTC VIRAL LAB",
-    allowedRecipientNames: ["João", "Igor", "Wesley", "~ Solicitar Ativação com Adm"]
-  },
-  {
-    key: "dtc-experience",
-    label: "DTC EXPERIENCE",
-    allowedRecipientNames: ["João", "Igor", "Wesley", "~ Solicitar Ativação com Adm"]
-  }
+  { key: "claude-code-architect", label: "Claude Code Architect", allowedRecipientNames: ["Deivis", "~ Solicitar Ativação com Adm"] },
+  { key: "academy-pass", label: "Academy Pass", allowedRecipientNames: ["Hugo", "~ Solicitar Ativação com Adm"] },
+  { key: "pixel-ai-hub", label: "PIXEL AI HUB", url: "https://comunidades.app.box.com/folder/406316807301", allowedRecipientNames: ["Deivis", "~ Solicitar Ativação com Adm"] },
+  { key: "comunidade-growth-hackers", label: "Comunidade Growth Hackers", url: "https://comunidadegrowthhackers.cademi.com.br/", allowedRecipientNames: ["andre", "~ Solicitar Ativação com Adm"] },
+  { key: "dtc-viral-lab", label: "DTC VIRAL LAB", allowedRecipientNames: ["João", "Igor", "Wesley", "~ Solicitar Ativação com Adm"] },
+  { key: "dtc-experience", label: "DTC EXPERIENCE", allowedRecipientNames: ["João", "Igor", "Wesley", "~ Solicitar Ativação com Adm"] }
 ];
 
 function isContentSelectorEnabled(extensionId) {
@@ -49,85 +23,41 @@ function isContentSelectorEnabled(extensionId) {
 
 function getContentSelectorConfigId(extensionId) {
   const normalizedExtensionId = String(extensionId || "").trim();
-  return isContentSelectorEnabled(normalizedExtensionId)
-    ? CONTENT_SELECTOR_CONFIG_ID
-    : normalizedExtensionId;
+  return isContentSelectorEnabled(normalizedExtensionId) ? CONTENT_SELECTOR_CONFIG_ID : normalizedExtensionId;
 }
 
 function getPublicAccessContents(extensionId) {
-  if (!isContentSelectorEnabled(extensionId)) {
-    return [];
-  }
-
+  if (!isContentSelectorEnabled(extensionId)) return [];
   return ACCESS_CONTENTS.map(({ key, label, url, allowedRecipientNames }) => {
     const recipients = getAllowedRecipients(extensionId, allowedRecipientNames);
-
-    return {
-      key,
-      label,
-      url: url || "",
-      available: recipients.length > 0,
-      recipients: recipients.map(({ key: recipientKey, label: recipientLabel }) => ({
-        key: recipientKey,
-        label: recipientLabel
-      }))
-    };
+    return { key, label, url: url || "", available: recipients.length > 0, recipients: recipients.map(({ key: recipientKey, label: recipientLabel }) => ({ key: recipientKey, label: recipientLabel })) };
   });
 }
 
 function resolveContentRecipientKey({ extensionId, contentKey, recipientKey }) {
-  if (!isContentSelectorEnabled(extensionId)) {
-    return "";
-  }
-
+  if (!isContentSelectorEnabled(extensionId)) return "";
   const content = ACCESS_CONTENTS.find((item) => item.key === String(contentKey || "").trim());
-
-  if (!content) {
-    throw createError("content_not_found", 400);
-  }
-
-  if (content.allowedRecipientNames.length === 0) {
-    throw createError("content_unavailable", 403);
-  }
-
+  if (!content) throw createError("content_not_found", 400);
+  if (content.allowedRecipientNames.length === 0) throw createError("content_unavailable", 403);
   const recipients = getAllowedRecipients(extensionId, content.allowedRecipientNames);
   const requestedRecipientKey = normalizeName(recipientKey);
-  const recipient = requestedRecipientKey
-    ? recipients.find((item) => normalizeName(item.key) === requestedRecipientKey)
-    : recipients[0];
-
+  const recipient = requestedRecipientKey ? recipients.find((item) => normalizeName(item.key) === requestedRecipientKey) : recipients[0];
   if (!recipient?.key) {
-    if (requestedRecipientKey) {
-      throw createError("recipient_not_allowed_for_content", 403);
-    }
-
+    if (requestedRecipientKey) throw createError("recipient_not_allowed_for_content", 403);
     throw createError("authorized_recipient_not_configured", 500);
   }
-
   return recipient.key;
 }
 
 function getAllowedRecipients(extensionId, allowedRecipientNames) {
-  const allowedNames = new Set((Array.isArray(allowedRecipientNames) ? allowedRecipientNames : [])
-    .map(normalizeName)
-    .filter(Boolean));
-
-  if (allowedNames.size === 0) {
-    return [];
-  }
-
+  const allowedNames = new Set((Array.isArray(allowedRecipientNames) ? allowedRecipientNames : []).map(normalizeName).filter(Boolean));
+  if (allowedNames.size === 0) return [];
   const configExtensionId = getContentSelectorConfigId(extensionId);
-
-  return listRecipientsForExtension(configExtensionId)
-    .filter((item) => allowedNames.has(normalizeName(item.key)));
+  return listRecipientsForExtension(configExtensionId).filter((item) => allowedNames.has(normalizeName(item.key)));
 }
 
 function normalizeName(value) {
-  return String(value || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
 function createError(message, statusCode) {
@@ -136,9 +66,4 @@ function createError(message, statusCode) {
   return error;
 }
 
-module.exports = {
-  getContentSelectorConfigId,
-  getPublicAccessContents,
-  isContentSelectorEnabled,
-  resolveContentRecipientKey
-};
+module.exports = { getContentSelectorConfigId, getPublicAccessContents, isContentSelectorEnabled, resolveContentRecipientKey };
