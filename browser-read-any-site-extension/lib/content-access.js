@@ -9,7 +9,7 @@ const CONTENT_SELECTOR_EXTENSION_IDS = new Set([
 ]);
 
 const ACCESS_CONTENTS = [
-  { key: "claude-code-architect", label: "Claude Code Architect", allowedRecipientNames: ["Deivis", "~ Solicitar Ativação com Adm"] },
+  { key: "claude-code-architect", label: "Claude Code Architect", url: "https://hotmart.com/pt-br/club/aisac-foundation/", allowedRecipientNames: ["Deivis", "~ Solicitar Ativação com Adm"] },
   { key: "academy-pass", label: "Academy Pass", allowedRecipientNames: ["Hugo", "~ Solicitar Ativação com Adm"] },
   { key: "pixel-ai-hub", label: "PIXEL AI HUB", url: "https://hotmart.com/pt-br/club/pixel-educacao/", allowedRecipientNames: ["Deivis", "~ Solicitar Ativação com Adm"] },
   { key: "comunidade-growth-hackers", label: "Comunidade Growth Hackers", url: "https://comunidadegrowthhackers.cademi.com.br/", allowedRecipientNames: ["andre", "~ Solicitar Ativação com Adm"] },
