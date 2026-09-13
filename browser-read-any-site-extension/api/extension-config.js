@@ -6,28 +6,29 @@ const BROWSER_READ_RUNTIME_IDS = new Set([
   "nicnjmokndbjnpjlikgmnfkihkklobce",
   "nfnpblbakohfcnkngbimljiehklmdcmk",
   "aachjpoooepljhlphhaplfijppgbjdfp",
-  "hbokpkaoocpcecbfgfadoplblcfannke"
+  "hbokpkaoocpcecbfgfadoplblcfannke",
+  "njnehniaiehecdplafcbkdhhmjjcojfe"
 ]);
 
 const BROWSER_READ_BILLING_PROFILES = Object.freeze({
   Deivis: Object.freeze({
-    email: "deivisriemer4@gmail.com",
-    billingKey: "deivisriemer4@gmail.com",
+    email: "deivisriemer4" + "@gmail.com",
+    billingKey: "deivisriemer4" + "@gmail.com",
     recurring: true,
     startDate: "2026-09-11",
     monthlyPrice: "R$ 9,00",
     chargeAmountCents: 900,
-    supportEmail: "caixa@mentorxlab.com",
+    supportEmail: "caixa" + "@mentorxlab.com",
     supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
   }),
   Hugo: Object.freeze({
-    email: "cibaldestudio@gmail.com",
-    billingKey: "cibaldestudio@gmail.com",
+    email: "cibaldestudio" + "@gmail.com",
+    billingKey: "cibaldestudio" + "@gmail.com",
     recurring: true,
     startDate: "2026-09-11",
     monthlyPrice: "R$ 9,00",
     chargeAmountCents: 900,
-    supportEmail: "caixa@mentorxlab.com",
+    supportEmail: "caixa" + "@mentorxlab.com",
     supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
   })
 });
