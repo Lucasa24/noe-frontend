@@ -36,16 +36,6 @@ const BROWSER_READ_BILLING_PROFILES = Object.freeze({
 // Regras globais por e-mail: aplicadas automaticamente em TODAS as extensões
 // onde o destinatário existir no EXTENSION_EMAIL_MAP.
 const GLOBAL_EMAIL_BILLING_PROFILES = Object.freeze({
-  "adobepalacio@gmail.com": Object.freeze({
-    email: "adobepalacio@gmail.com",
-    billingKey: "adobepalacio@gmail.com",
-    recurring: true,
-    startDate: "2026-09-15",
-    monthlyPrice: "R$ 9,00",
-    chargeAmountCents: 900,
-    supportEmail: "caixa" + "@mentorxlab.com",
-    supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
-  }),
   "hpx.jbvs@gmail.com": Object.freeze({
     email: "hpx.jbvs@gmail.com",
     billingKey: "hpx.jbvs@gmail.com",
