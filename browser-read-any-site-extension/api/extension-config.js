@@ -78,6 +78,12 @@ const GLOBAL_EMAIL_BILLING_PROFILES = Object.freeze({
   })
 });
 
+// E-mails explicitamente sem cobrança no mapa de cobrança da Vercel.
+const DISABLED_BILLING_EMAILS = new Set([
+  "wisdom.sats89@gmail.com",
+  "bragapeedro@gmail.com"
+]);
+
 async function extensionConfigHandler(req, res) {
   setCorsHeaders(res);
 
@@ -117,10 +123,10 @@ async function extensionConfigHandler(req, res) {
 async function buildExtensionConfig(extensionId, today = new Date()) {
   const config = await core.buildExtensionConfig(extensionId, today);
   const globalBillingProfiles = await buildGlobalEmailBillingProfiles(extensionId, today, false);
-  const pendingProfiles = {
+  const pendingProfiles = filterDisabledBillingProfiles({
     ...(config.pendingProfiles || {}),
     ...globalBillingProfiles
-  };
+  });
 
   if (!isBrowserReadRuntime(extensionId)) {
     return { ...config, pendingProfiles };
@@ -129,20 +135,20 @@ async function buildExtensionConfig(extensionId, today = new Date()) {
   const billingProfiles = await buildBrowserReadBillingProfiles(extensionId, today, false);
   return {
     ...config,
-    pendingProfiles: {
+    pendingProfiles: filterDisabledBillingProfiles({
       ...pendingProfiles,
       ...billingProfiles
-    }
+    })
   };
 }
 
 async function buildPublicExtensionConfig(extensionId, today = new Date()) {
   const config = await core.buildPublicExtensionConfig(extensionId, today);
   const globalBillingProfiles = await buildGlobalEmailBillingProfiles(extensionId, today, true);
-  const pendingProfiles = {
+  const pendingProfiles = filterDisabledBillingProfiles({
     ...(config.pendingProfiles || {}),
     ...globalBillingProfiles
-  };
+  });
 
   if (!isBrowserReadRuntime(extensionId)) {
     return { ...config, pendingProfiles };
@@ -151,10 +157,10 @@ async function buildPublicExtensionConfig(extensionId, today = new Date()) {
   const billingProfiles = await buildBrowserReadBillingProfiles(extensionId, today, true);
   return {
     ...config,
-    pendingProfiles: {
+    pendingProfiles: filterDisabledBillingProfiles({
       ...pendingProfiles,
       ...billingProfiles
-    }
+    })
   };
 }
 
@@ -171,7 +177,12 @@ async function resolvePendingProfile(extensionId, recipientKey) {
     return buildBillingProfile(extensionId, globalProfile);
   }
 
-  return core.resolvePendingProfile(extensionId, recipientKey);
+  const coreProfile = await core.resolvePendingProfile(extensionId, recipientKey);
+  if (isBillingDisabledProfile(coreProfile)) {
+    return null;
+  }
+
+  return coreProfile;
 }
 
 async function buildBrowserReadBillingProfiles(extensionId, today, dueOnly) {
@@ -246,6 +257,16 @@ function findGlobalEmailBillingProfile(extensionId, recipientKey) {
   } catch (_error) {
     return null;
   }
+}
+
+function filterDisabledBillingProfiles(pendingProfiles) {
+  return Object.fromEntries(
+    Object.entries(pendingProfiles || {}).filter(([, profile]) => !isBillingDisabledProfile(profile))
+  );
+}
+
+function isBillingDisabledProfile(profile) {
+  return DISABLED_BILLING_EMAILS.has(normalizeEmail(profile?.email));
 }
 
 function normalizeEmail(value) {
