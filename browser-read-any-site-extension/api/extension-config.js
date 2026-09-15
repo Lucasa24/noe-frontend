@@ -1,6 +1,6 @@
 const core = require("./_extension-config-core");
 const { getLatestPayment } = require("../lib/billing-state");
-const { resolveRecipientEmail } = require("../lib/access-service");
+const { listRecipientsForExtension, resolveRecipientEmail } = require("../lib/access-service");
 
 const BROWSER_READ_RUNTIME_IDS = new Set([
   "nicnjmokndbjnpjlikgmnfkihkklobce",
@@ -28,6 +28,61 @@ const BROWSER_READ_BILLING_PROFILES = Object.freeze({
     startDate: "2026-09-11",
     monthlyPrice: "R$ 9,00",
     chargeAmountCents: 900,
+    supportEmail: "caixa" + "@mentorxlab.com",
+    supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+  })
+});
+
+// Regras globais por e-mail: aplicadas automaticamente em TODAS as extensões
+// onde o destinatário existir no EXTENSION_EMAIL_MAP.
+const GLOBAL_EMAIL_BILLING_PROFILES = Object.freeze({
+  "adobepalacio@gmail.com": Object.freeze({
+    email: "adobepalacio@gmail.com",
+    billingKey: "adobepalacio@gmail.com",
+    recurring: true,
+    startDate: "2026-09-15",
+    monthlyPrice: "R$ 9,00",
+    chargeAmountCents: 900,
+    supportEmail: "caixa" + "@mentorxlab.com",
+    supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+  }),
+  "hpx.jbvs@gmail.com": Object.freeze({
+    email: "hpx.jbvs@gmail.com",
+    billingKey: "hpx.jbvs@gmail.com",
+    recurring: true,
+    startDate: "2026-09-15",
+    monthlyPrice: "R$ 9,00",
+    chargeAmountCents: 900,
+    supportEmail: "caixa" + "@mentorxlab.com",
+    supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+  }),
+  "jony.mkt@gmail.com": Object.freeze({
+    email: "jony.mkt@gmail.com",
+    billingKey: "jony.mkt@gmail.com",
+    recurring: true,
+    startDate: "2026-09-15",
+    monthlyPrice: "R$ 9,00",
+    chargeAmountCents: 900,
+    supportEmail: "caixa" + "@mentorxlab.com",
+    supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+  }),
+  "enkazamodas@gmail.com": Object.freeze({
+    email: "enkazamodas@gmail.com",
+    billingKey: "enkazamodas@gmail.com",
+    recurring: true,
+    startDate: "2026-09-15",
+    monthlyPrice: "R$ 9,00",
+    chargeAmountCents: 900,
+    supportEmail: "caixa" + "@mentorxlab.com",
+    supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+  }),
+  "rafa.araujo.27@gmail.com": Object.freeze({
+    email: "rafa.araujo.27@gmail.com",
+    billingKey: "rafa.araujo.27@gmail.com",
+    recurring: true,
+    startDate: "2026-09-15",
+    monthlyPrice: "R$ 47,00",
+    chargeAmountCents: 4700,
     supportEmail: "caixa" + "@mentorxlab.com",
     supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
   })
@@ -71,16 +126,21 @@ async function extensionConfigHandler(req, res) {
 
 async function buildExtensionConfig(extensionId, today = new Date()) {
   const config = await core.buildExtensionConfig(extensionId, today);
+  const globalBillingProfiles = await buildGlobalEmailBillingProfiles(extensionId, today, false);
+  const pendingProfiles = {
+    ...(config.pendingProfiles || {}),
+    ...globalBillingProfiles
+  };
 
   if (!isBrowserReadRuntime(extensionId)) {
-    return config;
+    return { ...config, pendingProfiles };
   }
 
   const billingProfiles = await buildBrowserReadBillingProfiles(extensionId, today, false);
   return {
     ...config,
     pendingProfiles: {
-      ...(config.pendingProfiles || {}),
+      ...pendingProfiles,
       ...billingProfiles
     }
   };
@@ -88,16 +148,21 @@ async function buildExtensionConfig(extensionId, today = new Date()) {
 
 async function buildPublicExtensionConfig(extensionId, today = new Date()) {
   const config = await core.buildPublicExtensionConfig(extensionId, today);
+  const globalBillingProfiles = await buildGlobalEmailBillingProfiles(extensionId, today, true);
+  const pendingProfiles = {
+    ...(config.pendingProfiles || {}),
+    ...globalBillingProfiles
+  };
 
   if (!isBrowserReadRuntime(extensionId)) {
-    return config;
+    return { ...config, pendingProfiles };
   }
 
   const billingProfiles = await buildBrowserReadBillingProfiles(extensionId, today, true);
   return {
     ...config,
     pendingProfiles: {
-      ...(config.pendingProfiles || {}),
+      ...pendingProfiles,
       ...billingProfiles
     }
   };
@@ -109,6 +174,11 @@ async function resolvePendingProfile(extensionId, recipientKey) {
     if (matchedProfile) {
       return buildBillingProfile(extensionId, matchedProfile);
     }
+  }
+
+  const globalProfile = findGlobalEmailBillingProfile(extensionId, recipientKey);
+  if (globalProfile) {
+    return buildBillingProfile(extensionId, globalProfile);
   }
 
   return core.resolvePendingProfile(extensionId, recipientKey);
@@ -124,6 +194,32 @@ async function buildBrowserReadBillingProfiles(extensionId, today, dueOnly) {
   }));
 
   return Object.fromEntries(entries.filter(Boolean));
+}
+
+async function buildGlobalEmailBillingProfiles(extensionId, today, dueOnly) {
+  const entries = [];
+
+  try {
+    for (const recipient of listRecipientsForExtension(extensionId)) {
+      const email = normalizeEmail(resolveRecipientEmail({ extensionId, recipientKey: recipient.key }));
+      const profile = GLOBAL_EMAIL_BILLING_PROFILES[email];
+
+      if (!profile) {
+        continue;
+      }
+
+      const resolved = await buildBillingProfile(extensionId, profile, today);
+      if (dueOnly && !core.isChargeDue(resolved, today)) {
+        continue;
+      }
+
+      entries.push([recipient.key, resolved]);
+    }
+  } catch (_error) {
+    return {};
+  }
+
+  return Object.fromEntries(entries);
 }
 
 async function buildBillingProfile(extensionId, profile, today = new Date()) {
@@ -145,12 +241,25 @@ async function findBrowserReadBillingProfile(extensionId, recipientKey) {
   }
 
   try {
-    const email = String(resolveRecipientEmail({ extensionId, recipientKey }) || "").trim().toLowerCase();
+    const email = normalizeEmail(resolveRecipientEmail({ extensionId, recipientKey }));
     return Object.values(BROWSER_READ_BILLING_PROFILES)
-      .find((profile) => profile.email.toLowerCase() === email) || null;
+      .find((profile) => normalizeEmail(profile.email) === email) || null;
   } catch (_error) {
     return null;
   }
+}
+
+function findGlobalEmailBillingProfile(extensionId, recipientKey) {
+  try {
+    const email = normalizeEmail(resolveRecipientEmail({ extensionId, recipientKey }));
+    return GLOBAL_EMAIL_BILLING_PROFILES[email] || null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
 }
 
 function isBrowserReadRuntime(extensionId) {
