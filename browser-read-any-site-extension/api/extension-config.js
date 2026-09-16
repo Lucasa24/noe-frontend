@@ -20,16 +20,6 @@ const BROWSER_READ_BILLING_PROFILES = Object.freeze({
     chargeAmountCents: 900,
     supportEmail: "caixa" + "@mentorxlab.com",
     supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
-  }),
-  Hugo: Object.freeze({
-    email: "cibaldestudio" + "@gmail.com",
-    billingKey: "cibaldestudio" + "@gmail.com",
-    recurring: true,
-    startDate: "2026-09-11",
-    monthlyPrice: "R$ 9,00",
-    chargeAmountCents: 900,
-    supportEmail: "caixa" + "@mentorxlab.com",
-    supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
   })
 });
 
@@ -81,7 +71,8 @@ const GLOBAL_EMAIL_BILLING_PROFILES = Object.freeze({
 // E-mails explicitamente sem cobrança no mapa de cobrança da Vercel.
 const DISABLED_BILLING_EMAILS = new Set([
   "wisdom.sats89@gmail.com",
-  "bragapeedro@gmail.com"
+  "bragapeedro@gmail.com",
+  "cibaldestudio@gmail.com"
 ]);
 
 async function extensionConfigHandler(req, res) {
@@ -167,13 +158,13 @@ async function buildPublicExtensionConfig(extensionId, today = new Date()) {
 async function resolvePendingProfile(extensionId, recipientKey) {
   if (isBrowserReadRuntime(extensionId)) {
     const matchedProfile = await findBrowserReadBillingProfile(extensionId, recipientKey);
-    if (matchedProfile) {
+    if (matchedProfile && !isBillingDisabledProfile(matchedProfile)) {
       return buildBillingProfile(extensionId, matchedProfile);
     }
   }
 
   const globalProfile = findGlobalEmailBillingProfile(extensionId, recipientKey);
-  if (globalProfile) {
+  if (globalProfile && !isBillingDisabledProfile(globalProfile)) {
     return buildBillingProfile(extensionId, globalProfile);
   }
 
@@ -205,7 +196,7 @@ async function buildGlobalEmailBillingProfiles(extensionId, today, dueOnly) {
       const email = normalizeEmail(resolveRecipientEmail({ extensionId, recipientKey: recipient.key }));
       const profile = GLOBAL_EMAIL_BILLING_PROFILES[email];
 
-      if (!profile) {
+      if (!profile || isBillingDisabledProfile(profile)) {
         continue;
       }
 
