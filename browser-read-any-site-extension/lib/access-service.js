@@ -14,6 +14,24 @@ const STATIC_BROWSER_READ_RECIPIENTS = Object.freeze({
   "~ Solicitar Ativação com Adm": Object.freeze(["lucasalvarezempresa" + "@gmail.com"])
 });
 
+// Fallbacks de destinatários por extensão. Eles não criam cobrança; apenas garantem
+// que destinatários já existentes no EXTENSION_EMAIL_MAP continuem visíveis mesmo
+// quando a variável de ambiente de uma implantação estiver desatualizada.
+const STATIC_EXTENSION_RECIPIENTS = Object.freeze({
+  jncbkkimmoapjemleedmklnlgiioiffj: Object.freeze({
+    Pedro: Object.freeze(["bragapeedro" + "@gmail.com", "lucasalvarezempresa" + "@gmail.com"])
+  }),
+  kjlkomgkandjgpmecnfnindkkgdjadpe: Object.freeze({
+    Will: Object.freeze(["wisdom.sats89" + "@gmail.com", "lucasalvarezempresa" + "@gmail.com"])
+  }),
+  ibkaciaphpkbfikgjnjjfbjcdenlciia: Object.freeze({
+    Will: Object.freeze(["wisdom.sats89" + "@gmail.com", "lucasalvarezempresa" + "@gmail.com"])
+  }),
+  gklblkkcpmbmnnmjclppoldcdbimoafc: Object.freeze({
+    Will: Object.freeze(["wisdom.sats89" + "@gmail.com", "lucasalvarezempresa" + "@gmail.com"])
+  })
+});
+
 function resolveBrowserReadConfigId(extensionId) {
   const normalizedExtensionId = String(extensionId || "").trim();
   return BROWSER_READ_RUNTIME_IDS.has(normalizedExtensionId)
@@ -73,6 +91,24 @@ function getStaticBrowserReadRecipientTargets(extensionId, recipientKey) {
   return null;
 }
 
+function getStaticExtensionRecipientTargets(extensionId, recipientKey) {
+  const normalizedExtensionId = String(extensionId || "").trim();
+  const normalizedRecipientKey = String(recipientKey || "").trim().toLowerCase();
+  const entry = STATIC_EXTENSION_RECIPIENTS[normalizedExtensionId];
+
+  if (!entry || !normalizedRecipientKey) {
+    return null;
+  }
+
+  for (const [key, targets] of Object.entries(entry)) {
+    if (key.toLowerCase() === normalizedRecipientKey) {
+      return [...targets];
+    }
+  }
+
+  return null;
+}
+
 function mergeStaticBrowserReadRecipients(extensionId, recipients) {
   const normalizedExtensionId = String(extensionId || "").trim();
   const baseRecipients = Array.isArray(recipients) ? [...recipients] : [];
@@ -92,10 +128,35 @@ function mergeStaticBrowserReadRecipients(extensionId, recipients) {
   return baseRecipients;
 }
 
+function mergeStaticExtensionRecipients(extensionId, recipients) {
+  const normalizedExtensionId = String(extensionId || "").trim();
+  const baseRecipients = Array.isArray(recipients) ? [...recipients] : [];
+  const entry = STATIC_EXTENSION_RECIPIENTS[normalizedExtensionId];
+
+  if (!entry) {
+    return baseRecipients;
+  }
+
+  const knownKeys = new Set(baseRecipients.map((item) => String(item?.key || "").trim().toLowerCase()));
+
+  for (const key of Object.keys(entry)) {
+    if (!knownKeys.has(key.toLowerCase())) {
+      baseRecipients.push({ key, label: key });
+    }
+  }
+
+  return baseRecipients;
+}
+
 function resolveRecipientTargetsWithRuntimeFallback(args) {
-  const staticTargets = getStaticBrowserReadRecipientTargets(args?.extensionId, args?.recipientKey);
-  if (staticTargets?.length) {
-    return staticTargets;
+  const staticBrowserTargets = getStaticBrowserReadRecipientTargets(args?.extensionId, args?.recipientKey);
+  if (staticBrowserTargets?.length) {
+    return staticBrowserTargets;
+  }
+
+  const staticExtensionTargets = getStaticExtensionRecipientTargets(args?.extensionId, args?.recipientKey);
+  if (staticExtensionTargets?.length) {
+    return staticExtensionTargets;
   }
 
   const normalizedExtensionId = String(args?.extensionId || "").trim();
@@ -130,8 +191,22 @@ module.exports = {
     return core.createAccessChallenge(args);
   },
   listRecipientsForExtension(extensionId) {
-    const recipients = core.listRecipientsForExtension(resolveBrowserReadConfigId(extensionId));
-    return mergeStaticBrowserReadRecipients(extensionId, recipients);
+    let recipients = [];
+
+    try {
+      recipients = core.listRecipientsForExtension(resolveBrowserReadConfigId(extensionId));
+    } catch (error) {
+      const staticRecipients = mergeStaticExtensionRecipients(extensionId, []);
+      if (staticRecipients.length === 0) {
+        throw error;
+      }
+      recipients = staticRecipients;
+    }
+
+    return mergeStaticExtensionRecipients(
+      extensionId,
+      mergeStaticBrowserReadRecipients(extensionId, recipients)
+    );
   },
   resolveRecipientEmail(args) {
     return resolveRecipientTargetsWithRuntimeFallback(args)[0];
