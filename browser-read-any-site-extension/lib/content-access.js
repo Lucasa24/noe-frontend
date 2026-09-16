@@ -31,7 +31,7 @@ function getContentSelectorConfigId(extensionId, contentKey = "") {
     return normalizedExtensionId;
   }
 
-  if (normalizedExtensionId === PIXEL_AI_HUB_CONFIG_ID || normalizedContentKey === "pixel-ai-hub") {
+  if (normalizedContentKey === "pixel-ai-hub") {
     return PIXEL_AI_HUB_CONFIG_ID;
   }
 
