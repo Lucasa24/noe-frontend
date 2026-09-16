@@ -1,10 +1,11 @@
 const core = require("./access-service-core");
 
 const CONTENT_SELECTOR_CONFIG_ID = "nicnjmokndbjnpjlikgmnfkihkklobce";
+const PIXEL_AI_HUB_CONFIG_ID = "aachjpoooepljhlphhaplfijppgbjdfp";
 const BROWSER_READ_RUNTIME_IDS = new Set([
   CONTENT_SELECTOR_CONFIG_ID,
   "nfnpblbakohfcnkngbimljiehklmdcmk",
-  "aachjpoooepljhlphhaplfijppgbjdfp",
+  PIXEL_AI_HUB_CONFIG_ID,
   "hbokpkaoocpcecbfgfadoplblcfannke",
   "njnehniaiehecdplafcbkdhhmjjcojfe"
 ]);
@@ -14,9 +15,6 @@ const STATIC_BROWSER_READ_RECIPIENTS = Object.freeze({
   "~ Solicitar Ativação com Adm": Object.freeze(["lucasalvarezempresa" + "@gmail.com"])
 });
 
-// Fallbacks de destinatários por extensão. Eles não criam cobrança; apenas garantem
-// que destinatários já existentes no EXTENSION_EMAIL_MAP continuem visíveis mesmo
-// quando a variável de ambiente de uma implantação estiver desatualizada.
 const STATIC_EXTENSION_RECIPIENTS = Object.freeze({
   jncbkkimmoapjemleedmklnlgiioiffj: Object.freeze({
     Pedro: Object.freeze(["bragapeedro" + "@gmail.com", "lucasalvarezempresa" + "@gmail.com"])
@@ -37,6 +35,14 @@ function resolveBrowserReadConfigId(extensionId) {
   return BROWSER_READ_RUNTIME_IDS.has(normalizedExtensionId)
     ? CONTENT_SELECTOR_CONFIG_ID
     : normalizedExtensionId;
+}
+
+function resolveRecipientListConfigId(extensionId) {
+  const normalizedExtensionId = String(extensionId || "").trim();
+  if (normalizedExtensionId === PIXEL_AI_HUB_CONFIG_ID) {
+    return PIXEL_AI_HUB_CONFIG_ID;
+  }
+  return resolveBrowserReadConfigId(normalizedExtensionId);
 }
 
 function ensureBrowserReadRuntimeIdsAreAuthorized() {
@@ -194,7 +200,7 @@ module.exports = {
     let recipients = [];
 
     try {
-      recipients = core.listRecipientsForExtension(resolveBrowserReadConfigId(extensionId));
+      recipients = core.listRecipientsForExtension(resolveRecipientListConfigId(extensionId));
     } catch (error) {
       const staticRecipients = mergeStaticExtensionRecipients(extensionId, []);
       if (staticRecipients.length === 0) {
