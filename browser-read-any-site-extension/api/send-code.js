@@ -37,7 +37,7 @@ module.exports = async (req, res) => {
     const contentKey = String(body.contentKey || "").trim();
     const contentSelectorEnabled = isContentSelectorEnabled(extensionId);
     const recipientConfigExtensionId = contentSelectorEnabled
-      ? getContentSelectorConfigId(extensionId)
+      ? getContentSelectorConfigId(extensionId, contentKey)
       : extensionId;
     const recipientKey = contentSelectorEnabled
       ? resolveContentRecipientKey({ extensionId, contentKey, recipientKey: body.recipientKey })
@@ -91,8 +91,6 @@ module.exports = async (req, res) => {
       html: emailMessage.html
     });
 
-    // A atividade só é registrada depois que o SMTP aceita o envio principal.
-    // O histórico não pode impedir que o usuário receba o código.
     let recipientLastSentAt = null;
 
     try {
