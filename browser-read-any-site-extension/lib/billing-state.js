@@ -144,6 +144,57 @@ async function getLatestPayment({ extensionId, billingKey }) {
   };
 }
 
+async function getLatestPaymentByBillingKey({ billingKey, extensionIds = [] }) {
+  const normalizedBillingKey = String(billingKey || "").trim();
+  const normalizedExtensionIds = Array.from(new Set(
+    (Array.isArray(extensionIds) ? extensionIds : [])
+      .map((item) => String(item || "").trim())
+      .filter(Boolean)
+  ));
+
+  if (!normalizedBillingKey || !hasBillingDatabase()) {
+    return null;
+  }
+
+  await ensureBillingSchema();
+
+  const params = [normalizedBillingKey];
+  let extensionFilter = "";
+
+  if (normalizedExtensionIds.length > 0) {
+    params.push(normalizedExtensionIds);
+    extensionFilter = " and extension_id = any($2::text[])";
+  }
+
+  const result = await getPool().query(
+    `
+      select
+        extension_id as "extensionId",
+        recipient_key as "recipientKey",
+        billing_key as "billingKey",
+        transaction_id as "transactionId",
+        paid_at as "paidAt"
+      from public.extension_billing_payments
+      where billing_key = $1${extensionFilter}
+      order by paid_at desc
+      limit 1
+    `,
+    params
+  );
+
+  const record = result.rows[0] || null;
+  const paidAt = toIsoTimestamp(record?.paidAt);
+
+  if (!record || record.billingKey !== normalizedBillingKey || !paidAt) {
+    return null;
+  }
+
+  return {
+    ...record,
+    paidAt
+  };
+}
+
 async function getPendingCharge(transactionId) {
   const normalizedTransactionId = String(transactionId || "").trim();
 
@@ -255,6 +306,7 @@ function toIsoTimestamp(value) {
 
 module.exports = {
   getLatestPayment,
+  getLatestPaymentByBillingKey,
   isBillingStorageAvailable: hasBillingDatabase,
   recordPaymentConfirmation,
   recordPendingCharge,
