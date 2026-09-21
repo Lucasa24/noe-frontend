@@ -39,7 +39,6 @@ const GLOBAL_EMAIL_BILLING_PROFILES = Object.freeze({
     billingKey: "drivecursos@proton.me",
     recurring: true,
     startDate: "2026-09-18",
-    manualPaidAt: "2026-09-18T12:00:00-03:00",
     monthlyPrice: "R$ 9,00",
     chargeAmountCents: 900,
     supportEmail: "caixa" + "@mentorxlab.com",
