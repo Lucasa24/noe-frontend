@@ -1,5 +1,5 @@
 const core = require("./_extension-config-core");
-const { getLatestPayment } = require("../lib/billing-state");
+const { getLatestPayment, getLatestPaymentByBillingKey } = require("../lib/billing-state");
 const { listRecipientsForExtension, resolveRecipientEmail } = require("../lib/access-service");
 
 const BROWSER_READ_RUNTIME_IDS = new Set([
@@ -8,6 +8,14 @@ const BROWSER_READ_RUNTIME_IDS = new Set([
   "aachjpoooepljhlphhaplfijppgbjdfp",
   "hbokpkaoocpcecbfgfadoplblcfannke",
   "njnehniaiehecdplafcbkdhhmjjcojfe"
+]);
+
+const RAONY_EMAIL = "raony-oliveira@hotmail.com";
+const RAONY_PREMIUM_BILLING_KEY = RAONY_EMAIL + ":47";
+const RAONY_STANDARD_BILLING_KEY = RAONY_EMAIL + ":9";
+const RAONY_PREMIUM_EXTENSION_IDS = Object.freeze([
+  "ocnhopnkhbkgknjhpfcmbihmialpjboj",
+  "gklblkkcpmbmnnmjclppoldcdbimoafc"
 ]);
 
 const BROWSER_READ_BILLING_PROFILES = Object.freeze({
@@ -26,6 +34,17 @@ const BROWSER_READ_BILLING_PROFILES = Object.freeze({
 // Regras globais por e-mail: aplicadas automaticamente em TODAS as extensões
 // onde o destinatário existir no EXTENSION_EMAIL_MAP.
 const GLOBAL_EMAIL_BILLING_PROFILES = Object.freeze({
+  "drivecursos@proton.me": Object.freeze({
+    email: "drivecursos@proton.me",
+    billingKey: "drivecursos@proton.me",
+    recurring: true,
+    startDate: "2026-09-18",
+    manualPaidAt: "2026-09-18T12:00:00-03:00",
+    monthlyPrice: "R$ 9,00",
+    chargeAmountCents: 900,
+    supportEmail: "caixa" + "@mentorxlab.com",
+    supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+  }),
   "hpx.jbvs@gmail.com": Object.freeze({
     email: "hpx.jbvs@gmail.com",
     billingKey: "hpx.jbvs@gmail.com",
@@ -194,7 +213,7 @@ async function buildGlobalEmailBillingProfiles(extensionId, today, dueOnly) {
   try {
     for (const recipient of listRecipientsForExtension(extensionId)) {
       const email = normalizeEmail(resolveRecipientEmail({ extensionId, recipientKey: recipient.key }));
-      const profile = GLOBAL_EMAIL_BILLING_PROFILES[email];
+      const profile = getEmailBillingProfile(extensionId, email);
 
       if (!profile || isBillingDisabledProfile(profile)) {
         continue;
@@ -215,12 +234,58 @@ async function buildGlobalEmailBillingProfiles(extensionId, today, dueOnly) {
 }
 
 async function buildBillingProfile(extensionId, profile, today = new Date()) {
+  const paymentCandidates = [];
+
   const latestPayment = await getLatestPayment({
     extensionId,
     billingKey: profile.billingKey
   });
-  const dates = core.resolveRecurrenceDates(profile, latestPayment?.paidAt, today);
-  return { ...profile, ...dates };
+  paymentCandidates.push(latestPayment?.paidAt);
+
+  if (Array.isArray(profile.sharedPaymentExtensionIds) && profile.sharedPaymentExtensionIds.length > 0) {
+    const sharedPayment = await getLatestPaymentByBillingKey({
+      billingKey: profile.billingKey,
+      extensionIds: profile.sharedPaymentExtensionIds
+    });
+    paymentCandidates.push(sharedPayment?.paidAt);
+  }
+
+  if (profile.coveredByBillingKey) {
+    const coveringPayment = await getLatestPaymentByBillingKey({
+      billingKey: profile.coveredByBillingKey,
+      extensionIds: profile.coveredByExtensionIds || []
+    });
+    paymentCandidates.push(coveringPayment?.paidAt);
+  }
+
+  paymentCandidates.push(profile.manualPaidAt);
+
+  const effectivePaidAt = getLatestPaidAt(paymentCandidates);
+  const dates = core.resolveRecurrenceDates(profile, effectivePaidAt, today);
+  const {
+    manualPaidAt,
+    sharedPaymentExtensionIds,
+    coveredByBillingKey,
+    coveredByExtensionIds,
+    ...publicProfile
+  } = profile;
+
+  return { ...publicProfile, ...dates };
+}
+
+function getLatestPaidAt(values) {
+  let latest = "";
+
+  for (const value of values || []) {
+    const date = new Date(value || "");
+    if (!Number.isFinite(date.getTime())) continue;
+
+    if (!latest || date.getTime() > new Date(latest).getTime()) {
+      latest = date.toISOString();
+    }
+  }
+
+  return latest;
 }
 
 async function findBrowserReadBillingProfile(extensionId, recipientKey) {
@@ -244,10 +309,47 @@ async function findBrowserReadBillingProfile(extensionId, recipientKey) {
 function findGlobalEmailBillingProfile(extensionId, recipientKey) {
   try {
     const email = normalizeEmail(resolveRecipientEmail({ extensionId, recipientKey }));
-    return GLOBAL_EMAIL_BILLING_PROFILES[email] || null;
+    return getEmailBillingProfile(extensionId, email);
   } catch (_error) {
     return null;
   }
+}
+
+function getEmailBillingProfile(extensionId, email) {
+  const normalizedEmail = normalizeEmail(email);
+
+  if (normalizedEmail === RAONY_EMAIL) {
+    const isPremiumExtension = RAONY_PREMIUM_EXTENSION_IDS.includes(String(extensionId || "").trim());
+
+    if (isPremiumExtension) {
+      return {
+        email: RAONY_EMAIL,
+        billingKey: RAONY_PREMIUM_BILLING_KEY,
+        recurring: true,
+        startDate: "2026-09-20",
+        monthlyPrice: "R$ 47,00",
+        chargeAmountCents: 4700,
+        sharedPaymentExtensionIds: RAONY_PREMIUM_EXTENSION_IDS,
+        supportEmail: "caixa" + "@mentorxlab.com",
+        supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+      };
+    }
+
+    return {
+      email: RAONY_EMAIL,
+      billingKey: RAONY_STANDARD_BILLING_KEY,
+      recurring: true,
+      startDate: "2026-09-20",
+      monthlyPrice: "R$ 9,00",
+      chargeAmountCents: 900,
+      coveredByBillingKey: RAONY_PREMIUM_BILLING_KEY,
+      coveredByExtensionIds: RAONY_PREMIUM_EXTENSION_IDS,
+      supportEmail: "caixa" + "@mentorxlab.com",
+      supportWhatsApp: "http://wa.me/5591984272483?text=Ol%C3%A1,%20gostaria%20de%20consultar%20as%20op%C3%A7%C3%B5es%20de%20parcelamento%20do%20Plano%20D.....V.....D%205"
+    };
+  }
+
+  return GLOBAL_EMAIL_BILLING_PROFILES[normalizedEmail] || null;
 }
 
 function filterDisabledBillingProfiles(pendingProfiles) {
