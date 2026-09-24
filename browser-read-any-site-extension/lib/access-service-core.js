@@ -8,7 +8,8 @@ const EXTENSION_CONFIG_ID_ALIASES = Object.freeze({
   nfnpblbakohfcnkngbimljiehklmdcmk: "nicnjmokndbjnpjlikgmnfkihkklobce"
 });
 const EXTENSION_AUTHORIZATION_ID_ALIASES = Object.freeze({
-  nfnpblbakohfcnkngbimljiehklmdcmk: "nicnjmokndbjnpjlikgmnfkihkklobce"
+  nfnpblbakohfcnkngbimljiehklmdcmk: "nicnjmokndbjnpjlikgmnfkihkklobce",
+  ikijmkigbfcanidmonpfaihfclefllin: "nicnjmokndbjnpjlikgmnfkihkklobce"
 });
 const EXTENSION_DISPLAY_NAMES = {
   kdiclmpfoijaodmpobpfnakglkpclijl: "comunidade invictus",
@@ -27,6 +28,7 @@ const EXTENSION_DISPLAY_NAMES = {
   nicnjmokndbjnpjlikgmnfkihkklobce: "CURSOS - DVD",
   nfnpblbakohfcnkngbimljiehklmdcmk: "CURSOS - DVD",
   ngjacbpbiegcnfkinikfpdkcplhejael: "Asimov",
+  ikijmkigbfcanidmonpfaihfclefllin: "MÉTODO ANDRÔMEDA",
   aachjpoooepljhlphhaplfijppgbjdfp: "PIXEL AI HUB"
 };
 
