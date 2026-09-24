@@ -5,11 +5,13 @@ const EXTENSION_CONFIG_ID_ALIASES = Object.freeze({
   // ID original observado no AdsPower/SunBrowser para o pacote CURSOS - DVD.
   // O alias afeta apenas a busca de configuração/destinatários no servidor;
   // o chrome.runtime.id real continua sendo usado e assinado no desafio.
-  nfnpblbakohfcnkngbimljiehklmdcmk: "nicnjmokndbjnpjlikgmnfkihkklobce"
+  nfnpblbakohfcnkngbimljiehklmdcmk: "nicnjmokndbjnpjlikgmnfkihkklobce",
+  icbfelnhpolnnlcamcmkadkdkmngdepa: "ebfndfgcpnomfmbnpfhnghbemgogoehl"
 });
 const EXTENSION_AUTHORIZATION_ID_ALIASES = Object.freeze({
   nfnpblbakohfcnkngbimljiehklmdcmk: "nicnjmokndbjnpjlikgmnfkihkklobce",
-  ikijmkigbfcanidmonpfaihfclefllin: "nicnjmokndbjnpjlikgmnfkihkklobce"
+  ikijmkigbfcanidmonpfaihfclefllin: "nicnjmokndbjnpjlikgmnfkihkklobce",
+  icbfelnhpolnnlcamcmkadkdkmngdepa: "ebfndfgcpnomfmbnpfhnghbemgogoehl"
 });
 const EXTENSION_DISPLAY_NAMES = {
   kdiclmpfoijaodmpobpfnakglkpclijl: "comunidade invictus",
@@ -23,6 +25,7 @@ const EXTENSION_DISPLAY_NAMES = {
   hbokpkaoocpcecbfgfadoplblcfannke: "CLAUDE CODE ARCHITECT",
   ibkaciaphpkbfikgjnjjfbjcdenlciia: "BLUEPRINTPRO - BRANDSDECODED",
   ebfndfgcpnomfmbnpfhnghbemgogoehl: "Rhawk.pro",
+  icbfelnhpolnnlcamcmkadkdkmngdepa: "Rhawk.pro",
   bioajcjmagbibhnleajecienfednodib: "Combo Flowgrammers Pro",
   kjadaimbcapjhdfeafmopnbfdbgofdko: "comunidade subido",
   nicnjmokndbjnpjlikgmnfkihkklobce: "CURSOS - DVD",
