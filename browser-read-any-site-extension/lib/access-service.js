@@ -65,7 +65,7 @@ const STATIC_EXTENSION_RECIPIENTS = Object.freeze({
   }),
   njnehniaiehecdplafcbkdhhmjjcojfe: Object.freeze({
     Sam: Object.freeze(["samuelbuenopessoal" + "@gmail.com"])
-  }))
+  })
 });
 
 function resolveBrowserReadConfigId(extensionId) {
