@@ -24,10 +24,23 @@ const STATIC_EXTENSION_RECIPIENTS = Object.freeze({
     Will: Object.freeze(["wisdom.sats89" + "@gmail.com", "lucasalvarezempresa" + "@gmail.com"])
   }),
   ibkaciaphpkbfikgjnjjfbjcdenlciia: Object.freeze({
-    Will: Object.freeze(["wisdom.sats89" + "@gmail.com", "lucasalvarezempresa" + "@gmail.com"])
+    Will: Object.freeze(["wisdom.sats89" + "@gmail.com", "lucasalvarezempresa" + "@gmail.com"]),
+    Janderson: Object.freeze(["jandergfx" + "@gmail.com"])
   }),
   gklblkkcpmbmnnmjclppoldcdbimoafc: Object.freeze({
     Will: Object.freeze(["wisdom.sats89" + "@gmail.com", "lucasalvarezempresa" + "@gmail.com"])
+  }),
+  ngjacbpbiegcnfkinikfpdkcplhejael: Object.freeze({
+    Janderson: Object.freeze(["jandergfx" + "@gmail.com"])
+  }),
+  dmenpfckkeafegadpafdndbnhgfmiffb: Object.freeze({
+    Janderson: Object.freeze(["jandergfx" + "@gmail.com"])
+  }),
+  hbokpkaoocpcecbfgfadoplblcfannke: Object.freeze({
+    Janderson: Object.freeze(["jandergfx" + "@gmail.com"])
+  }),
+  nicnjmokndbjnpjlikgmnfkihkklobce: Object.freeze({
+    Janderson: Object.freeze(["jandergfx" + "@gmail.com"])
   }),
   ikijmkigbfcanidmonpfaihfclefllin: Object.freeze({
     Janderson: Object.freeze(["jandergfx" + "@gmail.com"])
