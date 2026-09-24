@@ -56,7 +56,7 @@ const STATIC_EXTENSION_RECIPIENTS = Object.freeze({
   icbfelnhpolnnlcamcmkadkdkmngdepa: Object.freeze({
     Janderson: Object.freeze(["jandergfx" + "@gmail.com"]),
     Sam: Object.freeze(["samuelbuenopessoal" + "@gmail.com"])
-  },
+  }),
   aachjpoooepljhlphhaplfijppgbjdfp: Object.freeze({
     Sam: Object.freeze(["samuelbuenopessoal" + "@gmail.com"])
   }),
