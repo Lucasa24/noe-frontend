@@ -1214,6 +1214,7 @@ function isAllowedWhileLocked(url, state = null, tab = null) {
   }
 
   return normalizedUrl === normalizeUrl(getBlockedPageUrl())
+    || isExtensionsManagerUrl(normalizedUrl)
     || isPendingHostAccessUrl(normalizedUrl, state)
     || isAllowedWhileLockedOrigin(normalizedUrl);
 }
