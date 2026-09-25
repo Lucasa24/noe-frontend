@@ -7,7 +7,6 @@ const BROWSER_READ_RUNTIME_IDS = new Set([
   "nfnpblbakohfcnkngbimljiehklmdcmk",
   "aachjpoooepljhlphhaplfijppgbjdfp",
   "hbokpkaoocpcecbfgfadoplblcfannke",
-  "papoapfhfciiaaadmmondbdkfhgilbki",
   "njnehniaiehecdplafcbkdhhmjjcojfe"
 ]);
 
