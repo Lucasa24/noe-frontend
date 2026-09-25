@@ -7,7 +7,8 @@ const BROWSER_READ_RUNTIME_IDS = new Set([
   "nfnpblbakohfcnkngbimljiehklmdcmk",
   PIXEL_AI_HUB_CONFIG_ID,
   "hbokpkaoocpcecbfgfadoplblcfannke",
-  "papoapfhfciiaaadmmondbdkfhgilbki"
+  "papoapfhfciiaaadmmondbdkfhgilbki",
+  "njnehniaiehecdplafcbkdhhmjjcojfe"
 ]);
 const STATIC_BROWSER_READ_RECIPIENTS = Object.freeze({
   Deivis: Object.freeze(["deivisriemer4" + "@gmail.com"]),
