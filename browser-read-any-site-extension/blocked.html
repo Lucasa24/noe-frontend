@@ -242,7 +242,8 @@
         font-size: 14px;
       }
 
-      #reload-extension {
+      #reload-extension,
+      #reload-companion-extension {
         width: 100%;
         margin-top: 14px;
         padding: 11px 14px;
@@ -254,12 +255,14 @@
         cursor: pointer;
       }
 
-      #reload-extension:hover {
+      #reload-extension:hover,
+      #reload-companion-extension:hover {
         background: rgba(37, 99, 235, 0.18);
         color: #eff6ff;
       }
 
-      #reload-extension:disabled {
+      #reload-extension:disabled,
+      #reload-companion-extension:disabled {
         cursor: wait;
         opacity: 0.65;
       }
@@ -620,7 +623,9 @@
       <section id="recipient-picker" aria-label="Escolha do conteúdo"></section>
       <div id="pending-overlay"></div>
       <button id="reload-extension" type="button">♻ Recarregar extensão</button>
-      <p class="reload-help">Limpa o cache, reinicia a extensão e atualiza esta página. Atalho: Alt + Shift + R</p>
+      <p id="reload-extension-help" class="reload-help">Limpa o cache, reinicia a extensão e atualiza esta página. Atalho: Alt + Shift + R</p>
+      <button id="reload-companion-extension" type="button" hidden>♻ Recarregar extensão associada</button>
+      <p id="reload-companion-help" class="reload-help" hidden>Recarrega a extensão de conteúdo associada sem fechar esta tela.</p>
       <div id="status"></div>
       <div id="post-unlock">Acesso liberado. Agora voce pode abrir novas abas normalmente.</div>
     </main>
