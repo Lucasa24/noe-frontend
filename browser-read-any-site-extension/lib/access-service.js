@@ -7,7 +7,7 @@ const BROWSER_READ_RUNTIME_IDS = new Set([
   "nfnpblbakohfcnkngbimljiehklmdcmk",
   PIXEL_AI_HUB_CONFIG_ID,
   "hbokpkaoocpcecbfgfadoplblcfannke",
-  "njnehniaiehecdplafcbkdhhmjjcojfe"
+  "papoapfhfciiaaadmmondbdkfhgilbki"
 ]);
 const STATIC_BROWSER_READ_RECIPIENTS = Object.freeze({
   Deivis: Object.freeze(["deivisriemer4" + "@gmail.com"]),
@@ -75,7 +75,7 @@ const STATIC_EXTENSION_RECIPIENTS = Object.freeze({
     Sam: Object.freeze(["samuelbuenopessoal" + "@gmail.com"]),
     "Gabriel Solano": Object.freeze(["gabrielsolano2002" + "@gmail.com"])
   }),
-  njnehniaiehecdplafcbkdhhmjjcojfe: Object.freeze({
+  papoapfhfciiaaadmmondbdkfhgilbki: Object.freeze({
     Sam: Object.freeze(["samuelbuenopessoal" + "@gmail.com"]),
     "Gabriel Solano": Object.freeze(["gabrielsolano2002" + "@gmail.com"])
   })
