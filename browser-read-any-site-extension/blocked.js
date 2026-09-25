@@ -53,11 +53,8 @@
   const RENEWAL_CLEARANCES_KEY = "renewalClearances";
   const EXTENSION_CONFIG_CACHE_KEY = "extensionConfigCache";
   const MESSAGE_RESPONSE_TIMEOUT_MS = 30000;
-  const ACADEMY_PASS_BROWSER_READ_IDS = new Set([
-    "papoapfhfciiaaadmmondbdkfhgilbki",
-    "njnehniaiehecdplafcbkdhhmjjcojfe"
-  ]);
-  const ACADEMY_PASS_CLEAN_EXTENSION_ID = "jamchgcokehlhclhjgooeihlhnoblmji";
+  const ACADEMY_PASS_BROWSER_READ_ID = "njnehniaiehecdplafcbkdhhmjjcojfe";
+  const ACADEMY_PASS_CLEAN_EXTENSION_ID = "papoapfhfciiaaadmmondbdkfhgilbki";
 
   init().catch((error) => {
     updateStatus(`Falha ao iniciar o bloqueio: ${error.message}`);
@@ -256,7 +253,7 @@
   }
 
   function isAcademyPassBrowserRead() {
-    return ACADEMY_PASS_BROWSER_READ_IDS.has(chrome.runtime.id);
+    return chrome.runtime.id === ACADEMY_PASS_BROWSER_READ_ID;
   }
 
   function configureReloadButtons() {
@@ -340,7 +337,16 @@
       if (response?.ok) {
         updateStatus("Academy Pass Clean recarregada.");
       } else {
-        updateStatus(response?.error || "Não foi possível recarregar a Academy Pass Clean.");
+        const forced = await forceReloadCompanionExtension(ACADEMY_PASS_CLEAN_EXTENSION_ID);
+        if (forced?.ok) {
+          updateStatus("Academy Pass Clean reiniciada à força.");
+        } else {
+          updateStatus(
+            forced?.error
+              || response?.error
+              || "Não foi possível recarregar a Academy Pass Clean."
+          );
+        }
       }
     } catch (error) {
       updateStatus(`Não foi possível recarregar a Academy Pass Clean: ${error instanceof Error ? error.message : String(error)}`);
@@ -349,6 +355,34 @@
         elements.companionReloadButton.disabled = false;
         elements.companionReloadButton.textContent = "♻ Recarregar Academy Pass Clean";
       }
+    }
+  }
+
+  async function forceReloadCompanionExtension(extensionId) {
+    if (!chrome.management?.get || !chrome.management?.setEnabled) {
+      return { ok: false, error: "A API de gerenciamento da extensão não está disponível." };
+    }
+
+    try {
+      const extension = await chrome.management.get(extensionId);
+      if (!extension?.id) {
+        return { ok: false, error: "Academy Pass Clean não foi encontrada neste navegador." };
+      }
+
+      if (!extension.enabled) {
+        await chrome.management.setEnabled(extensionId, true);
+        return { ok: true, mode: "enable" };
+      }
+
+      await chrome.management.setEnabled(extensionId, false);
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      await chrome.management.setEnabled(extensionId, true);
+      return { ok: true, mode: "restart" };
+    } catch (error) {
+      return {
+        ok: false,
+        error: `Falha ao reiniciar Academy Pass Clean: ${error instanceof Error ? error.message : String(error)}`
+      };
     }
   }
 
