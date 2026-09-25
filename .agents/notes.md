@@ -41,7 +41,8 @@ chave `EXTENSION_EMAIL_MAP` no arquivo é o JSON
 |---|---|
 | `kdiclmpfoijaodmpobpfnakglkpclijl` | **comunidade invictus** |
 | `kjclfjfidoohlndnjldcbcjomjlcgicd` | **Formacao pre vendas diamond** |
-| `papoapfhfciiaaadmmondbdkfhgilbki` | **academy pass** |
+| `njnehniaiehecdplafcbkdhhmjjcojfe` | **academy pass (Browser Read)** |
+| `papoapfhfciiaaadmmondbdkfhgilbki` | **Academy Pass Clean** |
 | `dmenpfckkeafegadpafdndbnhgfmiffb` | **COMUNIDADE LENDÁRIA 2026** |
 | `jncbkkimmoapjemleedmklnlgiioiffj` | **DOUG - SKOOL** |
 | `ebfndfgcpnomfmbnpfhnghbemgogoehl` | sem nome no código |
