@@ -7,7 +7,7 @@ const CONTENT_SELECTOR_EXTENSION_IDS = new Set([
   "nfnpblbakohfcnkngbimljiehklmdcmk",
   PIXEL_AI_HUB_CONFIG_ID,
   "hbokpkaoocpcecbfgfadoplblcfannke",
-  "njnehniaiehecdplafcbkdhhmjjcojfe"
+  "papoapfhfciiaaadmmondbdkfhgilbki"
 ]);
 
 const ACCESS_CONTENTS = [
