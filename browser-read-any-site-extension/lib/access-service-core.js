@@ -6,12 +6,12 @@ const EXTENSION_CONFIG_ID_ALIASES = Object.freeze({
   // O alias afeta apenas a busca de configuração/destinatários no servidor;
   // o chrome.runtime.id real continua sendo usado e assinado no desafio.
   nfnpblbakohfcnkngbimljiehklmdcmk: "nicnjmokndbjnpjlikgmnfkihkklobce",
-  papoapfhfciiaaadmmondbdkfhgilbki: "njnehniaiehecdplafcbkdhhmjjcojfe",
   njnehniaiehecdplafcbkdhhmjjcojfe: "papoapfhfciiaaadmmondbdkfhgilbki",
   icbfelnhpolnnlcamcmkadkdkmngdepa: "ebfndfgcpnomfmbnpfhnghbemgogoehl"
 });
 const EXTENSION_AUTHORIZATION_ID_ALIASES = Object.freeze({
   nfnpblbakohfcnkngbimljiehklmdcmk: "nicnjmokndbjnpjlikgmnfkihkklobce",
+  papoapfhfciiaaadmmondbdkfhgilbki: "njnehniaiehecdplafcbkdhhmjjcojfe",
   ikijmkigbfcanidmonpfaihfclefllin: "nicnjmokndbjnpjlikgmnfkihkklobce",
   icbfelnhpolnnlcamcmkadkdkmngdepa: "ebfndfgcpnomfmbnpfhnghbemgogoehl"
 });
