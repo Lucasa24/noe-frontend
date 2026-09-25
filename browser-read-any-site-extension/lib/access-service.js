@@ -13,13 +13,15 @@ const STATIC_BROWSER_READ_RECIPIENTS = Object.freeze({
   Deivis: Object.freeze(["deivisriemer4" + "@gmail.com"]),
   Hugo: Object.freeze(["cibaldestudio" + "@gmail.com"]),
   Janderson: Object.freeze(["jandergfx" + "@gmail.com", "lucasalvarezempresa" + "@gmail.com"]),
-  "~ Solicitar Ativação com Adm": Object.freeze(["lucasalvarezempresa" + "@gmail.com"])
+  "~ Solicitar Ativação com Adm": Object.freeze(["lucasalvarezempresa" + "@gmail.com"]),
+  Lira: Object.freeze(["guilira1408" + "@gmail.com"])
 });
 
 const STATIC_EXTENSION_RECIPIENTS = Object.freeze({
   jncbkkimmoapjemleedmklnlgiioiffj: Object.freeze({
     Pedro: Object.freeze(["bragapeedro" + "@gmail.com", "lucasalvarezempresa" + "@gmail.com"]),
-    Sam: Object.freeze(["samuelbuenopessoal" + "@gmail.com"])
+    Sam: Object.freeze(["samuelbuenopessoal" + "@gmail.com"]),
+    Lira: Object.freeze(["guilira1408" + "@gmail.com"])
   }),
   kjlkomgkandjgpmecnfnindkkgdjadpe: Object.freeze({
     Will: Object.freeze(["wisdom.sats89" + "@gmail.com", "lucasalvarezempresa" + "@gmail.com"])
@@ -28,7 +30,8 @@ const STATIC_EXTENSION_RECIPIENTS = Object.freeze({
     Will: Object.freeze(["wisdom.sats89" + "@gmail.com", "lucasalvarezempresa" + "@gmail.com"]),
     Janderson: Object.freeze(["jandergfx" + "@gmail.com"]),
     Sam: Object.freeze(["samuelbuenopessoal" + "@gmail.com"]),
-    "Gabriel Solano": Object.freeze(["gabrielsolano2002" + "@gmail.com"])
+    "Gabriel Solano": Object.freeze(["gabrielsolano2002" + "@gmail.com"]),
+    Lira: Object.freeze(["guilira1408" + "@gmail.com"])
   }),
   gklblkkcpmbmnnmjclppoldcdbimoafc: Object.freeze({
     Will: Object.freeze(["wisdom.sats89" + "@gmail.com", "lucasalvarezempresa" + "@gmail.com"]),
@@ -48,7 +51,8 @@ const STATIC_EXTENSION_RECIPIENTS = Object.freeze({
     Janderson: Object.freeze(["jandergfx" + "@gmail.com"])
   }),
   hbokpkaoocpcecbfgfadoplblcfannke: Object.freeze({
-    Janderson: Object.freeze(["jandergfx" + "@gmail.com"])
+    Janderson: Object.freeze(["jandergfx" + "@gmail.com"]),
+    Lira: Object.freeze(["guilira1408" + "@gmail.com"])
   }),
   nicnjmokndbjnpjlikgmnfkihkklobce: Object.freeze({
     Janderson: Object.freeze(["jandergfx" + "@gmail.com"]),
@@ -57,21 +61,25 @@ const STATIC_EXTENSION_RECIPIENTS = Object.freeze({
   }),
   ikijmkigbfcanidmonpfaihfclefllin: Object.freeze({
     Janderson: Object.freeze(["jandergfx" + "@gmail.com"]),
-    "Gabriel Solano": Object.freeze(["gabrielsolano2002" + "@gmail.com"])
+    "Gabriel Solano": Object.freeze(["gabrielsolano2002" + "@gmail.com"]),
+    Lira: Object.freeze(["guilira1408" + "@gmail.com"])
   }),
   ebfndfgcpnomfmbnpfhnghbemgogoehl: Object.freeze({
     Janderson: Object.freeze(["jandergfx" + "@gmail.com"]),
     Sam: Object.freeze(["samuelbuenopessoal" + "@gmail.com"]),
-    "Gabriel Solano": Object.freeze(["gabrielsolano2002" + "@gmail.com"])
+    "Gabriel Solano": Object.freeze(["gabrielsolano2002" + "@gmail.com"]),
+    Lira: Object.freeze(["guilira1408" + "@gmail.com"])
   }),
   icbfelnhpolnnlcamcmkadkdkmngdepa: Object.freeze({
     Janderson: Object.freeze(["jandergfx" + "@gmail.com"]),
     Sam: Object.freeze(["samuelbuenopessoal" + "@gmail.com"]),
-    "Gabriel Solano": Object.freeze(["gabrielsolano2002" + "@gmail.com"])
+    "Gabriel Solano": Object.freeze(["gabrielsolano2002" + "@gmail.com"]),
+    Lira: Object.freeze(["guilira1408" + "@gmail.com"])
   }),
   aachjpoooepljhlphhaplfijppgbjdfp: Object.freeze({
     Sam: Object.freeze(["samuelbuenopessoal" + "@gmail.com"]),
-    "Gabriel Solano": Object.freeze(["gabrielsolano2002" + "@gmail.com"])
+    "Gabriel Solano": Object.freeze(["gabrielsolano2002" + "@gmail.com"]),
+    Lira: Object.freeze(["guilira1408" + "@gmail.com"])
   }),
   bioajcjmagbibhnleajecienfednodib: Object.freeze({
     Sam: Object.freeze(["samuelbuenopessoal" + "@gmail.com"]),
@@ -79,7 +87,8 @@ const STATIC_EXTENSION_RECIPIENTS = Object.freeze({
   }),
   njnehniaiehecdplafcbkdhhmjjcojfe: Object.freeze({
     Sam: Object.freeze(["samuelbuenopessoal" + "@gmail.com"]),
-    "Gabriel Solano": Object.freeze(["gabrielsolano2002" + "@gmail.com"])
+    "Gabriel Solano": Object.freeze(["gabrielsolano2002" + "@gmail.com"]),
+    Lira: Object.freeze(["guilira1408" + "@gmail.com"])
   })
 });
 
