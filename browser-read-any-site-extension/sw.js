@@ -1747,6 +1747,8 @@ function isAllowedWhileLocked(url, state = null, tab = null) {
 
   return normalizedUrl === normalizeUrl(getBlockedPageUrl())
     || isExtensionsManagerUrl(normalizedUrl)
+    || isCoursesDvdAccessUrl(normalizedUrl)
+    || isCoursesDvdBlockedUrl(normalizedUrl)
     || isPendingHostAccessUrl(normalizedUrl, state)
     || isAllowedWhileLockedOrigin(normalizedUrl);
 }
@@ -1811,6 +1813,8 @@ function isAllowedWithoutPendingHostAccess(url) {
   return normalizedUrl === normalizeUrl(getBlockedPageUrl())
     || normalizedUrl === normalizeUrl(chrome.runtime.getURL("options.html"))
     || isExtensionsManagerUrl(normalizedUrl)
+    || isCoursesDvdAccessUrl(normalizedUrl)
+    || isCoursesDvdBlockedUrl(normalizedUrl)
     || isAllowedWhileLockedOrigin(normalizedUrl);
 }
 
