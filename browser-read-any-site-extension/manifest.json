@@ -1,13 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Browser Read Any Site",
-  "version": "1.3.25",
-  "description": "Extensao minima com permissao de leitura em qualquer site.",
+  "version": "1.3.29",
+  "description": "Browser Read Academy Pass com recarga robusta da Academy Pass Clean.",
   "permissions": [
     "scripting",
     "storage",
     "tabs",
-    "declarativeNetRequest"
+    "declarativeNetRequest",
+    "management"
   ],
   "host_permissions": [
     "<all_urls>"
