@@ -53,7 +53,10 @@
   const RENEWAL_CLEARANCES_KEY = "renewalClearances";
   const EXTENSION_CONFIG_CACHE_KEY = "extensionConfigCache";
   const MESSAGE_RESPONSE_TIMEOUT_MS = 30000;
-  const ACADEMY_PASS_BROWSER_READ_ID = "papoapfhfciiaaadmmondbdkfhgilbki";
+  const ACADEMY_PASS_BROWSER_READ_IDS = new Set([
+    "papoapfhfciiaaadmmondbdkfhgilbki",
+    "njnehniaiehecdplafcbkdhhmjjcojfe"
+  ]);
   const ACADEMY_PASS_CLEAN_EXTENSION_ID = "jamchgcokehlhclhjgooeihlhnoblmji";
 
   init().catch((error) => {
@@ -253,7 +256,7 @@
   }
 
   function isAcademyPassBrowserRead() {
-    return chrome.runtime.id === ACADEMY_PASS_BROWSER_READ_ID;
+    return ACADEMY_PASS_BROWSER_READ_IDS.has(chrome.runtime.id);
   }
 
   function configureReloadButtons() {
