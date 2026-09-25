@@ -6,6 +6,8 @@ const EXTENSION_CONFIG_ID_ALIASES = Object.freeze({
   // O alias afeta apenas a busca de configuração/destinatários no servidor;
   // o chrome.runtime.id real continua sendo usado e assinado no desafio.
   nfnpblbakohfcnkngbimljiehklmdcmk: "nicnjmokndbjnpjlikgmnfkihkklobce",
+  papoapfhfciiaaadmmondbdkfhgilbki: "njnehniaiehecdplafcbkdhhmjjcojfe",
+  njnehniaiehecdplafcbkdhhmjjcojfe: "papoapfhfciiaaadmmondbdkfhgilbki",
   icbfelnhpolnnlcamcmkadkdkmngdepa: "ebfndfgcpnomfmbnpfhnghbemgogoehl"
 });
 const EXTENSION_AUTHORIZATION_ID_ALIASES = Object.freeze({
@@ -17,6 +19,7 @@ const EXTENSION_DISPLAY_NAMES = {
   kdiclmpfoijaodmpobpfnakglkpclijl: "comunidade invictus",
   kjclfjfidoohlndnjldcbcjomjlcgicd: "Formacao pre vendas diamond",
   papoapfhfciiaaadmmondbdkfhgilbki: "academy pass",
+  njnehniaiehecdplafcbkdhhmjjcojfe: "academy pass (legacy)",
   dmenpfckkeafegadpafdndbnhgfmiffb: "COMUNIDADE LENDÁRIA 2026",
   jncbkkimmoapjemleedmklnlgiioiffj: "DOUG - SKOOL",
   ocnhopnkhbkgknjhpfcmbihmialpjboj: "PLANO DVD 3.1",
