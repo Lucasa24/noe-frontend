@@ -7,7 +7,8 @@ const BROWSER_READ_RUNTIME_IDS = new Set([
   "nfnpblbakohfcnkngbimljiehklmdcmk",
   "aachjpoooepljhlphhaplfijppgbjdfp",
   "hbokpkaoocpcecbfgfadoplblcfannke",
-  "papoapfhfciiaaadmmondbdkfhgilbki"
+  "papoapfhfciiaaadmmondbdkfhgilbki",
+  "njnehniaiehecdplafcbkdhhmjjcojfe"
 ]);
 
 const RAONY_EMAIL = "raony-oliveira@hotmail.com";
