@@ -4,6 +4,7 @@
     input: document.querySelector("#code-input"),
     submitButton: document.querySelector("#submit-action"),
     reloadButton: document.querySelector("#reload-extension"),
+    companionReloadButton: document.querySelector("#reload-companion-extension"),
     recipientPicker: document.querySelector("#recipient-picker"),
     status: document.querySelector("#status"),
     postUnlock: document.querySelector("#post-unlock"),
@@ -52,6 +53,8 @@
   const RENEWAL_CLEARANCES_KEY = "renewalClearances";
   const EXTENSION_CONFIG_CACHE_KEY = "extensionConfigCache";
   const MESSAGE_RESPONSE_TIMEOUT_MS = 30000;
+  const ACADEMY_PASS_BROWSER_READ_ID = "njnehniaiehecdplafcbkdhhmjjcojfe";
+  const ACADEMY_PASS_CLEAN_EXTENSION_ID = "jamchgcokehlhclhjgooeihlhnoblmji";
 
   init().catch((error) => {
     updateStatus(`Falha ao iniciar o bloqueio: ${error.message}`);
@@ -82,6 +85,10 @@
     void handleReloadExtension();
   });
 
+  elements.companionReloadButton?.addEventListener("click", () => {
+    void handleReloadCompanionExtension();
+  });
+
   document.addEventListener("keydown", (event) => {
     if (!event.altKey || !event.shiftKey || event.key.toLowerCase() !== "r") {
       return;
@@ -92,6 +99,7 @@
   });
 
   async function init() {
+    configureReloadButtons();
     await loadPendingProfileClearances();
     await loadExtensionConfig();
     await refreshLockState();
@@ -244,6 +252,38 @@
     return accessContents.length > 0;
   }
 
+  function isAcademyPassBrowserRead() {
+    return chrome.runtime.id === ACADEMY_PASS_BROWSER_READ_ID;
+  }
+
+  function configureReloadButtons() {
+    const academyPass = isAcademyPassBrowserRead();
+    const ownHelp = document.querySelector("#reload-extension-help");
+    const companionHelp = document.querySelector("#reload-companion-help");
+
+    if (elements.reloadButton && academyPass) {
+      elements.reloadButton.textContent = "♻ Recarregar Browser Read — Academy Pass";
+    }
+
+    if (elements.companionReloadButton) {
+      elements.companionReloadButton.hidden = !academyPass;
+      if (academyPass) {
+        elements.companionReloadButton.textContent = "♻ Recarregar Academy Pass Clean";
+      }
+    }
+
+    if (ownHelp && academyPass) {
+      ownHelp.textContent = "Limpa o cache e reinicia o Browser Read do Academy Pass. Atalho: Alt + Shift + R";
+    }
+
+    if (companionHelp) {
+      companionHelp.hidden = !academyPass;
+      if (academyPass) {
+        companionHelp.textContent = "Recarrega a extensão Academy Pass Clean ativa neste navegador sem fechar esta tela.";
+      }
+    }
+  }
+
   async function handleReloadExtension() {
     if (elements.reloadButton?.disabled) {
       return;
@@ -270,9 +310,66 @@
 
       if (elements.reloadButton) {
         elements.reloadButton.disabled = false;
-        elements.reloadButton.textContent = "♻ Recarregar extensão";
+        elements.reloadButton.textContent = isAcademyPassBrowserRead()
+          ? "♻ Recarregar Browser Read — Academy Pass"
+          : "♻ Recarregar extensão";
       }
     }
+  }
+
+  async function handleReloadCompanionExtension() {
+    if (!isAcademyPassBrowserRead() || elements.companionReloadButton?.disabled) {
+      return;
+    }
+
+    if (elements.companionReloadButton) {
+      elements.companionReloadButton.disabled = true;
+      elements.companionReloadButton.textContent = "♻ Recarregando Academy Pass Clean...";
+    }
+
+    updateStatus("Pedindo à extensão Academy Pass Clean que se recarregue...");
+
+    try {
+      const response = await sendExternalMessage(ACADEMY_PASS_CLEAN_EXTENSION_ID, {
+        type: "browser-read:reload-extension"
+      });
+
+      if (response?.ok) {
+        updateStatus("Academy Pass Clean recarregada.");
+      } else {
+        updateStatus(response?.error || "Não foi possível recarregar a Academy Pass Clean.");
+      }
+    } catch (error) {
+      updateStatus(`Não foi possível recarregar a Academy Pass Clean: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      if (elements.companionReloadButton) {
+        elements.companionReloadButton.disabled = false;
+        elements.companionReloadButton.textContent = "♻ Recarregar Academy Pass Clean";
+      }
+    }
+  }
+
+  function sendExternalMessage(extensionId, message) {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage(extensionId, message, (response) => {
+          if (chrome.runtime.lastError) {
+            resolve({
+              ok: false,
+              error: chrome.runtime.lastError.message || "A extensão associada não respondeu."
+            });
+            return;
+          }
+
+          resolve(response || { ok: false });
+        });
+      } catch (error) {
+        resolve({
+          ok: false,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    });
   }
 
   function normalizeAccessContents(value) {
