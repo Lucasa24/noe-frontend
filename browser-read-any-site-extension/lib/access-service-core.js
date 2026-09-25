@@ -6,20 +6,18 @@ const EXTENSION_CONFIG_ID_ALIASES = Object.freeze({
   // O alias afeta apenas a busca de configuração/destinatários no servidor;
   // o chrome.runtime.id real continua sendo usado e assinado no desafio.
   nfnpblbakohfcnkngbimljiehklmdcmk: "nicnjmokndbjnpjlikgmnfkihkklobce",
-  njnehniaiehecdplafcbkdhhmjjcojfe: "papoapfhfciiaaadmmondbdkfhgilbki",
   icbfelnhpolnnlcamcmkadkdkmngdepa: "ebfndfgcpnomfmbnpfhnghbemgogoehl"
 });
 const EXTENSION_AUTHORIZATION_ID_ALIASES = Object.freeze({
   nfnpblbakohfcnkngbimljiehklmdcmk: "nicnjmokndbjnpjlikgmnfkihkklobce",
-  papoapfhfciiaaadmmondbdkfhgilbki: "njnehniaiehecdplafcbkdhhmjjcojfe",
   ikijmkigbfcanidmonpfaihfclefllin: "nicnjmokndbjnpjlikgmnfkihkklobce",
   icbfelnhpolnnlcamcmkadkdkmngdepa: "ebfndfgcpnomfmbnpfhnghbemgogoehl"
 });
 const EXTENSION_DISPLAY_NAMES = {
   kdiclmpfoijaodmpobpfnakglkpclijl: "comunidade invictus",
   kjclfjfidoohlndnjldcbcjomjlcgicd: "Formacao pre vendas diamond",
-  papoapfhfciiaaadmmondbdkfhgilbki: "academy pass",
-  njnehniaiehecdplafcbkdhhmjjcojfe: "academy pass (legacy)",
+  papoapfhfciiaaadmmondbdkfhgilbki: "Academy Pass Clean",
+  njnehniaiehecdplafcbkdhhmjjcojfe: "academy pass",
   dmenpfckkeafegadpafdndbnhgfmiffb: "COMUNIDADE LENDÁRIA 2026",
   jncbkkimmoapjemleedmklnlgiioiffj: "DOUG - SKOOL",
   ocnhopnkhbkgknjhpfcmbihmialpjboj: "PLANO DVD 3.1",
