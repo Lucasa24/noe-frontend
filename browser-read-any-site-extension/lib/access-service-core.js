@@ -16,7 +16,7 @@ const EXTENSION_AUTHORIZATION_ID_ALIASES = Object.freeze({
 const EXTENSION_DISPLAY_NAMES = {
   kdiclmpfoijaodmpobpfnakglkpclijl: "comunidade invictus",
   kjclfjfidoohlndnjldcbcjomjlcgicd: "Formacao pre vendas diamond",
-  njnehniaiehecdplafcbkdhhmjjcojfe: "academy pass",
+  papoapfhfciiaaadmmondbdkfhgilbki: "academy pass",
   dmenpfckkeafegadpafdndbnhgfmiffb: "COMUNIDADE LENDÁRIA 2026",
   jncbkkimmoapjemleedmklnlgiioiffj: "DOUG - SKOOL",
   ocnhopnkhbkgknjhpfcmbihmialpjboj: "PLANO DVD 3.1",
