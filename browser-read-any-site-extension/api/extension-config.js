@@ -90,7 +90,8 @@ const GLOBAL_EMAIL_BILLING_PROFILES = Object.freeze({
 const DISABLED_BILLING_EMAILS = new Set([
   "wisdom.sats89@gmail.com",
   "bragapeedro@gmail.com",
-  "cibaldestudio@gmail.com"
+  "cibaldestudio@gmail.com",
+  "guilira1408@gmail.com"
 ]);
 
 async function extensionConfigHandler(req, res) {
