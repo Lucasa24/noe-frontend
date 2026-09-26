@@ -34,6 +34,12 @@ const SCOPED_RULE_IDS = [
   SCOPED_ZOOM_ENTRY_RULE_ID,
   SCOPED_ZOOM_WEB_CLIENT_RULE_ID
 ];
+const CLAUDE_CODE_CONTENT_KEY = "claude-code-architect";
+const CLAUDE_CODE_HOTMART_AUTH_ORIGINS = Object.freeze([
+  "https://sso.hotmart.com",
+  "https://sso-surrogate.hotmart.com"
+]);
+
 const DTC_CONTENT_KEYS = new Set(["dtc-viral-lab", "dtc-experience"]);
 const DTC_ALLOWED_ORIGINS = ["https://dtcvirallab.com", "https://v2.aionmembers.com"];
 const DTC_ZOOM_SESSION_ORIGINS = new Set([
@@ -1436,9 +1442,17 @@ async function clearScopedNetworkRules() {
 
 function getAllowedContentOrigins(state) {
   const primaryOrigin = String(state?.allowedContentOrigin || "").trim();
+  const contentKey = String(state?.contentKey || "").trim();
 
-  if (DTC_CONTENT_KEYS.has(String(state?.contentKey || "").trim())) {
+  if (DTC_CONTENT_KEYS.has(contentKey)) {
     return [...DTC_ALLOWED_ORIGINS];
+  }
+
+  if (contentKey === CLAUDE_CODE_CONTENT_KEY) {
+    return Array.from(new Set([
+      ...(primaryOrigin ? [primaryOrigin] : []),
+      ...CLAUDE_CODE_HOTMART_AUTH_ORIGINS
+    ]));
   }
 
   return primaryOrigin ? [primaryOrigin] : [];
