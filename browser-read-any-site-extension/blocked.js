@@ -569,7 +569,7 @@
         return;
       }
 
-      updateStatus("Página de ativação da leitura Cursos DVD aberta. Conceda a permissão; na primeira autorização o navegador será fechado automaticamente.");
+      updateStatus("Página de ativação da leitura Cursos DVD aberta. Conceda a permissão; na primeira autorização o navegador será fechado automaticamente, depois abra o perfil novamente, peça o código e acesse.");
     } finally {
       if (elements.coursesDvdPermissionButton) {
         elements.coursesDvdPermissionButton.disabled = false;
