@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Permitir leitura — Combo Vitalicio</title>
+  <style>
+    :root { color-scheme: dark; font-family: Arial, Helvetica, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #05070b; color: #f8fafc; padding: 24px; }
+    main { width: min(620px, 100%); background: #111827; border: 1px solid #2b3648; border-radius: 22px; padding: 32px; box-shadow: 0 24px 70px rgba(0,0,0,.45); }
+    .eyebrow { margin: 0 0 10px; color: #93c5fd; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    h1 { margin: 0 0 14px; font-size: clamp(28px, 5vw, 40px); line-height: 1.05; }
+    p { color: #cbd5e1; line-height: 1.6; font-size: 16px; }
+    .notice { margin: 22px 0; padding: 16px; border-radius: 14px; background: #0b1220; border: 1px solid #26344b; }
+    button { width: 100%; border: 0; border-radius: 14px; padding: 16px 18px; font-size: 17px; font-weight: 700; cursor: pointer; background: #2563eb; color: #fff; }
+    button:disabled { opacity: .55; cursor: wait; }
+    #status { min-height: 24px; margin: 14px 0 0; color: #93c5fd; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="eyebrow">Combo Vitalicio</p>
+    <h1>Permitir leitura da extensão</h1>
+    <p>Para continuar, confirme que o Browser Read pode usar a permissão de leitura já concedida ao navegador para proteger e abrir os conteúdos do Combo Vitalicio.</p>
+    <div class="notice">Esta confirmação é feita uma única vez neste perfil da extensão. Depois de permitir, esta página será fechada automaticamente.</div>
+    <button id="allowRead" type="button">Permitir leitura</button>
+    <p id="status" role="status" aria-live="polite"></p>
+  </main>
+  <script src="combo-permission.js"></script>
+</body>
+</html>
