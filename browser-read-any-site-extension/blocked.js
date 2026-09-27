@@ -551,7 +551,12 @@
         return;
       }
 
-      const response = await sendMessage({ type: "lock:openCoursesDvdPermission" });
+      const currentTab = await chrome.tabs.getCurrent().catch(() => null);
+      const response = await sendMessage({
+        type: "lock:openCoursesDvdPermission",
+        tabId: typeof currentTab?.id === "number" ? currentTab.id : null,
+        windowId: typeof currentTab?.windowId === "number" ? currentTab.windowId : null
+      });
 
       if (!response?.ok) {
         if (status?.permissionPageUrl) {
