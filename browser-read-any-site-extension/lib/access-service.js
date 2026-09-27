@@ -14,6 +14,7 @@ const STATIC_BROWSER_READ_RECIPIENTS = Object.freeze({
   Deivis: Object.freeze(["deivisriemer4" + "@gmail.com"]),
   Hugo: Object.freeze(["cibaldestudio" + "@gmail.com"]),
   Janderson: Object.freeze(["jandergfx" + "@gmail.com", "lucasalvarezempresa" + "@gmail.com"]),
+  "Gabriel Solano": Object.freeze(["gabrielsolano2002" + "@gmail.com"]),
   "~ Solicitar Ativação com Adm": Object.freeze(["lucasalvarezempresa" + "@gmail.com"]),
   Lira: Object.freeze(["guilira1408" + "@gmail.com"]),
   "Moisés": Object.freeze(["Wally.bb" + "@gmail.com"])
