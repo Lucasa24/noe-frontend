@@ -207,7 +207,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
 
       if (message?.type === "lock:openCoursesDvdPermission") {
-        sendResponse(await openCoursesDvdPermissionPage(sender));
+        sendResponse(await openCoursesDvdPermissionPage(sender, message));
         return;
       }
 
@@ -1134,7 +1134,7 @@ async function getCoursesDvdStatus() {
   }
 }
 
-async function openCoursesDvdPermissionPage(sender) {
+async function openCoursesDvdPermissionPage(sender, message = {}) {
   const extensionInfo = await getCoursesDvdExtensionInfo();
 
   if (!extensionInfo?.id) {
@@ -1146,33 +1146,23 @@ async function openCoursesDvdPermissionPage(sender) {
   }
 
   const permissionUrl = `${COURSES_DVD_BLOCKED_URL}?permissionGate=1`;
-  const senderTabId = typeof sender?.tab?.id === "number" ? sender.tab.id : null;
-  const senderWindowId = typeof sender?.tab?.windowId === "number" ? sender.tab.windowId : null;
+  const requestedTabId = Number(message?.tabId);
+  const requestedWindowId = Number(message?.windowId);
+  const senderTabId = Number.isInteger(requestedTabId)
+    ? requestedTabId
+    : (typeof sender?.tab?.id === "number" ? sender.tab.id : null);
+  const senderWindowId = Number.isInteger(requestedWindowId)
+    ? requestedWindowId
+    : (typeof sender?.tab?.windowId === "number" ? sender.tab.windowId : null);
 
+  // Best effort: avisa o companion para que versões novas também conheçam o fluxo.
   try {
-    const response = await chrome.runtime.sendMessage(COURSES_DVD_EXTENSION_ID, {
+    await chrome.runtime.sendMessage(COURSES_DVD_EXTENSION_ID, {
       type: COURSES_DVD_OPEN_PERMISSION_MESSAGE,
       payload: { windowId: senderWindowId }
     });
-
-    if (response?.ok === true) {
-      return response;
-    }
-
-    // Compatibilidade com versões antigas do #CURSOS - DVD:
-    // se o service worker ainda não conhece o comando, o próprio Browser Read
-    // navega diretamente para a página de permissão da extensão companheira.
-    if (
-      response?.error !== "unsupported_external_message"
-      && response?.error !== "unsupported_message"
-    ) {
-      return {
-        ok: false,
-        error: response?.error || "Nao foi possivel abrir a pagina de ativacao da leitura."
-      };
-    }
   } catch (_error) {
-    // Continua para o fallback direto abaixo.
+    // A navegação direta abaixo é a fonte de verdade.
   }
 
   try {
@@ -1181,9 +1171,10 @@ async function openCoursesDvdPermissionPage(sender) {
         url: permissionUrl,
         active: true
       });
+
       return {
         ok: true,
-        mode: "direct_navigation",
+        mode: "direct_current_tab",
         pageUrl: updated?.url || permissionUrl,
         tabId: senderTabId
       };
@@ -1197,7 +1188,7 @@ async function openCoursesDvdPermissionPage(sender) {
 
     return {
       ok: true,
-      mode: "direct_navigation",
+      mode: "direct_new_tab",
       pageUrl: created?.url || permissionUrl,
       tabId: created?.id
     };
@@ -2313,12 +2304,25 @@ async function clearZoomMeetingSessions() {
     removeRuleIds: [ZOOM_SESSION_ALLOW_RULE_ID]
   }).catch(() => undefined);
 }
+function matchesExtensionPageUrl(url, expectedUrl) {
+  try {
+    const actual = new URL(String(url || "").trim());
+    const expected = new URL(String(expectedUrl || "").trim());
+
+    return actual.protocol === expected.protocol
+      && actual.host === expected.host
+      && actual.pathname === expected.pathname;
+  } catch (_error) {
+    return false;
+  }
+}
+
 function isCoursesDvdAccessUrl(url) {
-  return normalizeUrl(url) === normalizeUrl(COURSES_DVD_ACCESS_URL);
+  return matchesExtensionPageUrl(url, COURSES_DVD_ACCESS_URL);
 }
 
 function isCoursesDvdBlockedUrl(url) {
-  return normalizeUrl(url) === normalizeUrl(COURSES_DVD_BLOCKED_URL);
+  return matchesExtensionPageUrl(url, COURSES_DVD_BLOCKED_URL);
 }
 
 function isValidSelectedAccessState(state) {
