@@ -199,6 +199,16 @@
       return;
     }
 
+    if (response?.action === "combo_read_permission" && response?.pageUrl) {
+      window.location.replace(response.pageUrl);
+      return;
+    }
+
+    if (response?.action === "combo_links" && response?.pageUrl) {
+      window.location.replace(response.pageUrl);
+      return;
+    }
+
     await applyLockState(response?.state || { unlocked: true });
   }
 
