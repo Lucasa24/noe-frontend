@@ -12,6 +12,7 @@ const CONTENT_SELECTOR_EXTENSION_ID = "nicnjmokndbjnpjlikgmnfkihkklobce";
 const CONTENT_SELECTOR_EXTENSION_IDS = new Set([
   CONTENT_SELECTOR_EXTENSION_ID,
   "nfnpblbakohfcnkngbimljiehklmdcmk",
+  "miipjameglmiodjjgghegcidmkiefmlg",
   "aachjpoooepljhlphhaplfijppgbjdfp"
 ]);
 const PIXEL_EXTENSION_ID = "opebpmbhihaffdfogpeimddbpjhhejpk";
@@ -25,6 +26,13 @@ const COURSES_DVD_ACCESS_MESSAGE = "browser-read:set-content-access";
 const COURSES_DVD_STATUS_MESSAGE = "browser-read:get-companion-status";
 const COURSES_DVD_RELOAD_MESSAGE = "browser-read:reload-extension";
 const COURSES_DVD_OPEN_PERMISSION_MESSAGE = "browser-read:open-permission-page";
+const AUTONEXT_EXTENSION_ID = "ajbahhfleppkggefflekfencifmodjed";
+const AUTONEXT_BLOCKED_URL = `chrome-extension://${AUTONEXT_EXTENSION_ID}/blocked.html`;
+const AUTONEXT_ACCESS_MESSAGE = "browser-read:set-content-access";
+const AUTONEXT_STATUS_MESSAGE = "browser-read:get-companion-status";
+const AUTONEXT_RELOAD_MESSAGE = "browser-read:reload-extension";
+const AUTONEXT_OPEN_PERMISSION_MESSAGE = "browser-read:open-permission-page";
+const AUTONEXT_CONTENT_KEY = "comunidade-autonext-vibestack";
 const SCOPED_BLOCK_RULE_ID = 9101;
 const SCOPED_ALLOW_RULE_ID_START = 9102;
 const SCOPED_ZOOM_ENTRY_RULE_ID = SCOPED_ALLOW_RULE_ID_START + 2;
@@ -67,6 +75,7 @@ const DTC_ZOOM_ENTRY_REGEX = "^https://us05web\\.zoom\\.us/j/[0-9]{9,13}/?\\?pwd
 const DTC_ZOOM_WEB_CLIENT_REGEX = "^https://app\\.zoom\\.us/wc/(?:join/[0-9]{9,13}|[0-9]{9,13}/join)/?\\?(?:[^#&]*&)*pwd=[^&#\\s]+(?:&[^#]*)?(?:#.*)?$";
 const CONTENT_URL_FALLBACKS = {
   "comunidade-growth-hackers": "https://comunidadegrowthhackers.cademi.com.br/",
+  "comunidade-autonext-vibestack": "https://comunidade.ericorenato.com.br/m/courses",
   "combo-vitalicio-leandro-ladeira": COMBO_VITALICIO_BASE_URL,
   "dtc-viral-lab": "https://dtcvirallab.com/",
   "dtc-experience": "https://v2.aionmembers.com/"
@@ -213,6 +222,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       if (message?.type === "lock:reloadCoursesDvd") {
         sendResponse(await reloadCoursesDvdCompanion());
+        return;
+      }
+
+      if (message?.type === "lock:getAutonextStatus") {
+        sendResponse(await getAutonextStatus());
+        return;
+      }
+
+      if (message?.type === "lock:openAutonextPermission") {
+        sendResponse(await openAutonextPermissionPage(sender, message));
+        return;
+      }
+
+      if (message?.type === "lock:reloadAutonext") {
+        sendResponse(await reloadAutonextCompanion());
         return;
       }
 
@@ -621,7 +645,7 @@ async function verifyAccessCode(code, senderTabId) {
     };
   }
 
-  if (chrome.runtime.id === CONTENT_SELECTOR_EXTENSION_ID &&
+  if (isContentSelectorExtension() &&
       state.contentKey === DTC_EXPERIENCE_CONTENT_KEY) {
     const companionStatus = await getCoursesDvdStatus();
 
@@ -645,6 +669,34 @@ async function verifyAccessCode(code, senderTabId) {
         action: "courses_dvd_permission",
         pageUrl: companionStatus.permissionPageUrl,
         error: "Ative a leitura da extensao Cursos DVD antes de validar o codigo."
+      };
+    }
+  }
+
+  if (isContentSelectorExtension() &&
+      state.contentKey === AUTONEXT_CONTENT_KEY) {
+    const companionStatus = await getAutonextStatus();
+
+    if (!companionStatus.installed) {
+      return {
+        ok: false,
+        error: "A extensao AutoNext Clean nao foi encontrada neste navegador."
+      };
+    }
+
+    if (!companionStatus.enabled) {
+      return {
+        ok: false,
+        error: "A extensao AutoNext Clean esta instalada, mas desativada."
+      };
+    }
+
+    if (companionStatus.hasPermission !== true) {
+      return {
+        ok: false,
+        action: "autonext_permission",
+        pageUrl: companionStatus.permissionPageUrl,
+        error: "Ative a leitura da extensao AutoNext antes de validar o codigo."
       };
     }
   }
@@ -762,6 +814,18 @@ async function verifyAccessCode(code, senderTabId) {
         typeof senderTabId === "number") {
       await chrome.tabs.update(senderTabId, {
         url: CONTENT_URL_FALLBACKS[DTC_EXPERIENCE_CONTENT_KEY]
+      }).catch(() => undefined);
+    }
+
+    // direct_autonext_after_unlock:
+    // depois que a leitura do AutoNext já está ativa e o código foi validado,
+    // a aba bloqueada segue direto para a comunidade.
+    if (isContentSelectorExtension() &&
+        restoredState?.unlocked === true &&
+        restoredState?.contentKey === AUTONEXT_CONTENT_KEY &&
+        typeof senderTabId === "number") {
+      await chrome.tabs.update(senderTabId, {
+        url: CONTENT_URL_FALLBACKS[AUTONEXT_CONTENT_KEY]
       }).catch(() => undefined);
     }
 
@@ -943,7 +1007,15 @@ async function syncSelectedCompanionContentAccess(selectedAccess, recipientKey) 
     return syncClaudeCleanContentAccess(selectedAccess, recipientKey);
   }
 
-  return syncCoursesDvdContentAccess(selectedAccess, recipientKey);
+  if (selectedAccess?.key === DTC_EXPERIENCE_CONTENT_KEY) {
+    return syncCoursesDvdContentAccess(selectedAccess, recipientKey);
+  }
+
+  if (selectedAccess?.key === AUTONEXT_CONTENT_KEY) {
+    return syncAutonextContentAccess(selectedAccess, recipientKey);
+  }
+
+  return;
 }
 
 function normalizeExtensionDisplayName(value) {
@@ -1055,6 +1127,240 @@ async function syncClaudeCleanContentAccess(selectedAccess, recipientKey) {
       checkedAt: Date.now()
     }
   });
+}
+
+async function getAutonextExtensionInfo() {
+  if (!chrome.management?.get) {
+    return null;
+  }
+
+  try {
+    return await chrome.management.get(AUTONEXT_EXTENSION_ID);
+  } catch (_error) {
+    return null;
+  }
+}
+
+async function getAutonextStatus() {
+  const permissionPageUrl = `${AUTONEXT_BLOCKED_URL}?permissionGate=1`;
+  const extensionInfo = await getAutonextExtensionInfo();
+
+  if (!extensionInfo?.id) {
+    return {
+      ok: true,
+      installed: false,
+      enabled: false,
+      reachable: false,
+      hasPermission: false,
+      operational: false,
+      extensionId: AUTONEXT_EXTENSION_ID,
+      permissionPageUrl,
+      targetUrl: CONTENT_URL_FALLBACKS[AUTONEXT_CONTENT_KEY]
+    };
+  }
+
+  if (!extensionInfo.enabled) {
+    return {
+      ok: true,
+      installed: true,
+      enabled: false,
+      reachable: false,
+      hasPermission: false,
+      operational: false,
+      extensionId: AUTONEXT_EXTENSION_ID,
+      permissionPageUrl,
+      targetUrl: CONTENT_URL_FALLBACKS[AUTONEXT_CONTENT_KEY]
+    };
+  }
+
+  try {
+    const response = await chrome.runtime.sendMessage(AUTONEXT_EXTENSION_ID, {
+      type: AUTONEXT_STATUS_MESSAGE
+    });
+
+    return {
+      ok: true,
+      installed: true,
+      enabled: true,
+      reachable: response?.ok === true,
+      hasPermission: response?.hasPermission === true,
+      operational: response?.operational === true || response?.allowed === true,
+      selectedContentKey: String(response?.selectedContentKey || ""),
+      extensionId: AUTONEXT_EXTENSION_ID,
+      permissionPageUrl,
+      targetUrl: CONTENT_URL_FALLBACKS[AUTONEXT_CONTENT_KEY]
+    };
+  } catch (error) {
+    return {
+      ok: true,
+      installed: true,
+      enabled: true,
+      reachable: false,
+      hasPermission: false,
+      operational: false,
+      extensionId: AUTONEXT_EXTENSION_ID,
+      permissionPageUrl,
+      targetUrl: CONTENT_URL_FALLBACKS[AUTONEXT_CONTENT_KEY],
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
+async function openAutonextPermissionPage(sender, message = {}) {
+  const extensionInfo = await getAutonextExtensionInfo();
+
+  if (!extensionInfo?.id) {
+    return { ok: false, error: "A extensao AutoNext Clean nao foi encontrada neste navegador." };
+  }
+
+  if (!extensionInfo.enabled) {
+    return { ok: false, error: "A extensao AutoNext Clean esta instalada, mas desativada." };
+  }
+
+  const permissionUrl = `${AUTONEXT_BLOCKED_URL}?permissionGate=1`;
+  const requestedTabId = Number(message?.tabId);
+  const requestedWindowId = Number(message?.windowId);
+  const senderTabId = Number.isInteger(requestedTabId)
+    ? requestedTabId
+    : (typeof sender?.tab?.id === "number" ? sender.tab.id : null);
+  const senderWindowId = Number.isInteger(requestedWindowId)
+    ? requestedWindowId
+    : (typeof sender?.tab?.windowId === "number" ? sender.tab.windowId : null);
+
+  try {
+    await chrome.runtime.sendMessage(AUTONEXT_EXTENSION_ID, {
+      type: AUTONEXT_OPEN_PERMISSION_MESSAGE,
+      payload: { windowId: senderWindowId }
+    });
+  } catch (_error) {
+    // A navegação direta abaixo é a fonte de verdade.
+  }
+
+  try {
+    if (senderTabId !== null) {
+      const updated = await chrome.tabs.update(senderTabId, {
+        url: permissionUrl,
+        active: true
+      });
+
+      return {
+        ok: true,
+        mode: "direct_current_tab",
+        pageUrl: updated?.url || permissionUrl,
+        tabId: senderTabId
+      };
+    }
+
+    const created = await chrome.tabs.create({
+      url: permissionUrl,
+      active: true,
+      ...(senderWindowId !== null ? { windowId: senderWindowId } : {})
+    });
+
+    return {
+      ok: true,
+      mode: "direct_new_tab",
+      pageUrl: created?.url || permissionUrl,
+      tabId: created?.id
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: `Nao foi possivel abrir a pagina de ativacao do AutoNext: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+}
+
+async function reloadAutonextCompanion() {
+  const extensionInfo = await getAutonextExtensionInfo();
+
+  if (!extensionInfo?.id) {
+    return { ok: false, error: "A extensao AutoNext Clean nao foi encontrada neste navegador." };
+  }
+
+  if (!extensionInfo.enabled) {
+    return { ok: false, error: "A extensao AutoNext Clean esta instalada, mas desativada." };
+  }
+
+  try {
+    const response = await chrome.runtime.sendMessage(AUTONEXT_EXTENSION_ID, {
+      type: AUTONEXT_RELOAD_MESSAGE
+    });
+    if (response?.ok === true) {
+      return { ok: true, mode: "message" };
+    }
+  } catch (_error) {
+    // Fallback abaixo.
+  }
+
+  if (!chrome.management?.setEnabled) {
+    return { ok: false, error: "Nao foi possivel reiniciar a extensao AutoNext Clean." };
+  }
+
+  try {
+    await chrome.management.setEnabled(AUTONEXT_EXTENSION_ID, false);
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await chrome.management.setEnabled(AUTONEXT_EXTENSION_ID, true);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    return { ok: true, mode: "restart" };
+  } catch (error) {
+    return {
+      ok: false,
+      error: `Falha ao reiniciar AutoNext Clean: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+}
+
+async function syncAutonextContentAccess(selectedAccess, recipientKey) {
+  const extensionInfo = await getAutonextExtensionInfo();
+
+  if (!extensionInfo?.id) {
+    throw new Error("A extensao AutoNext Clean nao foi encontrada neste navegador.");
+  }
+
+  if (!extensionInfo.enabled) {
+    throw new Error("A extensao AutoNext Clean esta instalada, mas desativada.");
+  }
+
+  const payload = {
+    contentKey: selectedAccess.key,
+    contentLabel: selectedAccess.label,
+    contentUrl: selectedAccess.url,
+    recipientKey: String(recipientKey || "").trim(),
+    browserReadExtensionId: chrome.runtime.id
+  };
+
+  try {
+    const response = await chrome.runtime.sendMessage(AUTONEXT_EXTENSION_ID, {
+      type: AUTONEXT_ACCESS_MESSAGE,
+      payload
+    });
+
+    if (response?.ok === true) {
+      return;
+    }
+  } catch (_error) {
+    // Tenta recarregar uma vez abaixo.
+  }
+
+  const recovery = await reloadAutonextCompanion();
+  if (!recovery?.ok) {
+    throw new Error(recovery?.error || "Nao foi possivel reiniciar a extensao AutoNext Clean.");
+  }
+
+  try {
+    const retry = await chrome.runtime.sendMessage(AUTONEXT_EXTENSION_ID, {
+      type: AUTONEXT_ACCESS_MESSAGE,
+      payload
+    });
+    if (retry?.ok === true) {
+      return;
+    }
+  } catch (_error) {
+    // Erro final abaixo.
+  }
+
+  throw new Error("A extensao AutoNext Clean esta ativa, mas nao respondeu ao Browser Read. Atualize o ZIP dela e tente novamente.");
 }
 
 async function getCoursesDvdExtensionInfo() {
@@ -2325,6 +2631,10 @@ function isCoursesDvdBlockedUrl(url) {
   return matchesExtensionPageUrl(url, COURSES_DVD_BLOCKED_URL);
 }
 
+function isAutonextBlockedUrl(url) {
+  return matchesExtensionPageUrl(url, AUTONEXT_BLOCKED_URL);
+}
+
 function isValidSelectedAccessState(state) {
   const allowedUrl = String(state?.allowedContentUrl || "").trim();
   const allowedOrigin = String(state?.allowedContentOrigin || "").trim();
@@ -2355,7 +2665,7 @@ function isComboVitalicioUrl(url) {
 }
 
 function isAllowedAfterUnlock(url, state) {
-  if (isCoursesDvdAccessUrl(url) || isCoursesDvdBlockedUrl(url)) {
+  if (isCoursesDvdAccessUrl(url) || isCoursesDvdBlockedUrl(url) || isAutonextBlockedUrl(url)) {
     return true;
   }
 
@@ -2390,6 +2700,7 @@ function isAllowedWhileLocked(url, state = null, tab = null) {
     || isExtensionsManagerUrl(normalizedUrl)
     || isCoursesDvdAccessUrl(normalizedUrl)
     || isCoursesDvdBlockedUrl(normalizedUrl)
+    || isAutonextBlockedUrl(normalizedUrl)
     || isPendingHostAccessUrl(normalizedUrl, state)
     || isAllowedWhileLockedOrigin(normalizedUrl);
 }
@@ -2456,6 +2767,7 @@ function isAllowedWithoutPendingHostAccess(url) {
     || isExtensionsManagerUrl(normalizedUrl)
     || isCoursesDvdAccessUrl(normalizedUrl)
     || isCoursesDvdBlockedUrl(normalizedUrl)
+    || isAutonextBlockedUrl(normalizedUrl)
     || isAllowedWhileLockedOrigin(normalizedUrl);
 }
 
