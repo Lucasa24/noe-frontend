@@ -34,6 +34,9 @@ const SCOPED_RULE_IDS = [
   SCOPED_ZOOM_ENTRY_RULE_ID,
   SCOPED_ZOOM_WEB_CLIENT_RULE_ID
 ];
+const CLAUDE_BROWSER_READ_EXTENSION_ID = "hbokpkaoocpcecbfgfadoplblcfannke";
+const CLAUDE_CLEAN_EXTENSION_ID = "gphcdebdfhjiomklliooamglagpphnii";
+const CLAUDE_CLEAN_ACCESS_MESSAGE = "browser-read:set-content-access";
 const CLAUDE_CODE_CONTENT_KEY = "claude-code-architect";
 const CLAUDE_CODE_HOTMART_AUTH_ORIGINS = Object.freeze([
   "https://sso.hotmart.com",
@@ -590,7 +593,7 @@ async function sendAccessCode(contentKey, recipientKey = "") {
 
   try {
     selectedAccess = await resolveSelectedContentAccess(contentKey, recipientKey);
-    await syncCoursesDvdContentAccess(selectedAccess, recipientKey);
+    await syncSelectedCompanionContentAccess(selectedAccess, recipientKey);
   } catch (error) {
     return {
       ok: false,
@@ -710,6 +713,41 @@ async function resolveSelectedContentAccess(contentKey, recipientKey) {
     url: parsedUrl.href,
     origin: parsedUrl.origin
   };
+}
+
+async function syncSelectedCompanionContentAccess(selectedAccess, recipientKey) {
+  const shouldUseClaudeClean =
+    chrome.runtime.id === CLAUDE_BROWSER_READ_EXTENSION_ID
+    && selectedAccess?.key === CLAUDE_CODE_CONTENT_KEY;
+
+  if (shouldUseClaudeClean) {
+    return syncClaudeCleanContentAccess(selectedAccess, recipientKey);
+  }
+
+  return syncCoursesDvdContentAccess(selectedAccess, recipientKey);
+}
+
+async function syncClaudeCleanContentAccess(selectedAccess, recipientKey) {
+  try {
+    const response = await chrome.runtime.sendMessage(CLAUDE_CLEAN_EXTENSION_ID, {
+      type: CLAUDE_CLEAN_ACCESS_MESSAGE,
+      payload: {
+        contentKey: selectedAccess.key,
+        contentLabel: selectedAccess.label,
+        contentUrl: selectedAccess.url,
+        recipientKey: String(recipientKey || "").trim(),
+        browserReadExtensionId: chrome.runtime.id
+      }
+    });
+
+    if (response?.ok !== true) {
+      throw new Error(response?.error || "claude_clean_sync_failed");
+    }
+  } catch (_error) {
+    throw new Error(
+      "Atualize e mantenha ativa a extensao Privacy Shield Admin para liberar o Claude Code Architect."
+    );
+  }
 }
 
 async function syncCoursesDvdContentAccess(selectedAccess, recipientKey) {
