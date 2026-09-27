@@ -62,7 +62,7 @@
   const SHARED_BROWSER_READ_IDS = new Set([
     "nicnjmokndbjnpjlikgmnfkihkklobce",
     "nfnpblbakohfcnkngbimljiehklmdcmk",
-    "miipjameglmiodjgghegcidmkiemflg"
+    "miipjameglmiodjjgghegcidmkiefmlg"
   ]);
   const COURSES_DVD_EXTENSION_ID = "jamchgcokehlhclhjgooeihlhnoblmji";
   const AUTONEXT_EXTENSION_ID = "ajbahhfleppkggefflekfencifmodjed";
