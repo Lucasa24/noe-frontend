@@ -18,10 +18,12 @@ const PIXEL_EXTENSION_ID = "opebpmbhihaffdfogpeimddbpjhhejpk";
 const PIXEL_GATE_QUERY_MESSAGE = "browser-read:get-state";
 const PIXEL_GATE_UNLOCKED_MESSAGE = "browser-read:unlocked";
 const PIXEL_GATE_LOCKED_MESSAGE = "browser-read:locked";
-const COURSES_DVD_EXTENSION_ID = "papoapfhfciiaaadmmondbdkfhgilbki";
+const COURSES_DVD_EXTENSION_ID = "jamchgcokehlhclhjgooeihlhnoblmji";
 const COURSES_DVD_ACCESS_URL = `chrome-extension://${COURSES_DVD_EXTENSION_ID}/src/access/access.html`;
 const COURSES_DVD_BLOCKED_URL = `chrome-extension://${COURSES_DVD_EXTENSION_ID}/blocked.html`;
 const COURSES_DVD_ACCESS_MESSAGE = "browser-read:set-content-access";
+const COURSES_DVD_STATUS_MESSAGE = "browser-read:get-companion-status";
+const COURSES_DVD_RELOAD_MESSAGE = "browser-read:reload-extension";
 const SCOPED_BLOCK_RULE_ID = 9101;
 const SCOPED_ALLOW_RULE_ID_START = 9102;
 const SCOPED_ZOOM_ENTRY_RULE_ID = SCOPED_ALLOW_RULE_ID_START + 2;
@@ -53,7 +55,8 @@ const COMBO_READ_PERMISSION_KEY = "comboVitalicioReadPermission";
 const COMBO_PERMISSION_PAGE_PATH = "combo-permission.html";
 const COMBO_LINKS_PAGE_PATH = "combo-links.html";
 
-const DTC_CONTENT_KEYS = new Set(["dtc-viral-lab", "dtc-experience"]);
+const DTC_EXPERIENCE_CONTENT_KEY = "dtc-experience";
+const DTC_CONTENT_KEYS = new Set(["dtc-viral-lab", DTC_EXPERIENCE_CONTENT_KEY]);
 const DTC_ALLOWED_ORIGINS = ["https://dtcvirallab.com", "https://v2.aionmembers.com"];
 const DTC_ZOOM_SESSION_ORIGINS = new Set([
   "https://us05web.zoom.us",
@@ -166,7 +169,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
 
       if (message?.type === "lock:submitCode") {
-        sendResponse(await verifyAccessCode(message.code));
+        sendResponse(await verifyAccessCode(message.code, sender?.tab?.id));
         return;
       }
 
@@ -194,6 +197,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       if (message?.type === "lock:getRuntimeInfo") {
         sendResponse({ extensionId: chrome.runtime.id });
+        return;
+      }
+
+      if (message?.type === "lock:getCoursesDvdStatus") {
+        sendResponse(await getCoursesDvdStatus());
+        return;
+      }
+
+      if (message?.type === "lock:reloadCoursesDvd") {
+        sendResponse(await reloadCoursesDvdCompanion());
         return;
       }
 
@@ -557,7 +570,7 @@ function isComboLinksPageUrl(url) {
   return normalizeUrl(url) === normalizeUrl(getComboLinksPageUrl());
 }
 
-async function verifyAccessCode(code) {
+async function verifyAccessCode(code, senderTabId) {
   const state = await ensureCurrentLockState("startup");
   const config = await getAuthConfig();
   const siteAccessGranted = await hasRequiredSiteAccess();
@@ -600,6 +613,34 @@ async function verifyAccessCode(code) {
       ok: false,
       error: "Escolha novamente o conteudo e o destinatario antes de validar o codigo."
     };
+  }
+
+  if (chrome.runtime.id === CONTENT_SELECTOR_EXTENSION_ID &&
+      state.contentKey === DTC_EXPERIENCE_CONTENT_KEY) {
+    const companionStatus = await getCoursesDvdStatus();
+
+    if (!companionStatus.installed) {
+      return {
+        ok: false,
+        error: "A extensao Cursos DVD nao foi encontrada neste navegador."
+      };
+    }
+
+    if (!companionStatus.enabled) {
+      return {
+        ok: false,
+        error: "A extensao Cursos DVD esta instalada, mas desativada."
+      };
+    }
+
+    if (companionStatus.hasPermission !== true) {
+      return {
+        ok: false,
+        action: "courses_dvd_permission",
+        pageUrl: companionStatus.permissionPageUrl,
+        error: "Ative a leitura da extensao Cursos DVD antes de validar o codigo."
+      };
+    }
   }
 
   try {
@@ -705,6 +746,18 @@ async function verifyAccessCode(code) {
     const restoredState = await enforceScopedBrowser(updatedState);
     await saveLockState(restoredState);
     await notifyPixelGate(restoredState?.unlocked === true, restoredState);
+
+    // direct_dtc_experience_after_unlock:
+    // quando o Browser Read nic... libera DTC Experience e o companion já tem
+    // permissão de leitura, a própria aba bloqueada segue direto para o Aion.
+    if (chrome.runtime.id === CONTENT_SELECTOR_EXTENSION_ID &&
+        restoredState?.unlocked === true &&
+        restoredState?.contentKey === DTC_EXPERIENCE_CONTENT_KEY &&
+        typeof senderTabId === "number") {
+      await chrome.tabs.update(senderTabId, {
+        url: CONTENT_URL_FALLBACKS[DTC_EXPERIENCE_CONTENT_KEY]
+      }).catch(() => undefined);
+    }
 
     return {
       ok: true,
@@ -998,23 +1051,168 @@ async function syncClaudeCleanContentAccess(selectedAccess, recipientKey) {
   });
 }
 
-async function syncCoursesDvdContentAccess(selectedAccess, recipientKey) {
+async function getCoursesDvdExtensionInfo() {
+  if (!chrome.management?.get) {
+    return null;
+  }
+
+  try {
+    return await chrome.management.get(COURSES_DVD_EXTENSION_ID);
+  } catch (_error) {
+    return null;
+  }
+}
+
+async function getCoursesDvdStatus() {
+  const permissionPageUrl = `${COURSES_DVD_BLOCKED_URL}?permissionGate=1`;
+  const extensionInfo = await getCoursesDvdExtensionInfo();
+
+  if (!extensionInfo?.id) {
+    return {
+      ok: true,
+      installed: false,
+      enabled: false,
+      reachable: false,
+      hasPermission: false,
+      operational: false,
+      extensionId: COURSES_DVD_EXTENSION_ID,
+      permissionPageUrl,
+      targetUrl: CONTENT_URL_FALLBACKS[DTC_EXPERIENCE_CONTENT_KEY]
+    };
+  }
+
+  if (!extensionInfo.enabled) {
+    return {
+      ok: true,
+      installed: true,
+      enabled: false,
+      reachable: false,
+      hasPermission: false,
+      operational: false,
+      extensionId: COURSES_DVD_EXTENSION_ID,
+      permissionPageUrl,
+      targetUrl: CONTENT_URL_FALLBACKS[DTC_EXPERIENCE_CONTENT_KEY]
+    };
+  }
+
   try {
     const response = await chrome.runtime.sendMessage(COURSES_DVD_EXTENSION_ID, {
-      type: COURSES_DVD_ACCESS_MESSAGE,
-      payload: {
-        contentKey: selectedAccess.key,
-        contentLabel: selectedAccess.label,
-        contentUrl: selectedAccess.url,
-        recipientKey: String(recipientKey || "").trim()
-      }
+      type: COURSES_DVD_STATUS_MESSAGE
     });
 
-    if (response?.ok !== true) {
-      throw new Error(response?.error || "courses_dvd_sync_failed");
+    return {
+      ok: true,
+      installed: true,
+      enabled: true,
+      reachable: response?.ok === true,
+      hasPermission: response?.hasPermission === true,
+      operational: response?.operational === true || response?.allowed === true,
+      selectedContentKey: String(response?.selectedContentKey || ""),
+      extensionId: COURSES_DVD_EXTENSION_ID,
+      permissionPageUrl,
+      targetUrl: CONTENT_URL_FALLBACKS[DTC_EXPERIENCE_CONTENT_KEY]
+    };
+  } catch (error) {
+    return {
+      ok: true,
+      installed: true,
+      enabled: true,
+      reachable: false,
+      hasPermission: false,
+      operational: false,
+      extensionId: COURSES_DVD_EXTENSION_ID,
+      permissionPageUrl,
+      targetUrl: CONTENT_URL_FALLBACKS[DTC_EXPERIENCE_CONTENT_KEY],
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
+async function reloadCoursesDvdCompanion() {
+  const extensionInfo = await getCoursesDvdExtensionInfo();
+
+  if (!extensionInfo?.id) {
+    return { ok: false, error: "A extensao Cursos DVD nao foi encontrada neste navegador." };
+  }
+
+  if (!extensionInfo.enabled) {
+    return { ok: false, error: "A extensao Cursos DVD esta instalada, mas desativada." };
+  }
+
+  try {
+    const response = await chrome.runtime.sendMessage(COURSES_DVD_EXTENSION_ID, {
+      type: COURSES_DVD_RELOAD_MESSAGE
+    });
+    if (response?.ok === true) {
+      return { ok: true, mode: "message" };
     }
   } catch (_error) {
-    throw new Error("Atualize e mantenha ativa a extensao Cursos DVD para liberar este conteudo.");
+    // Fallback abaixo.
+  }
+
+  if (!chrome.management?.setEnabled) {
+    return { ok: false, error: "Nao foi possivel reiniciar a extensao Cursos DVD." };
+  }
+
+  try {
+    await chrome.management.setEnabled(COURSES_DVD_EXTENSION_ID, false);
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await chrome.management.setEnabled(COURSES_DVD_EXTENSION_ID, true);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    return { ok: true, mode: "restart" };
+  } catch (error) {
+    return {
+      ok: false,
+      error: `Falha ao reiniciar Cursos DVD: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+}
+
+async function sendCoursesDvdSelection(selectedAccess, recipientKey) {
+  return chrome.runtime.sendMessage(COURSES_DVD_EXTENSION_ID, {
+    type: COURSES_DVD_ACCESS_MESSAGE,
+    payload: {
+      contentKey: selectedAccess.key,
+      contentLabel: selectedAccess.label,
+      contentUrl: selectedAccess.url,
+      recipientKey: String(recipientKey || "").trim()
+    }
+  });
+}
+
+async function syncCoursesDvdContentAccess(selectedAccess, recipientKey) {
+  const extensionInfo = await getCoursesDvdExtensionInfo();
+
+  if (!extensionInfo?.id) {
+    throw new Error("A extensao Cursos DVD nao foi encontrada neste navegador.");
+  }
+
+  if (!extensionInfo.enabled) {
+    throw new Error("A extensao Cursos DVD esta instalada, mas desativada.");
+  }
+
+  try {
+    const response = await sendCoursesDvdSelection(selectedAccess, recipientKey);
+    if (response?.ok === true) {
+      return;
+    }
+  } catch (_error) {
+    // Tenta acordar/reiniciar a extensão uma vez.
+  }
+
+  const recovery = await reloadCoursesDvdCompanion();
+  if (!recovery?.ok) {
+    throw new Error(recovery?.error || "Nao foi possivel reiniciar a extensao Cursos DVD.");
+  }
+
+  try {
+    const retry = await sendCoursesDvdSelection(selectedAccess, recipientKey);
+    if (retry?.ok === true) {
+      return;
+    }
+    throw new Error(retry?.error || "courses_dvd_sync_failed");
+  } catch (_error) {
+    throw new Error("A extensao Cursos DVD esta ativa, mas nao respondeu ao Browser Read. Atualize o ZIP dela e tente novamente.");
   }
 }
 
