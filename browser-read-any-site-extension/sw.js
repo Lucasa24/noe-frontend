@@ -728,26 +728,60 @@ async function syncSelectedCompanionContentAccess(selectedAccess, recipientKey) 
 }
 
 async function syncClaudeCleanContentAccess(selectedAccess, recipientKey) {
+  let extensionInfo = null;
+
+  try {
+    if (!chrome.management?.get) {
+      throw new Error("management_api_unavailable");
+    }
+
+    extensionInfo = await chrome.management.get(CLAUDE_CLEAN_EXTENSION_ID);
+  } catch (_error) {
+    throw new Error(
+      "A extensao Privacy Shield Admin nao foi encontrada neste navegador."
+    );
+  }
+
+  if (!extensionInfo?.enabled) {
+    throw new Error(
+      "A extensao Privacy Shield Admin esta instalada, mas desativada."
+    );
+  }
+
+  const payload = {
+    contentKey: selectedAccess.key,
+    contentLabel: selectedAccess.label,
+    contentUrl: selectedAccess.url,
+    recipientKey: String(recipientKey || "").trim(),
+    browserReadExtensionId: chrome.runtime.id
+  };
+
+  // A presença + estado habilitado da extensão é a fonte de verdade.
+  // O canal externo é uma sincronização complementar: um service worker
+  // adormecido ou reiniciando não deve bloquear o envio do código.
   try {
     const response = await chrome.runtime.sendMessage(CLAUDE_CLEAN_EXTENSION_ID, {
       type: CLAUDE_CLEAN_ACCESS_MESSAGE,
-      payload: {
-        contentKey: selectedAccess.key,
-        contentLabel: selectedAccess.label,
-        contentUrl: selectedAccess.url,
-        recipientKey: String(recipientKey || "").trim(),
-        browserReadExtensionId: chrome.runtime.id
-      }
+      payload
     });
 
-    if (response?.ok !== true) {
-      throw new Error(response?.error || "claude_clean_sync_failed");
+    if (response?.ok === true) {
+      return;
     }
   } catch (_error) {
-    throw new Error(
-      "Atualize e mantenha ativa a extensao Privacy Shield Admin para liberar o Claude Code Architect."
-    );
+    // Não bloquear: a extensão foi confirmada como instalada e habilitada.
   }
+
+  await chrome.storage.local.set({
+    claudeCleanCompanionStatus: {
+      extensionId: CLAUDE_CLEAN_EXTENSION_ID,
+      installed: true,
+      enabled: true,
+      syncPending: true,
+      payload,
+      checkedAt: Date.now()
+    }
+  });
 }
 
 async function syncCoursesDvdContentAccess(selectedAccess, recipientKey) {
