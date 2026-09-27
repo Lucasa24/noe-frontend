@@ -7,6 +7,8 @@
     companionReloadButton: document.querySelector("#reload-companion-extension"),
     coursesDvdPermissionButton: document.querySelector("#courses-dvd-permission"),
     coursesDvdPermissionHelp: document.querySelector("#courses-dvd-permission-help"),
+    autonextPermissionButton: document.querySelector("#autonext-permission"),
+    autonextPermissionHelp: document.querySelector("#autonext-permission-help"),
     recipientPicker: document.querySelector("#recipient-picker"),
     status: document.querySelector("#status"),
     postUnlock: document.querySelector("#post-unlock"),
@@ -57,9 +59,15 @@
   const MESSAGE_RESPONSE_TIMEOUT_MS = 30000;
   const ACADEMY_PASS_BROWSER_READ_ID = "njnehniaiehecdplafcbkdhhmjjcojfe";
   const ACADEMY_PASS_CLEAN_EXTENSION_ID = "papoapfhfciiaaadmmondbdkfhgilbki";
-  const COURSES_DVD_BROWSER_READ_ID = "nicnjmokndbjnpjlikgmnfkihkklobce";
+  const SHARED_BROWSER_READ_IDS = new Set([
+    "nicnjmokndbjnpjlikgmnfkihkklobce",
+    "nfnpblbakohfcnkngbimljiehklmdcmk",
+    "miipjameglmiodjgghegcidmkiemflg"
+  ]);
   const COURSES_DVD_EXTENSION_ID = "jamchgcokehlhclhjgooeihlhnoblmji";
+  const AUTONEXT_EXTENSION_ID = "ajbahhfleppkggefflekfencifmodjed";
   const DTC_EXPERIENCE_CONTENT_KEY = "dtc-experience";
+  const AUTONEXT_CONTENT_KEY = "comunidade-autonext-vibestack";
 
   init().catch((error) => {
     updateStatus(`Falha ao iniciar o bloqueio: ${error.message}`);
@@ -98,6 +106,10 @@
     void handleCoursesDvdPermission();
   });
 
+  elements.autonextPermissionButton?.addEventListener("click", () => {
+    void handleAutonextPermission();
+  });
+
   document.addEventListener("keydown", (event) => {
     if (!event.altKey || !event.shiftKey || event.key.toLowerCase() !== "r") {
       return;
@@ -113,6 +125,8 @@
     await loadExtensionConfig();
     await refreshLockState();
     await refreshCoursesDvdControls();
+    await refreshAutonextControls();
+    configureReloadButtons();
   }
 
   async function applyLockState(lockState) {
@@ -209,6 +223,13 @@
       if (response?.action === "courses_dvd_permission") {
         selectedContentKey = DTC_EXPERIENCE_CONTENT_KEY;
         await refreshCoursesDvdControls();
+        configureReloadButtons();
+      }
+
+      if (response?.action === "autonext_permission") {
+        selectedContentKey = AUTONEXT_CONTENT_KEY;
+        await refreshAutonextControls();
+        configureReloadButtons();
       }
       return;
     }
@@ -280,13 +301,19 @@
     return chrome.runtime.id === ACADEMY_PASS_BROWSER_READ_ID;
   }
 
+  function isSharedBrowserRead() {
+    return SHARED_BROWSER_READ_IDS.has(chrome.runtime.id);
+  }
+
   function isCoursesDvdBrowserRead() {
-    return chrome.runtime.id === COURSES_DVD_BROWSER_READ_ID;
+    return isSharedBrowserRead();
   }
 
   function configureReloadButtons() {
     const academyPass = isAcademyPassBrowserRead();
-    const coursesDvd = isCoursesDvdBrowserRead();
+    const sharedBrowser = isSharedBrowserRead();
+    const coursesDvd = sharedBrowser && selectedContentKey === DTC_EXPERIENCE_CONTENT_KEY;
+    const autonext = sharedBrowser && selectedContentKey === AUTONEXT_CONTENT_KEY;
     const ownHelp = document.querySelector("#reload-extension-help");
     const companionHelp = document.querySelector("#reload-companion-help");
 
@@ -295,11 +322,14 @@
     }
 
     if (elements.companionReloadButton) {
-      elements.companionReloadButton.hidden = !(academyPass || coursesDvd);
+      elements.companionReloadButton.hidden = !(academyPass || coursesDvd || autonext);
+
       if (academyPass) {
         elements.companionReloadButton.textContent = "♻ Recarregar Academy Pass Clean";
       } else if (coursesDvd) {
         elements.companionReloadButton.textContent = "♻ Recarregar extensão Cursos DVD";
+      } else if (autonext) {
+        elements.companionReloadButton.textContent = "♻ Recarregar extensão AutoNext";
       }
     }
 
@@ -308,11 +338,14 @@
     }
 
     if (companionHelp) {
-      companionHelp.hidden = !(academyPass || coursesDvd);
+      companionHelp.hidden = !(academyPass || coursesDvd || autonext);
+
       if (academyPass) {
         companionHelp.textContent = "Recarrega a extensão Academy Pass Clean ativa neste navegador sem fechar esta tela.";
       } else if (coursesDvd) {
         companionHelp.textContent = "Recarrega a extensão Cursos DVD instalada no mesmo navegador sem fechar esta tela.";
+      } else if (autonext) {
+        companionHelp.textContent = "Recarrega a extensão AutoNext Clean instalada no mesmo navegador sem fechar esta tela.";
       }
     }
   }
@@ -352,9 +385,39 @@
 
   async function handleReloadCompanionExtension() {
     const academyPass = isAcademyPassBrowserRead();
-    const coursesDvd = isCoursesDvdBrowserRead();
+    const sharedBrowser = isSharedBrowserRead();
+    const coursesDvd = sharedBrowser && selectedContentKey === DTC_EXPERIENCE_CONTENT_KEY;
+    const autonext = sharedBrowser && selectedContentKey === AUTONEXT_CONTENT_KEY;
 
-    if ((!academyPass && !coursesDvd) || elements.companionReloadButton?.disabled) {
+    if ((!academyPass && !coursesDvd && !autonext) || elements.companionReloadButton?.disabled) {
+      return;
+    }
+
+    if (autonext) {
+      if (elements.companionReloadButton) {
+        elements.companionReloadButton.disabled = true;
+        elements.companionReloadButton.textContent = "♻ Recarregando extensão AutoNext...";
+      }
+
+      updateStatus("Reiniciando a extensão AutoNext Clean...");
+
+      try {
+        const response = await sendMessage({ type: "lock:reloadAutonext" });
+        if (response?.ok) {
+          updateStatus("Extensão AutoNext Clean recarregada.");
+          await new Promise((resolve) => setTimeout(resolve, 600));
+          await refreshAutonextControls();
+        } else {
+          updateStatus(response?.error || "Não foi possível recarregar a extensão AutoNext Clean.");
+        }
+      } catch (error) {
+        updateStatus(`Não foi possível recarregar a extensão AutoNext Clean: ${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        if (elements.companionReloadButton) {
+          elements.companionReloadButton.disabled = false;
+          elements.companionReloadButton.textContent = "♻ Recarregar extensão AutoNext";
+        }
+      }
       return;
     }
 
@@ -578,6 +641,112 @@
     }
   }
 
+  function setAutonextPermissionUi({ visible = false, text = "" } = {}) {
+    if (elements.autonextPermissionButton) {
+      elements.autonextPermissionButton.hidden = !visible;
+    }
+
+    if (elements.autonextPermissionHelp) {
+      elements.autonextPermissionHelp.hidden = !text;
+      elements.autonextPermissionHelp.textContent = text;
+    }
+  }
+
+  async function refreshAutonextControls() {
+    if (!isSharedBrowserRead() || selectedContentKey !== AUTONEXT_CONTENT_KEY) {
+      setAutonextPermissionUi({ visible: false, text: "" });
+      return null;
+    }
+
+    const status = await sendMessage({ type: "lock:getAutonextStatus" });
+
+    if (!status?.installed) {
+      setAutonextPermissionUi({
+        visible: false,
+        text: "A extensão AutoNext Clean não foi encontrada neste navegador."
+      });
+      return status;
+    }
+
+    if (!status?.enabled) {
+      setAutonextPermissionUi({
+        visible: false,
+        text: "A extensão AutoNext Clean está instalada, mas desativada. Ative-a para continuar."
+      });
+      return status;
+    }
+
+    if (status?.hasPermission === true) {
+      setAutonextPermissionUi({
+        visible: false,
+        text: "Leitura AutoNext ativa. Após validar o código, a comunidade abrirá diretamente."
+      });
+      return status;
+    }
+
+    setAutonextPermissionUi({
+      visible: true,
+      text: "A extensão AutoNext está ON, mas a leitura ainda não foi concedida. Ative a leitura; na primeira autorização o navegador fechará automaticamente."
+    });
+    return status;
+  }
+
+  async function handleAutonextPermission() {
+    if (!isSharedBrowserRead() || selectedContentKey !== AUTONEXT_CONTENT_KEY) {
+      return;
+    }
+
+    if (elements.autonextPermissionButton) {
+      elements.autonextPermissionButton.disabled = true;
+      elements.autonextPermissionButton.textContent = "Abrindo ativação da leitura...";
+    }
+
+    try {
+      const status = await sendMessage({ type: "lock:getAutonextStatus" });
+
+      if (!status?.installed) {
+        updateStatus("A extensão AutoNext Clean não foi encontrada neste navegador.");
+        return;
+      }
+
+      if (!status?.enabled) {
+        updateStatus("A extensão AutoNext Clean está instalada, mas desativada.");
+        return;
+      }
+
+      if (status?.hasPermission === true) {
+        updateStatus("A leitura da extensão AutoNext já está ativa.");
+        await refreshAutonextControls();
+        return;
+      }
+
+      const currentTab = await chrome.tabs.getCurrent().catch(() => null);
+      const response = await sendMessage({
+        type: "lock:openAutonextPermission",
+        tabId: typeof currentTab?.id === "number" ? currentTab.id : null,
+        windowId: typeof currentTab?.windowId === "number" ? currentTab.windowId : null
+      });
+
+      if (!response?.ok) {
+        if (status?.permissionPageUrl) {
+          updateStatus("Abrindo diretamente a ativação da leitura AutoNext...");
+          window.location.assign(status.permissionPageUrl);
+          return;
+        }
+
+        updateStatus(response?.error || "Não foi possível abrir a ativação da leitura da extensão AutoNext.");
+        return;
+      }
+
+      updateStatus("Página de ativação da leitura AutoNext aberta. Conceda a permissão; na primeira autorização o navegador será fechado automaticamente, depois abra o perfil novamente, peça o código e acesse.");
+    } finally {
+      if (elements.autonextPermissionButton) {
+        elements.autonextPermissionButton.disabled = false;
+        elements.autonextPermissionButton.textContent = "🔓 Ativar leitura AUTONEXT & VIBESTACK";
+      }
+    }
+  }
+
   function normalizeAccessContents(value) {
     if (!Array.isArray(value)) {
       return [];
@@ -715,6 +884,8 @@
     selectedContentKey = contentKey;
     renderContentPicker();
     void refreshCoursesDvdControls();
+    void refreshAutonextControls();
+    configureReloadButtons();
     updateStatus(`Enviando código para ${recipient.label}...`);
 
     const response = await sendMessage({
@@ -940,6 +1111,8 @@
         recipientQuery = "";
         renderContentPicker();
         void refreshCoursesDvdControls();
+        void refreshAutonextControls();
+        configureReloadButtons();
         updateStatus("Escolha um conteúdo abaixo para solicitar um novo código.");
         return;
       }
@@ -972,6 +1145,8 @@
       recipientQuery = "";
       renderContentPicker();
       void refreshCoursesDvdControls();
+      void refreshAutonextControls();
+      configureReloadButtons();
 
       const content = accessContents.find((item) => item.key === selectedContentKey);
       updateStatus(`Escolha o destinatário para ${content?.label || "este conteúdo"}.`);
