@@ -43,6 +43,16 @@ const CLAUDE_CODE_HOTMART_AUTH_ORIGINS = Object.freeze([
   "https://sso-surrogate.hotmart.com"
 ]);
 
+const COMBO_VITALICIO_CONTENT_KEY = "combo-vitalicio-leandro-ladeira";
+const COMBO_VITALICIO_LABEL = "Combo vitalicio";
+const COMBO_VITALICIO_BASE_URL = "https://hotmart.com/pt-br/club/";
+const COMBO_VITALICIO_NAVIGATION_REGEX = "^https://hotmart\\.com/pt-br/club(?:/|\\?|$)";
+const COMBO_VITALICIO_ACCESS_MESSAGE = "browser-read:set-content-access";
+const COMBO_VITALICIO_EXTENSION_NAMES = ["combo vitalicio", "combo vitalício"];
+const COMBO_READ_PERMISSION_KEY = "comboVitalicioReadPermission";
+const COMBO_PERMISSION_PAGE_PATH = "combo-permission.html";
+const COMBO_LINKS_PAGE_PATH = "combo-links.html";
+
 const DTC_CONTENT_KEYS = new Set(["dtc-viral-lab", "dtc-experience"]);
 const DTC_ALLOWED_ORIGINS = ["https://dtcvirallab.com", "https://v2.aionmembers.com"];
 const DTC_ZOOM_SESSION_ORIGINS = new Set([
@@ -53,6 +63,7 @@ const DTC_ZOOM_ENTRY_REGEX = "^https://us05web\\.zoom\\.us/j/[0-9]{9,13}/?\\?pwd
 const DTC_ZOOM_WEB_CLIENT_REGEX = "^https://app\\.zoom\\.us/wc/(?:join/[0-9]{9,13}|[0-9]{9,13}/join)/?\\?(?:[^#&]*&)*pwd=[^&#\\s]+(?:&[^#]*)?(?:#.*)?$";
 const CONTENT_URL_FALLBACKS = {
   "comunidade-growth-hackers": "https://comunidadegrowthhackers.cademi.com.br/",
+  "combo-vitalicio-leandro-ladeira": COMBO_VITALICIO_BASE_URL,
   "dtc-viral-lab": "https://dtcvirallab.com/",
   "dtc-experience": "https://v2.aionmembers.com/"
 };
@@ -120,7 +131,7 @@ chrome.permissions?.onRemoved?.addListener(() => {
   void handleSiteAccessPolicyChange();
 });
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   void (async () => {
     try {
       if (message?.type === "lock:getState") {
@@ -183,6 +194,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
       if (message?.type === "lock:getRuntimeInfo") {
         sendResponse({ extensionId: chrome.runtime.id });
+        return;
+      }
+
+      if (message?.type === "combo:getReadPermission") {
+        sendResponse({
+          ok: true,
+          granted: await hasComboReadPermission(),
+          siteAccessGranted: await hasRequiredSiteAccess()
+        });
+        return;
+      }
+
+      if (message?.type === "combo:grantReadPermission") {
+        sendResponse(await grantComboReadPermission(sender));
         return;
       }
 
@@ -476,6 +501,62 @@ async function requestSiteAccessPrompt() {
   }
 }
 
+async function hasComboReadPermission() {
+  const data = await chrome.storage.local.get(COMBO_READ_PERMISSION_KEY);
+  const permission = data[COMBO_READ_PERMISSION_KEY];
+
+  return permission?.granted === true;
+}
+
+async function grantComboReadPermission(sender) {
+  const siteAccessGranted = await hasRequiredSiteAccess();
+
+  if (!siteAccessGranted) {
+    return {
+      ok: false,
+      error: getMissingSiteAccessMessage()
+    };
+  }
+
+  await chrome.storage.local.set({
+    [COMBO_READ_PERMISSION_KEY]: {
+      granted: true,
+      grantedAt: Date.now(),
+      extensionId: chrome.runtime.id
+    }
+  });
+
+  const tabId = sender?.tab?.id;
+
+  if (typeof tabId === "number") {
+    globalThis.setTimeout(() => {
+      void chrome.tabs.remove(tabId).catch(() => undefined);
+    }, 250);
+  }
+
+  return {
+    ok: true,
+    granted: true,
+    closeScheduled: typeof tabId === "number"
+  };
+}
+
+function getComboPermissionPageUrl() {
+  return chrome.runtime.getURL(COMBO_PERMISSION_PAGE_PATH);
+}
+
+function getComboLinksPageUrl() {
+  return chrome.runtime.getURL(COMBO_LINKS_PAGE_PATH);
+}
+
+function isComboPermissionPageUrl(url) {
+  return normalizeUrl(url) === normalizeUrl(getComboPermissionPageUrl());
+}
+
+function isComboLinksPageUrl(url) {
+  return normalizeUrl(url) === normalizeUrl(getComboLinksPageUrl());
+}
+
 async function verifyAccessCode(code) {
   const state = await ensureCurrentLockState("startup");
   const config = await getAuthConfig();
@@ -536,6 +617,26 @@ async function verifyAccessCode(code) {
       };
     }
 
+    if (isComboVitalicioState(state) && !(await hasComboReadPermission())) {
+      const permissionState = {
+        ...buildSiteAccessLockedState(state, config),
+        reason: "combo_read_permission"
+      };
+
+      await clearScopedNetworkRules();
+      await saveLockState(permissionState);
+      await syncComboVitalicioContentAccess(null, "", false, false).catch(() => {});
+      await notifyPixelGate(false, permissionState);
+      await updateBadge(permissionState);
+
+      return {
+        ok: true,
+        action: "combo_read_permission",
+        pageUrl: getComboPermissionPageUrl(),
+        state: toPublicLockState(permissionState)
+      };
+    }
+
     const updatedState = {
       ...state,
       unlocked: true,
@@ -547,8 +648,61 @@ async function verifyAccessCode(code) {
 
     await saveLockState(updatedState);
     await updateBadge(updatedState);
-    const restoredState = await enforceScopedBrowser(updatedState);
 
+    if (isComboVitalicioState(updatedState)) {
+      let comboState;
+
+      try {
+        await configureScopedNetworkRules(updatedState);
+        comboState = {
+          ...updatedState,
+          restorableTabs: [],
+          restoredTabsAt: Date.now()
+        };
+      } catch (_error) {
+        const relockedState = buildSiteAccessLockedState(updatedState, config);
+        await saveLockState(relockedState);
+        await syncComboVitalicioContentAccess(null, "", false, false).catch(() => {});
+        await notifyPixelGate(false, relockedState);
+        await updateBadge(relockedState);
+        await enforceLockedBrowser(relockedState);
+        return {
+          ok: false,
+          error: "Nao foi possivel aplicar as regras de acesso do Combo vitalicio."
+        };
+      }
+
+      try {
+        await syncComboVitalicioContentAccess({
+          key: comboState.contentKey,
+          label: comboState.allowedContentLabel || COMBO_VITALICIO_LABEL,
+          url: comboState.allowedContentUrl || COMBO_VITALICIO_BASE_URL
+        }, comboState.recipientKey, true, true);
+      } catch (error) {
+        const relockedState = buildSiteAccessLockedState(comboState, config);
+        await saveLockState(relockedState);
+        await syncComboVitalicioContentAccess(null, "", false, false).catch(() => {});
+        await notifyPixelGate(false, relockedState);
+        await updateBadge(relockedState);
+        await enforceLockedBrowser(relockedState);
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : "Nao foi possivel ativar o Combo vitalicio."
+        };
+      }
+
+      await saveLockState(comboState);
+      await notifyPixelGate(true, comboState);
+
+      return {
+        ok: true,
+        action: "combo_links",
+        pageUrl: getComboLinksPageUrl(),
+        state: toPublicLockState(comboState)
+      };
+    }
+
+    const restoredState = await enforceScopedBrowser(updatedState);
     await saveLockState(restoredState);
     await notifyPixelGate(restoredState?.unlocked === true, restoredState);
 
@@ -716,6 +870,12 @@ async function resolveSelectedContentAccess(contentKey, recipientKey) {
 }
 
 async function syncSelectedCompanionContentAccess(selectedAccess, recipientKey) {
+  if (selectedAccess?.key === COMBO_VITALICIO_CONTENT_KEY) {
+    return syncComboVitalicioContentAccess(selectedAccess, recipientKey, false, true);
+  }
+
+  await syncComboVitalicioContentAccess(null, "", false, false).catch(() => {});
+
   const shouldUseClaudeClean =
     chrome.runtime.id === CLAUDE_BROWSER_READ_EXTENSION_ID
     && selectedAccess?.key === CLAUDE_CODE_CONTENT_KEY;
@@ -725,6 +885,60 @@ async function syncSelectedCompanionContentAccess(selectedAccess, recipientKey) 
   }
 
   return syncCoursesDvdContentAccess(selectedAccess, recipientKey);
+}
+
+function normalizeExtensionDisplayName(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+async function findComboVitalicioExtension() {
+  if (!chrome.management?.getAll) return null;
+  const extensions = await chrome.management.getAll();
+  const allowedNames = COMBO_VITALICIO_EXTENSION_NAMES.map(normalizeExtensionDisplayName);
+  return extensions.find((item) => {
+    if (!item?.enabled || item.type !== "extension") return false;
+    return allowedNames.includes(normalizeExtensionDisplayName(item.name));
+  }) || null;
+}
+
+async function syncComboVitalicioContentAccess(selectedAccess, recipientKey, approved, required) {
+  const extensionInfo = await findComboVitalicioExtension();
+
+  if (!extensionInfo?.id) {
+    if (required) {
+      throw new Error("A extensao Combo vitalicio nao foi encontrada ou esta desativada.");
+    }
+    return false;
+  }
+
+  const payload = {
+    approved: approved === true,
+    contentKey: selectedAccess?.key || COMBO_VITALICIO_CONTENT_KEY,
+    contentLabel: selectedAccess?.label || COMBO_VITALICIO_LABEL,
+    contentUrl: selectedAccess?.url || COMBO_VITALICIO_BASE_URL,
+    recipientKey: String(recipientKey || "").trim(),
+    browserReadExtensionId: chrome.runtime.id
+  };
+
+  try {
+    const response = await chrome.runtime.sendMessage(extensionInfo.id, {
+      type: COMBO_VITALICIO_ACCESS_MESSAGE,
+      payload
+    });
+
+    if (response?.ok === true) return true;
+    if (required) throw new Error(response?.error || "combo_vitalicio_sync_failed");
+  } catch (_error) {
+    if (required) {
+      throw new Error("Atualize e mantenha ativa a extensao Combo vitalicio para liberar este conteudo.");
+    }
+  }
+
+  return false;
 }
 
 async function syncClaudeCleanContentAccess(selectedAccess, recipientKey) {
@@ -1542,6 +1756,44 @@ async function configureScopedNetworkRules(state) {
 
   await clearZoomMeetingSessions();
 
+  if (isComboVitalicioState(state)) {
+    const comboRules = [
+      {
+        id: SCOPED_BLOCK_RULE_ID,
+        priority: 1,
+        action: { type: "block" },
+        condition: {
+          regexFilter: "^https?://",
+          resourceTypes: ["main_frame"]
+        }
+      },
+      {
+        id: SCOPED_ALLOW_RULE_ID_START,
+        priority: 100,
+        action: { type: "allow" },
+        condition: {
+          regexFilter: COMBO_VITALICIO_NAVIGATION_REGEX,
+          resourceTypes: ["main_frame"]
+        }
+      }
+    ];
+
+    await chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: SCOPED_RULE_IDS,
+      addRules: comboRules
+    });
+
+    const activeRuleIds = new Set(
+      (await chrome.declarativeNetRequest.getDynamicRules()).map((rule) => rule.id)
+    );
+
+    if (!activeRuleIds.has(SCOPED_BLOCK_RULE_ID) ||
+        !activeRuleIds.has(SCOPED_ALLOW_RULE_ID_START)) {
+      throw new Error("combo_scoped_network_rules_not_applied");
+    }
+    return;
+  }
+
   const isDtcContent = isDtcContentState(state);
   const addRules = [
     {
@@ -1803,18 +2055,37 @@ function isValidSelectedAccessState(state) {
   );
 }
 
+function isComboVitalicioState(state) {
+  return String(state?.contentKey || "").trim() === COMBO_VITALICIO_CONTENT_KEY;
+}
+
+function isComboVitalicioUrl(url) {
+  try {
+    const parsed = new URL(String(url || "").trim());
+    const path = parsed.pathname.replace(/\/{2,}/g, "/");
+    return parsed.protocol === "https:"
+      && parsed.hostname === "hotmart.com"
+      && (path === "/pt-br/club" || path.startsWith("/pt-br/club/"));
+  } catch (_error) {
+    return false;
+  }
+}
+
 function isAllowedAfterUnlock(url, state) {
-  // A página de acesso e a página de bloqueio da extensão Cursos DVD são os
-  // únicos destinos internos permitidos após o desbloqueio. Sem isso, quando o
-  // Cursos DVD redireciona access.html -> blocked.html (usuário ainda não
-  // autorizou a leitura), esta extensão devolveria a aba para access.html,
-  // criando um loop infinito entre as duas extensões.
   if (isCoursesDvdAccessUrl(url) || isCoursesDvdBlockedUrl(url)) {
     return true;
   }
 
   if (!isValidSelectedAccessState(state)) {
     return false;
+  }
+
+  if (isComboVitalicioState(state)) {
+    if (isComboLinksPageUrl(url)) {
+      return true;
+    }
+
+    return isComboVitalicioUrl(url);
   }
 
   return getAllowedContentOrigins(state).includes(getUrlOrigin(url));
@@ -1832,6 +2103,7 @@ function isAllowedWhileLocked(url, state = null, tab = null) {
   }
 
   return normalizedUrl === normalizeUrl(getBlockedPageUrl())
+    || isComboPermissionPageUrl(normalizedUrl)
     || isExtensionsManagerUrl(normalizedUrl)
     || isCoursesDvdAccessUrl(normalizedUrl)
     || isCoursesDvdBlockedUrl(normalizedUrl)
