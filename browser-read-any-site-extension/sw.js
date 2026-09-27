@@ -1145,26 +1145,66 @@ async function openCoursesDvdPermissionPage(sender) {
     return { ok: false, error: "A extensao Cursos DVD esta instalada, mas desativada." };
   }
 
+  const permissionUrl = `${COURSES_DVD_BLOCKED_URL}?permissionGate=1`;
+  const senderTabId = typeof sender?.tab?.id === "number" ? sender.tab.id : null;
+  const senderWindowId = typeof sender?.tab?.windowId === "number" ? sender.tab.windowId : null;
+
   try {
     const response = await chrome.runtime.sendMessage(COURSES_DVD_EXTENSION_ID, {
       type: COURSES_DVD_OPEN_PERMISSION_MESSAGE,
-      payload: {
-        windowId: typeof sender?.tab?.windowId === "number" ? sender.tab.windowId : null
-      }
+      payload: { windowId: senderWindowId }
     });
 
     if (response?.ok === true) {
       return response;
     }
 
+    // Compatibilidade com versões antigas do #CURSOS - DVD:
+    // se o service worker ainda não conhece o comando, o próprio Browser Read
+    // navega diretamente para a página de permissão da extensão companheira.
+    if (
+      response?.error !== "unsupported_external_message"
+      && response?.error !== "unsupported_message"
+    ) {
+      return {
+        ok: false,
+        error: response?.error || "Nao foi possivel abrir a pagina de ativacao da leitura."
+      };
+    }
+  } catch (_error) {
+    // Continua para o fallback direto abaixo.
+  }
+
+  try {
+    if (senderTabId !== null) {
+      const updated = await chrome.tabs.update(senderTabId, {
+        url: permissionUrl,
+        active: true
+      });
+      return {
+        ok: true,
+        mode: "direct_navigation",
+        pageUrl: updated?.url || permissionUrl,
+        tabId: senderTabId
+      };
+    }
+
+    const created = await chrome.tabs.create({
+      url: permissionUrl,
+      active: true,
+      ...(senderWindowId !== null ? { windowId: senderWindowId } : {})
+    });
+
     return {
-      ok: false,
-      error: response?.error || "Nao foi possivel abrir a pagina de ativacao da leitura."
+      ok: true,
+      mode: "direct_navigation",
+      pageUrl: created?.url || permissionUrl,
+      tabId: created?.id
     };
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : "Nao foi possivel abrir a pagina de ativacao da leitura."
+      error: `Nao foi possivel abrir a pagina de ativacao da leitura: ${error instanceof Error ? error.message : String(error)}`
     };
   }
 }
