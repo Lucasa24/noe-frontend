@@ -15,7 +15,7 @@ const ACCESS_CONTENTS = [
   { key: "academy-pass", label: "Academy Pass", url: "https://app.academypass.ai/", allowedRecipientNames: ["Hugo", "Janderson", "~ Solicitar Ativação com Adm", "Sam", "Gabriel Solano", "Lira", "Moisés"] },
   { key: "pixel-ai-hub", label: "PIXEL AI HUB", url: "https://app.pixeleducacao.com.br/", allowedRecipientNames: ["Davidson", "Deivis", "Vitor", "LGA", "adspc7", "~ Solicitar Ativação com Adm", "Sam", "Gabriel Solano", "Lira", "Moisés"] },
   { key: "comunidade-growth-hackers", label: "Comunidade Growth Hackers", url: "https://comunidadegrowthhackers.cademi.com.br/", allowedRecipientNames: ["andre", "Janderson", "~ Solicitar Ativação com Adm", "Sam", "Moisés"] },
-  { key: "combo-vitalicio-leandro-ladeira", label: "Combo Vitalício — Leandro Ladeira", allowedRecipientNames: ["Gabriel Solano", "Moisés"] },
+  { key: "combo-vitalicio-leandro-ladeira", label: "Combo vitalicio", url: "https://hotmart.com/pt-br/club/", allowedRecipientNames: ["Gabriel Solano", "Moisés", "~ Solicitar Ativação com Adm"] },
   { key: "edu-led-growth", label: "Edu-Led Growth", allowedRecipientNames: ["Gabriel Solano", "Moisés"] },
   { key: "comunidade-autonext-vibestack", label: "COMUNIDADE AUTONEXT & VIBESTACK", allowedRecipientNames: ["Gabriel Solano"] },
   { key: "dtc-viral-lab", label: "DTC VIRAL LAB", allowedRecipientNames: ["João", "Igor", "Wesley", "Janderson", "adspc7", "~ Solicitar Ativação com Adm"] },
