@@ -1,6 +1,8 @@
 const crypto = require("crypto");
 
 const DEFAULT_TTL_MINUTES = 10;
+const CLAUDE_CODE_ARCHITECT_EXTENSION_ID = "hbokpkaoocpcecbfgfadoplblcfannke";
+const CLAUDE_CODE_ARCHITECT_DISPLAY_NAME = "CLAUDE CODE ARCHITECT";
 const EXTENSION_CONFIG_ID_ALIASES = Object.freeze({
   // ID original observado no AdsPower/SunBrowser para o pacote CURSOS - DVD.
   // O alias afeta apenas a busca de configuração/destinatários no servidor;
@@ -23,7 +25,7 @@ const EXTENSION_DISPLAY_NAMES = {
   ocnhopnkhbkgknjhpfcmbihmialpjboj: "PLANO DVD 3.1",
   gklblkkcpmbmnnmjclppoldcdbimoafc: "Verificação de Atualização em Plataformas",
   kjlkomgkandjgpmecnfnindkkgdjadpe: "Autodark",
-  hbokpkaoocpcecbfgfadoplblcfannke: "CLAUDE CODE ARCHITECT",
+  [CLAUDE_CODE_ARCHITECT_EXTENSION_ID]: CLAUDE_CODE_ARCHITECT_DISPLAY_NAME,
   ibkaciaphpkbfikgjnjjfbjcdenlciia: "BLUEPRINTPRO - BRANDSDECODED",
   ebfndfgcpnomfmbnpfhnghbemgogoehl: "Rhawk.pro",
   icbfelnhpolnnlcamcmkadkdkmngdepa: "Rhawk.pro",
