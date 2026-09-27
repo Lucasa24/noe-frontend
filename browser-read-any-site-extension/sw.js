@@ -24,6 +24,7 @@ const COURSES_DVD_BLOCKED_URL = `chrome-extension://${COURSES_DVD_EXTENSION_ID}/
 const COURSES_DVD_ACCESS_MESSAGE = "browser-read:set-content-access";
 const COURSES_DVD_STATUS_MESSAGE = "browser-read:get-companion-status";
 const COURSES_DVD_RELOAD_MESSAGE = "browser-read:reload-extension";
+const COURSES_DVD_OPEN_PERMISSION_MESSAGE = "browser-read:open-permission-page";
 const SCOPED_BLOCK_RULE_ID = 9101;
 const SCOPED_ALLOW_RULE_ID_START = 9102;
 const SCOPED_ZOOM_ENTRY_RULE_ID = SCOPED_ALLOW_RULE_ID_START + 2;
@@ -202,6 +203,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       if (message?.type === "lock:getCoursesDvdStatus") {
         sendResponse(await getCoursesDvdStatus());
+        return;
+      }
+
+      if (message?.type === "lock:openCoursesDvdPermission") {
+        sendResponse(await openCoursesDvdPermissionPage(sender));
         return;
       }
 
@@ -1124,6 +1130,41 @@ async function getCoursesDvdStatus() {
       permissionPageUrl,
       targetUrl: CONTENT_URL_FALLBACKS[DTC_EXPERIENCE_CONTENT_KEY],
       error: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
+async function openCoursesDvdPermissionPage(sender) {
+  const extensionInfo = await getCoursesDvdExtensionInfo();
+
+  if (!extensionInfo?.id) {
+    return { ok: false, error: "A extensao Cursos DVD nao foi encontrada neste navegador." };
+  }
+
+  if (!extensionInfo.enabled) {
+    return { ok: false, error: "A extensao Cursos DVD esta instalada, mas desativada." };
+  }
+
+  try {
+    const response = await chrome.runtime.sendMessage(COURSES_DVD_EXTENSION_ID, {
+      type: COURSES_DVD_OPEN_PERMISSION_MESSAGE,
+      payload: {
+        windowId: typeof sender?.tab?.windowId === "number" ? sender.tab.windowId : null
+      }
+    });
+
+    if (response?.ok === true) {
+      return response;
+    }
+
+    return {
+      ok: false,
+      error: response?.error || "Nao foi possivel abrir a pagina de ativacao da leitura."
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Nao foi possivel abrir a pagina de ativacao da leitura."
     };
   }
 }
