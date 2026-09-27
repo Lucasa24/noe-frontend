@@ -2,12 +2,14 @@ const { listRecipientsForExtension } = require("./access-service");
 
 const CONTENT_SELECTOR_CONFIG_ID = "nicnjmokndbjnpjlikgmnfkihkklobce";
 const PIXEL_AI_HUB_CONFIG_ID = "aachjpoooepljhlphhaplfijppgbjdfp";
+const COMBO_BROWSER_READ_RUNTIME_ID = "miipjameglmiodjjgghegcidmkiefmlg";
 const CONTENT_SELECTOR_EXTENSION_IDS = new Set([
   CONTENT_SELECTOR_CONFIG_ID,
   "nfnpblbakohfcnkngbimljiehklmdcmk",
   PIXEL_AI_HUB_CONFIG_ID,
   "hbokpkaoocpcecbfgfadoplblcfannke",
-  "njnehniaiehecdplafcbkdhhmjjcojfe"
+  "njnehniaiehecdplafcbkdhhmjjcojfe",
+  COMBO_BROWSER_READ_RUNTIME_ID
 ]);
 
 const ACCESS_CONTENTS = [
@@ -15,12 +17,26 @@ const ACCESS_CONTENTS = [
   { key: "academy-pass", label: "Academy Pass", url: "https://app.academypass.ai/", allowedRecipientNames: ["Hugo", "Janderson", "~ Solicitar Ativação com Adm", "Sam", "Gabriel Solano", "Lira", "Moisés"] },
   { key: "pixel-ai-hub", label: "PIXEL AI HUB", url: "https://app.pixeleducacao.com.br/", allowedRecipientNames: ["Davidson", "Deivis", "Vitor", "LGA", "adspc7", "~ Solicitar Ativação com Adm", "Sam", "Gabriel Solano", "Lira", "Moisés"] },
   { key: "comunidade-growth-hackers", label: "Comunidade Growth Hackers", url: "https://comunidadegrowthhackers.cademi.com.br/", allowedRecipientNames: ["andre", "Janderson", "~ Solicitar Ativação com Adm", "Sam", "Moisés"] },
-  { key: "combo-vitalicio-leandro-ladeira", label: "Combo vitalicio", url: "https://hotmart.com/pt-br/club/", allowedRecipientNames: ["Gabriel Solano", "Moisés", "~ Solicitar Ativação com Adm"] },
-  { key: "edu-led-growth", label: "Edu-Led Growth", allowedRecipientNames: ["Gabriel Solano", "Moisés"] },
+  { key: "combo-vitalicio-leandro-ladeira", label: "COMBO VITALICIO", url: "https://hotmart.com/pt-br/club/", allowedRecipientNames: ["Gabriel Solano", "Moisés", "~ Solicitar Ativação com Adm"] },
+  { key: "ai-coding", label: "AI CODING", url: "https://app.hub.la/m/vNGHcQ35ONNqWKbIFcEw", allowedRecipientNames: ["~ Solicitar Ativação com Adm"] },
+  { key: "edu-led-growth", label: "EDU-LED GROWTH", allowedRecipientNames: ["Gabriel Solano", "Moisés"] },
   { key: "comunidade-autonext-vibestack", label: "COMUNIDADE AUTONEXT & VIBESTACK", allowedRecipientNames: ["Gabriel Solano"] },
   { key: "dtc-viral-lab", label: "DTC VIRAL LAB", allowedRecipientNames: ["João", "Igor", "Wesley", "Janderson", "adspc7", "~ Solicitar Ativação com Adm"] },
   { key: "dtc-experience", label: "DTC EXPERIENCE", allowedRecipientNames: ["João", "Igor", "Wesley", "Janderson", "adspc7", "~ Solicitar Ativação com Adm", "Sam"] }
 ];
+
+const COMBO_BROWSER_READ_CONTENT_KEYS = new Set([
+  "combo-vitalicio-leandro-ladeira",
+  "ai-coding",
+  "edu-led-growth",
+  "comunidade-autonext-vibestack"
+]);
+
+function getAccessContentsForExtension(extensionId) {
+  const normalizedExtensionId = String(extensionId || "").trim();
+  if (normalizedExtensionId !== COMBO_BROWSER_READ_RUNTIME_ID) return ACCESS_CONTENTS;
+  return ACCESS_CONTENTS.filter((item) => COMBO_BROWSER_READ_CONTENT_KEYS.has(item.key));
+}
 
 function isContentSelectorEnabled(extensionId) {
   return CONTENT_SELECTOR_EXTENSION_IDS.has(String(extensionId || "").trim());
@@ -43,7 +59,7 @@ function getContentSelectorConfigId(extensionId, contentKey = "") {
 
 function getPublicAccessContents(extensionId) {
   if (!isContentSelectorEnabled(extensionId)) return [];
-  return ACCESS_CONTENTS.map(({ key, label, url, allowedRecipientNames }) => {
+  return getAccessContentsForExtension(extensionId).map(({ key, label, url, allowedRecipientNames }) => {
     const recipients = getAllowedRecipients(extensionId, key, allowedRecipientNames);
     return { key, label, url: url || "", available: recipients.length > 0, recipients: recipients.map(({ key: recipientKey, label: recipientLabel }) => ({ key: recipientKey, label: recipientLabel })) };
   });
@@ -51,7 +67,7 @@ function getPublicAccessContents(extensionId) {
 
 function resolveContentRecipientKey({ extensionId, contentKey, recipientKey }) {
   if (!isContentSelectorEnabled(extensionId)) return "";
-  const content = ACCESS_CONTENTS.find((item) => item.key === String(contentKey || "").trim());
+  const content = getAccessContentsForExtension(extensionId).find((item) => item.key === String(contentKey || "").trim());
   if (!content) throw createError("content_not_found", 400);
   if (content.allowedRecipientNames.length === 0) throw createError("content_unavailable", 403);
   const recipients = getAllowedRecipients(extensionId, content.key, content.allowedRecipientNames);
