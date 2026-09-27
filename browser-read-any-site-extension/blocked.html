@@ -244,7 +244,8 @@
 
       #reload-extension,
       #reload-companion-extension,
-      #courses-dvd-permission {
+      #courses-dvd-permission,
+      #autonext-permission {
         width: 100%;
         margin-top: 14px;
         padding: 11px 14px;
@@ -258,14 +259,16 @@
 
       #reload-extension:hover,
       #reload-companion-extension:hover,
-      #courses-dvd-permission:hover {
+      #courses-dvd-permission:hover,
+      #autonext-permission:hover {
         background: rgba(37, 99, 235, 0.18);
         color: #eff6ff;
       }
 
       #reload-extension:disabled,
       #reload-companion-extension:disabled,
-      #courses-dvd-permission:disabled {
+      #courses-dvd-permission:disabled,
+      #autonext-permission:disabled {
         cursor: wait;
         opacity: 0.65;
       }
@@ -631,6 +634,8 @@
       <p id="reload-companion-help" class="reload-help" hidden>Recarrega a extensão de conteúdo associada sem fechar esta tela.</p>
       <button id="courses-dvd-permission" type="button" hidden>🔓 Ativar leitura Cursos DVD</button>
       <p id="courses-dvd-permission-help" class="reload-help" hidden></p>
+      <button id="autonext-permission" type="button" hidden>🔓 Ativar leitura AUTONEXT & VIBESTACK</button>
+      <p id="autonext-permission-help" class="reload-help" hidden></p>
       <div id="status"></div>
       <div id="post-unlock">Acesso liberado. Agora voce pode abrir novas abas normalmente.</div>
     </main>
