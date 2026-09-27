@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Browser Read Any Site",
-  "version": "1.3.30",
-  "description": "Browser Read com acesso restrito por conteúdo e suporte ao SSO da Hotmart no Claude Code Architect.",
+  "version": "1.3.31",
+  "description": "Browser Read com integração direta ao Privacy Shield Admin no Claude Code Architect.",
   "permissions": [
     "scripting",
     "storage",
