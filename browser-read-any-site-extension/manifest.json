@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Browser Read Any Site",
-  "version": "1.3.34",
-  "description": "Browser Read com fluxo em duas etapas para Combo Vitalicio: permissao de leitura e pagina segura de links apos validacao.",
+  "version": "1.3.35",
+  "description": "Browser Read com integração do DTC Experience ao Cursos DVD, ativação de leitura e abertura direta no Aion Members.",
   "permissions": [
     "scripting",
     "storage",
