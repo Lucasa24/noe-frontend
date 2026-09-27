@@ -787,14 +787,22 @@
     attachContentPickerListeners(picker);
 
     const searchInput = picker.querySelector("#recipient-search");
+    if (searchInput instanceof HTMLInputElement) {
+      searchInput.value = contentQuery;
+    }
+
+    renderContentsList(picker);
+    picker.style.display = "block";
+  }
+
+  function renderContentsList(picker) {
     const list = picker.querySelector("#recipient-list");
     const emptyState = picker.querySelector("#recipient-empty");
 
-    if (!(searchInput instanceof HTMLInputElement) || !(list instanceof HTMLUListElement) || !(emptyState instanceof HTMLElement)) {
+    if (!(list instanceof HTMLUListElement) || !(emptyState instanceof HTMLElement)) {
       return;
     }
 
-    searchInput.value = contentQuery;
     const visibleContents = filterContents(accessContents, contentQuery);
 
     list.innerHTML = visibleContents.map((item) => {
@@ -818,7 +826,6 @@
       `;
     }).join("");
     emptyState.hidden = visibleContents.length > 0;
-    picker.style.display = "block";
   }
 
   function renderRecipientPicker(picker, content) {
@@ -843,14 +850,23 @@
     attachContentPickerListeners(picker);
 
     const searchInput = picker.querySelector("#recipient-search");
+    if (searchInput instanceof HTMLInputElement) {
+      searchInput.value = recipientQuery;
+    }
+
+    renderRecipientList(picker, content);
+    picker.style.display = "block";
+  }
+
+  function renderRecipientList(picker, content) {
+    const recipients = Array.isArray(content.recipients) ? content.recipients : [];
     const list = picker.querySelector("#recipient-list");
     const emptyState = picker.querySelector("#recipient-empty");
 
-    if (!(searchInput instanceof HTMLInputElement) || !(list instanceof HTMLUListElement) || !(emptyState instanceof HTMLElement)) {
+    if (!(list instanceof HTMLUListElement) || !(emptyState instanceof HTMLElement)) {
       return;
     }
 
-    searchInput.value = recipientQuery;
     const visibleRecipients = filterRecipients(recipients, recipientQuery);
 
     list.innerHTML = visibleRecipients.map((item) => `
@@ -870,7 +886,6 @@
       </li>
     `).join("");
     emptyState.hidden = recipients.length === 0 || visibleRecipients.length > 0;
-    picker.style.display = "block";
   }
 
   function attachContentPickerListeners(picker) {
@@ -881,14 +896,23 @@
     picker.addEventListener("input", (event) => {
       const target = event.target;
 
-      if (target instanceof HTMLInputElement && target.id === "recipient-search") {
-        if (selectedContentKey) {
-          recipientQuery = target.value;
-        } else {
-          contentQuery = target.value;
-        }
-        renderContentPicker();
+      if (!(target instanceof HTMLInputElement) || target.id !== "recipient-search") {
+        return;
       }
+
+      // Não recrie o <input> enquanto o usuário digita. Recriar o picker
+      // aqui fazia o campo perder foco/cursor após cada caractere.
+      if (selectedContentKey) {
+        recipientQuery = target.value;
+        const selectedContent = accessContents.find((item) => item.key === selectedContentKey);
+        if (selectedContent) {
+          renderRecipientList(picker, selectedContent);
+        }
+        return;
+      }
+
+      contentQuery = target.value;
+      renderContentsList(picker);
     });
 
     picker.addEventListener("click", (event) => {
