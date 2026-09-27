@@ -551,12 +551,14 @@
         return;
       }
 
-      if (!status?.permissionPageUrl) {
-        updateStatus("Não foi possível abrir a ativação da leitura da extensão Cursos DVD.");
+      const response = await sendMessage({ type: "lock:openCoursesDvdPermission" });
+
+      if (!response?.ok) {
+        updateStatus(response?.error || "Não foi possível abrir a ativação da leitura da extensão Cursos DVD.");
         return;
       }
 
-      window.location.assign(status.permissionPageUrl);
+      updateStatus("Página de ativação da leitura Cursos DVD aberta. Conceda a permissão; na primeira autorização o navegador será fechado automaticamente.");
     } finally {
       if (elements.coursesDvdPermissionButton) {
         elements.coursesDvdPermissionButton.disabled = false;
