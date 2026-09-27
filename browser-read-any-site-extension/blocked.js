@@ -5,6 +5,8 @@
     submitButton: document.querySelector("#submit-action"),
     reloadButton: document.querySelector("#reload-extension"),
     companionReloadButton: document.querySelector("#reload-companion-extension"),
+    coursesDvdPermissionButton: document.querySelector("#courses-dvd-permission"),
+    coursesDvdPermissionHelp: document.querySelector("#courses-dvd-permission-help"),
     recipientPicker: document.querySelector("#recipient-picker"),
     status: document.querySelector("#status"),
     postUnlock: document.querySelector("#post-unlock"),
@@ -55,6 +57,9 @@
   const MESSAGE_RESPONSE_TIMEOUT_MS = 30000;
   const ACADEMY_PASS_BROWSER_READ_ID = "njnehniaiehecdplafcbkdhhmjjcojfe";
   const ACADEMY_PASS_CLEAN_EXTENSION_ID = "papoapfhfciiaaadmmondbdkfhgilbki";
+  const COURSES_DVD_BROWSER_READ_ID = "nicnjmokndbjnpjlikgmnfkihkklobce";
+  const COURSES_DVD_EXTENSION_ID = "jamchgcokehlhclhjgooeihlhnoblmji";
+  const DTC_EXPERIENCE_CONTENT_KEY = "dtc-experience";
 
   init().catch((error) => {
     updateStatus(`Falha ao iniciar o bloqueio: ${error.message}`);
@@ -89,6 +94,10 @@
     void handleReloadCompanionExtension();
   });
 
+  elements.coursesDvdPermissionButton?.addEventListener("click", () => {
+    void handleCoursesDvdPermission();
+  });
+
   document.addEventListener("keydown", (event) => {
     if (!event.altKey || !event.shiftKey || event.key.toLowerCase() !== "r") {
       return;
@@ -103,6 +112,7 @@
     await loadPendingProfileClearances();
     await loadExtensionConfig();
     await refreshLockState();
+    await refreshCoursesDvdControls();
   }
 
   async function applyLockState(lockState) {
@@ -196,6 +206,10 @@
 
     if (!response?.ok) {
       updateStatus(response?.error || "Nao foi possivel validar o codigo.");
+      if (response?.action === "courses_dvd_permission") {
+        selectedContentKey = DTC_EXPERIENCE_CONTENT_KEY;
+        await refreshCoursesDvdControls();
+      }
       return;
     }
 
@@ -266,8 +280,13 @@
     return chrome.runtime.id === ACADEMY_PASS_BROWSER_READ_ID;
   }
 
+  function isCoursesDvdBrowserRead() {
+    return chrome.runtime.id === COURSES_DVD_BROWSER_READ_ID;
+  }
+
   function configureReloadButtons() {
     const academyPass = isAcademyPassBrowserRead();
+    const coursesDvd = isCoursesDvdBrowserRead();
     const ownHelp = document.querySelector("#reload-extension-help");
     const companionHelp = document.querySelector("#reload-companion-help");
 
@@ -276,9 +295,11 @@
     }
 
     if (elements.companionReloadButton) {
-      elements.companionReloadButton.hidden = !academyPass;
+      elements.companionReloadButton.hidden = !(academyPass || coursesDvd);
       if (academyPass) {
         elements.companionReloadButton.textContent = "♻ Recarregar Academy Pass Clean";
+      } else if (coursesDvd) {
+        elements.companionReloadButton.textContent = "♻ Recarregar extensão Cursos DVD";
       }
     }
 
@@ -287,9 +308,11 @@
     }
 
     if (companionHelp) {
-      companionHelp.hidden = !academyPass;
+      companionHelp.hidden = !(academyPass || coursesDvd);
       if (academyPass) {
         companionHelp.textContent = "Recarrega a extensão Academy Pass Clean ativa neste navegador sem fechar esta tela.";
+      } else if (coursesDvd) {
+        companionHelp.textContent = "Recarrega a extensão Cursos DVD instalada no mesmo navegador sem fechar esta tela.";
       }
     }
   }
@@ -328,7 +351,38 @@
   }
 
   async function handleReloadCompanionExtension() {
-    if (!isAcademyPassBrowserRead() || elements.companionReloadButton?.disabled) {
+    const academyPass = isAcademyPassBrowserRead();
+    const coursesDvd = isCoursesDvdBrowserRead();
+
+    if ((!academyPass && !coursesDvd) || elements.companionReloadButton?.disabled) {
+      return;
+    }
+
+    if (coursesDvd) {
+      if (elements.companionReloadButton) {
+        elements.companionReloadButton.disabled = true;
+        elements.companionReloadButton.textContent = "♻ Recarregando extensão Cursos DVD...";
+      }
+
+      updateStatus("Reiniciando a extensão Cursos DVD...");
+
+      try {
+        const response = await sendMessage({ type: "lock:reloadCoursesDvd" });
+        if (response?.ok) {
+          updateStatus("Extensão Cursos DVD recarregada.");
+          await new Promise((resolve) => setTimeout(resolve, 600));
+          await refreshCoursesDvdControls();
+        } else {
+          updateStatus(response?.error || "Não foi possível recarregar a extensão Cursos DVD.");
+        }
+      } catch (error) {
+        updateStatus(`Não foi possível recarregar a extensão Cursos DVD: ${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        if (elements.companionReloadButton) {
+          elements.companionReloadButton.disabled = false;
+          elements.companionReloadButton.textContent = "♻ Recarregar extensão Cursos DVD";
+        }
+      }
       return;
     }
 
@@ -417,6 +471,98 @@
         });
       }
     });
+  }
+
+  function setCoursesDvdPermissionUi({ visible = false, text = "" } = {}) {
+    if (elements.coursesDvdPermissionButton) {
+      elements.coursesDvdPermissionButton.hidden = !visible;
+    }
+    if (elements.coursesDvdPermissionHelp) {
+      elements.coursesDvdPermissionHelp.hidden = !text;
+      elements.coursesDvdPermissionHelp.textContent = text;
+    }
+  }
+
+  async function refreshCoursesDvdControls() {
+    if (!isCoursesDvdBrowserRead() || selectedContentKey !== DTC_EXPERIENCE_CONTENT_KEY) {
+      setCoursesDvdPermissionUi({ visible: false, text: "" });
+      return null;
+    }
+
+    const status = await sendMessage({ type: "lock:getCoursesDvdStatus" });
+
+    if (!status?.installed) {
+      setCoursesDvdPermissionUi({
+        visible: false,
+        text: "A extensão Cursos DVD não foi encontrada neste navegador."
+      });
+      return status;
+    }
+
+    if (!status?.enabled) {
+      setCoursesDvdPermissionUi({
+        visible: false,
+        text: "A extensão Cursos DVD está instalada, mas desativada. Ative-a para continuar."
+      });
+      return status;
+    }
+
+    if (status?.hasPermission === true) {
+      setCoursesDvdPermissionUi({
+        visible: false,
+        text: "Leitura Cursos DVD ativa. Após validar o código, o DTC Experience abrirá direto em v2.aionmembers.com."
+      });
+      return status;
+    }
+
+    setCoursesDvdPermissionUi({
+      visible: true,
+      text: "A extensão Cursos DVD está ON, mas a leitura ainda não foi concedida. Ative a leitura; na primeira autorização o navegador fechará automaticamente."
+    });
+    return status;
+  }
+
+  async function handleCoursesDvdPermission() {
+    if (!isCoursesDvdBrowserRead() || selectedContentKey !== DTC_EXPERIENCE_CONTENT_KEY) {
+      return;
+    }
+
+    if (elements.coursesDvdPermissionButton) {
+      elements.coursesDvdPermissionButton.disabled = true;
+      elements.coursesDvdPermissionButton.textContent = "Abrindo ativação da leitura...";
+    }
+
+    try {
+      const status = await sendMessage({ type: "lock:getCoursesDvdStatus" });
+
+      if (!status?.installed) {
+        updateStatus("A extensão Cursos DVD não foi encontrada neste navegador.");
+        return;
+      }
+
+      if (!status?.enabled) {
+        updateStatus("A extensão Cursos DVD está instalada, mas desativada.");
+        return;
+      }
+
+      if (status?.hasPermission === true) {
+        updateStatus("A leitura da extensão Cursos DVD já está ativa.");
+        await refreshCoursesDvdControls();
+        return;
+      }
+
+      if (!status?.permissionPageUrl) {
+        updateStatus("Não foi possível abrir a ativação da leitura da extensão Cursos DVD.");
+        return;
+      }
+
+      window.location.assign(status.permissionPageUrl);
+    } finally {
+      if (elements.coursesDvdPermissionButton) {
+        elements.coursesDvdPermissionButton.disabled = false;
+        elements.coursesDvdPermissionButton.textContent = "🔓 Ativar leitura Cursos DVD";
+      }
+    }
   }
 
   function normalizeAccessContents(value) {
@@ -555,6 +701,7 @@
 
     selectedContentKey = contentKey;
     renderContentPicker();
+    void refreshCoursesDvdControls();
     updateStatus(`Enviando código para ${recipient.label}...`);
 
     const response = await sendMessage({
@@ -755,6 +902,7 @@
         selectedContentKey = "";
         recipientQuery = "";
         renderContentPicker();
+        void refreshCoursesDvdControls();
         updateStatus("Escolha um conteúdo abaixo para solicitar um novo código.");
         return;
       }
@@ -786,6 +934,7 @@
       selectedContentKey = String(key || "");
       recipientQuery = "";
       renderContentPicker();
+      void refreshCoursesDvdControls();
 
       const content = accessContents.find((item) => item.key === selectedContentKey);
       updateStatus(`Escolha o destinatário para ${content?.label || "este conteúdo"}.`);
