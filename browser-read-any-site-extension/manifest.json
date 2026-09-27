@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Browser Read Any Site",
-  "version": "1.3.37",
-  "description": "Browser Read com busca estável no blocked.html, integração DTC Experience e Cursos DVD.",
+  "version": "1.3.38",
+  "description": "Browser Read com fallback direto para ativação de leitura do Cursos DVD e busca estável no blocked.html.",
   "permissions": [
     "scripting",
     "storage",
