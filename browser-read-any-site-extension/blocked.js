@@ -554,6 +554,12 @@
       const response = await sendMessage({ type: "lock:openCoursesDvdPermission" });
 
       if (!response?.ok) {
+        if (status?.permissionPageUrl) {
+          updateStatus("Abrindo diretamente a ativação da leitura Cursos DVD...");
+          window.location.assign(status.permissionPageUrl);
+          return;
+        }
+
         updateStatus(response?.error || "Não foi possível abrir a ativação da leitura da extensão Cursos DVD.");
         return;
       }
