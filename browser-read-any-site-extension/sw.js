@@ -54,13 +54,20 @@ const SCOPED_BLOCK_RULE_ID = 9101;
 const SCOPED_ALLOW_RULE_ID_START = 9102;
 const SCOPED_ZOOM_ENTRY_RULE_ID = SCOPED_ALLOW_RULE_ID_START + 2;
 const SCOPED_ZOOM_WEB_CLIENT_RULE_ID = SCOPED_ALLOW_RULE_ID_START + 3;
+const COMBO_SCOPED_ALLOW_RULE_ID_START = 9301;
+const COMBO_SCOPED_ALLOW_RULE_COUNT = 14;
+const COMBO_SCOPED_ALLOW_RULE_IDS = Array.from(
+  { length: COMBO_SCOPED_ALLOW_RULE_COUNT },
+  (_, index) => COMBO_SCOPED_ALLOW_RULE_ID_START + index
+);
 const ZOOM_SESSION_ALLOW_RULE_ID = 9201;
 const SCOPED_RULE_IDS = [
   SCOPED_BLOCK_RULE_ID,
   SCOPED_ALLOW_RULE_ID_START,
   SCOPED_ALLOW_RULE_ID_START + 1,
   SCOPED_ZOOM_ENTRY_RULE_ID,
-  SCOPED_ZOOM_WEB_CLIENT_RULE_ID
+  SCOPED_ZOOM_WEB_CLIENT_RULE_ID,
+  ...COMBO_SCOPED_ALLOW_RULE_IDS
 ];
 const CLAUDE_BROWSER_READ_EXTENSION_ID = "hbokpkaoocpcecbfgfadoplblcfannke";
 const CLAUDE_CLEAN_EXTENSION_ID = "gphcdebdfhjiomklliooamglagpphnii";
@@ -74,7 +81,6 @@ const CLAUDE_CODE_HOTMART_AUTH_ORIGINS = Object.freeze([
 const COMBO_VITALICIO_CONTENT_KEY = "combo-vitalicio-leandro-ladeira";
 const COMBO_VITALICIO_LABEL = "Combo vitalicio";
 const COMBO_VITALICIO_BASE_URL = "https://hotmart.com/pt-br/club/";
-const COMBO_VITALICIO_ALLOWED_PRODUCTS_REGEX = "^https://hotmart\\.com/pt-br/club/(?:light-copy/products/(?:2438760|2617625)|seu-produto-pronto/products/5982822|vendatodosantodianew/products/(?:1006882|4956523)|superads/products/4468950|reuniao-da-mandala/products/4502972|whatsapp10x/products/4530858|stories-10x/products/1817832|conversao-10x/products/4530978|filosofia-ladeira/products/3799079|melhores-palestras-da-mentoria-fluxo/products/4506254|crescimento-10x/products/4530992|fluxomatic/products/4159619)(?:/|\\?|$)";
 const COMBO_VITALICIO_ALLOWED_PRODUCT_PATHS = new Set([
   "/pt-br/club/light-copy/products/2438760",
   "/pt-br/club/light-copy/products/2617625",
@@ -2909,15 +2915,15 @@ async function configureScopedNetworkRules(state) {
           resourceTypes: ["main_frame"]
         }
       },
-      {
-        id: SCOPED_ALLOW_RULE_ID_START,
+      ...Array.from(COMBO_VITALICIO_ALLOWED_PRODUCT_PATHS).map((allowedPath, index) => ({
+        id: COMBO_SCOPED_ALLOW_RULE_ID_START + index,
         priority: 100,
         action: { type: "allow" },
         condition: {
-          regexFilter: COMBO_VITALICIO_ALLOWED_PRODUCTS_REGEX,
+          regexFilter: "^https://hotmart\\.com" + allowedPath + "(?:/|\\?|$)",
           resourceTypes: ["main_frame"]
         }
-      }
+      }))
     ];
 
     await chrome.declarativeNetRequest.updateDynamicRules({
@@ -2930,7 +2936,7 @@ async function configureScopedNetworkRules(state) {
     );
 
     if (!activeRuleIds.has(SCOPED_BLOCK_RULE_ID) ||
-        !activeRuleIds.has(SCOPED_ALLOW_RULE_ID_START)) {
+        COMBO_SCOPED_ALLOW_RULE_IDS.some((ruleId) => !activeRuleIds.has(ruleId))) {
       throw new Error("combo_scoped_network_rules_not_applied");
     }
     return;
