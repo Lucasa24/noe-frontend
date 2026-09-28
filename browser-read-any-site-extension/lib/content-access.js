@@ -13,14 +13,14 @@ const CONTENT_SELECTOR_EXTENSION_IDS = new Set([
 ]);
 
 const ACCESS_CONTENTS = [
-  { key: "claude-code-architect", label: "Claude Code Architect", url: "https://hotmart.com/pt-br/club/aisac-foundation/", allowedRecipientNames: ["Deivis", "LGA", "Janderson", "~ Solicitar Ativação com Adm", "Lira", "Moisés", "Daniel Lins", "Jonatas Gomes"] },
-  { key: "academy-pass", label: "Academy Pass", url: "https://app.academypass.ai/", allowedRecipientNames: ["Hugo", "Janderson", "~ Solicitar Ativação com Adm", "Sam", "Gabriel Solano", "Lira", "Moisés", "Jonatas Gomes"] },
-  { key: "pixel-ai-hub", label: "PIXEL AI HUB", url: "https://app.pixeleducacao.com.br/", allowedRecipientNames: ["Davidson", "Deivis", "Vitor", "LGA", "adspc7", "~ Solicitar Ativação com Adm", "Sam", "Gabriel Solano", "Lira", "Moisés", "Daniel Lins"] },
-  { key: "comunidade-growth-hackers", label: "Comunidade Growth Hackers", url: "https://comunidadegrowthhackers.cademi.com.br/", allowedRecipientNames: ["andre", "Janderson", "~ Solicitar Ativação com Adm", "Sam", "Moisés", "Daniel Lins"] },
+  { key: "claude-code-architect", label: "Claude Code Architect", url: "https://hotmart.com/pt-br/club/aisac-foundation/", allowedRecipientNames: ["Deivis", "LGA", "Janderson", "~ Solicitar Ativação com Adm", "Lira", "Moisés", "Daniel Lins", "Jonatas Gomes", "John"] },
+  { key: "academy-pass", label: "Academy Pass", url: "https://app.academypass.ai/", allowedRecipientNames: ["Hugo", "Janderson", "~ Solicitar Ativação com Adm", "Sam", "Gabriel Solano", "Lira", "Moisés", "Jonatas Gomes", "Solano", "John"] },
+  { key: "pixel-ai-hub", label: "PIXEL AI HUB", url: "https://app.pixeleducacao.com.br/", allowedRecipientNames: ["Davidson", "Deivis", "Vitor", "LGA", "adspc7", "~ Solicitar Ativação com Adm", "Sam", "Gabriel Solano", "Lira", "Moisés", "Daniel Lins", "Solano", "John"] },
+  { key: "comunidade-growth-hackers", label: "Comunidade Growth Hackers", url: "https://comunidadegrowthhackers.cademi.com.br/", allowedRecipientNames: ["andre", "Janderson", "~ Solicitar Ativação com Adm", "Sam", "Moisés", "Daniel Lins", "John"] },
   { key: "combo-vitalicio-leandro-ladeira", label: "COMBO VITALICIO", url: "https://hotmart.com/pt-br/club/", allowedRecipientNames: ["Gabriel Solano", "Moisés", "~ Solicitar Ativação com Adm"] },
-  { key: "ai-coding", label: "AI CODING", url: "https://app.hub.la/m/vNGHcQ35ONNqWKbIFcEw", allowedRecipientNames: ["~ Solicitar Ativação com Adm"] },
+  { key: "ai-coding", label: "AI CODING", url: "https://app.hub.la/m/vNGHcQ35ONNqWKbIFcEw", allowedRecipientNames: ["~ Solicitar Ativação com Adm", "John"] },
   { key: "edu-led-growth", label: "EDU-LED GROWTH", allowedRecipientNames: ["Gabriel Solano", "Moisés"] },
-  { key: "comunidade-autonext-vibestack", label: "COMUNIDADE AUTONEXT & VIBESTACK", allowedRecipientNames: ["Gabriel Solano", "Daniel Lins", "~ Solicitar Ativação com Adm"] },
+  { key: "comunidade-autonext-vibestack", label: "COMUNIDADE AUTONEXT & VIBESTACK", allowedRecipientNames: ["Gabriel Solano", "Daniel Lins", "~ Solicitar Ativação com Adm", "Solano", "John"] },
   { key: "linguagem-secreta-rian-dutra-psicologia-design", label: "Linguagem Secreta", url: "https://mentorxlab.com/linguagem-secreta-rian-dutra-psicologia-design/", allowedRecipientNames: ["Daniel Lins", "Jonatas Gomes"] },
   { key: "mkt360-programa-marketing-360-camila-renaux", label: "MKT360 - Programa Marketing 360° - Camila Renaux", url: "https://mentorxlab.com/mkt360-programa-marketing-360-camila-renaux/", allowedRecipientNames: ["Jonatas Gomes"] },
   { key: "formacao-estrategistas-de-marketing-camila-renaux", label: "Formação Estrategistas de Marketing - Camila Renaux", url: "https://mentorxlab.com/formacao-estrategistas-de-marketing-camila-renaux/", allowedRecipientNames: ["Jonatas Gomes"] },
