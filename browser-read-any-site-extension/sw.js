@@ -601,49 +601,6 @@ function getComboLinksPageUrl() {
   return chrome.runtime.getURL(COMBO_LINKS_PAGE_PATH);
 }
 
-async function loadComboVitalicioLinkUrls() {
-  const response = await fetch(getComboLinksPageUrl(), { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error("combo_links_file_unavailable");
-  }
-
-  const html = await response.text();
-  const matches = [...html.matchAll(/href\s*=\s*["'](https:\/\/hotmart\.com\/pt-br\/club\/[^"'<>\s]+)["']/gi)];
-  const urls = [...new Set(matches.map((match) => String(match[1] || "").trim()))]
-    .filter((url) => isComboVitalicioUrl(url));
-
-  if (urls.length !== 14) {
-    throw new Error(`combo_links_invalid_count:${urls.length}`);
-  }
-
-  return urls;
-}
-
-async function prepareComboVitalicioTabs(senderTabId) {
-  const urls = await loadComboVitalicioLinkUrls();
-  let windowId = null;
-
-  if (typeof senderTabId === "number") {
-    const senderTab = await chrome.tabs.get(senderTabId).catch(() => null);
-    if (typeof senderTab?.windowId === "number") {
-      windowId = senderTab.windowId;
-    }
-  }
-
-  for (const url of urls.slice(1)) {
-    await chrome.tabs.create({
-      url,
-      active: false,
-      ...(windowId !== null ? { windowId } : {})
-    });
-  }
-
-  return {
-    firstUrl: urls[0],
-    openedCount: urls.length
-  };
-}
-
 function isComboPermissionPageUrl(url) {
   return normalizeUrl(url) === normalizeUrl(getComboPermissionPageUrl());
 }
@@ -866,22 +823,10 @@ async function verifyAccessCode(code, senderTabId) {
       await saveLockState(comboState);
       await notifyPixelGate(true, comboState);
 
-      let comboTabs;
-      try {
-        comboTabs = await prepareComboVitalicioTabs(senderTabId);
-      } catch (error) {
-        return {
-          ok: false,
-          error: `Nao foi possivel abrir os 14 links do Combo vitalicio: ${error instanceof Error ? error.message : String(error)}`,
-          state: toPublicLockState(comboState)
-        };
-      }
-
       return {
         ok: true,
         action: "combo_links",
-        pageUrl: comboTabs.firstUrl,
-        openedCount: comboTabs.openedCount,
+        pageUrl: getComboLinksPageUrl(),
         state: toPublicLockState(comboState)
       };
     }
