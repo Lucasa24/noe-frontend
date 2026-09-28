@@ -690,15 +690,6 @@ async function verifyAccessCode(code, senderTabId) {
         error: "A extensao AutoNext Clean esta instalada, mas desativada."
       };
     }
-
-    if (companionStatus.hasPermission !== true) {
-      return {
-        ok: false,
-        action: "autonext_permission",
-        pageUrl: companionStatus.permissionPageUrl,
-        error: "Ative a leitura da extensao AutoNext antes de validar o codigo."
-      };
-    }
   }
 
   try {
@@ -714,6 +705,35 @@ async function verifyAccessCode(code, senderTabId) {
         ok: false,
         error: mapServerError(response.error)
       };
+    }
+
+    if (isContentSelectorExtension() &&
+        state.contentKey === AUTONEXT_CONTENT_KEY) {
+      const companionStatus = await getAutonextStatus();
+
+      if (companionStatus.hasPermission !== true) {
+        const permissionState = {
+          ...state,
+          unlocked: false,
+          unlockedAt: null,
+          restoredTabsAt: null,
+          sendStatus: "used",
+          lastError: "",
+          reason: "autonext_read_permission"
+        };
+
+        await clearScopedNetworkRules();
+        await saveLockState(permissionState);
+        await notifyPixelGate(false, permissionState);
+        await updateBadge(permissionState);
+
+        return {
+          ok: true,
+          action: "autonext_permission",
+          pageUrl: companionStatus.permissionPageUrl || `${AUTONEXT_BLOCKED_URL}?permissionGate=1`,
+          state: toPublicLockState(permissionState)
+        };
+      }
     }
 
     if (isComboVitalicioState(state) && !(await hasComboReadPermission())) {
@@ -808,7 +828,7 @@ async function verifyAccessCode(code, senderTabId) {
     // direct_dtc_experience_after_unlock:
     // quando o Browser Read nic... libera DTC Experience e o companion já tem
     // permissão de leitura, a própria aba bloqueada segue direto para o Aion.
-    if (chrome.runtime.id === CONTENT_SELECTOR_EXTENSION_ID &&
+    if (isContentSelectorExtension() &&
         restoredState?.unlocked === true &&
         restoredState?.contentKey === DTC_EXPERIENCE_CONTENT_KEY &&
         typeof senderTabId === "number") {
@@ -1983,7 +2003,7 @@ async function enforceLockedTab(tabId, tabUrl) {
 
   if (state.unlocked && siteAccessGranted) {
     if (!(await isAllowedTabAfterUnlock(tabId, tabUrl, state))) {
-      await chrome.tabs.update(tabId, { url: COURSES_DVD_ACCESS_URL, active: true }).catch(() => undefined);
+      await chrome.tabs.update(tabId, { url: getScopedFallbackUrl(state), active: true }).catch(() => undefined);
     }
     return;
   }
@@ -2236,6 +2256,25 @@ async function restoreTabsAfterUnlock(state) {
   };
 }
 
+function getScopedFallbackUrl(state) {
+  const selectedUrl = String(state?.allowedContentUrl || "").trim();
+  const contentKey = String(state?.contentKey || "").trim();
+
+  if (contentKey === AUTONEXT_CONTENT_KEY) {
+    return CONTENT_URL_FALLBACKS[AUTONEXT_CONTENT_KEY];
+  }
+
+  if (contentKey === DTC_EXPERIENCE_CONTENT_KEY) {
+    return CONTENT_URL_FALLBACKS[DTC_EXPERIENCE_CONTENT_KEY];
+  }
+
+  if (selectedUrl) {
+    return selectedUrl;
+  }
+
+  return getBlockedPageUrl();
+}
+
 async function enforceScopedBrowser(state) {
   if (!isValidSelectedAccessState(state)) {
     const config = await getAuthConfig();
@@ -2273,7 +2312,7 @@ async function enforceScopedBrowser(state) {
     }
 
     await chrome.tabs.update(tab.id, {
-      url: COURSES_DVD_ACCESS_URL
+      url: getScopedFallbackUrl(state)
     }).catch(() => undefined);
   }));
 
