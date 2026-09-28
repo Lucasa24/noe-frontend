@@ -253,6 +253,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return;
       }
 
+      if (message?.type === "lock:reloadComboVitalicio") {
+        sendResponse(await reloadComboVitalicioCompanion());
+        return;
+      }
+
       if (message?.type === "combo:getReadPermission") {
         sendResponse({
           ok: true,
@@ -1062,14 +1067,19 @@ function normalizeExtensionDisplayName(value) {
     .trim();
 }
 
-async function findComboVitalicioExtension() {
+async function findInstalledComboVitalicioExtension() {
   if (!chrome.management?.getAll) return null;
   const extensions = await chrome.management.getAll();
   const allowedNames = COMBO_VITALICIO_EXTENSION_NAMES.map(normalizeExtensionDisplayName);
   return extensions.find((item) => {
-    if (!item?.enabled || item.type !== "extension") return false;
+    if (item?.type !== "extension") return false;
     return allowedNames.includes(normalizeExtensionDisplayName(item.name));
   }) || null;
+}
+
+async function findComboVitalicioExtension() {
+  const extension = await findInstalledComboVitalicioExtension();
+  return extension?.enabled === true ? extension : null;
 }
 
 async function syncComboVitalicioContentAccess(selectedAccess, recipientKey, approved, required) {
@@ -1626,6 +1636,46 @@ async function openAutonextPermissionPage(sender, message = {}) {
     return {
       ok: false,
       error: `Nao foi possivel abrir a pagina de ativacao do AutoNext: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+}
+
+async function reloadComboVitalicioCompanion() {
+  if (!chrome.management?.setEnabled) {
+    return { ok: false, error: "A API de gerenciamento da extensão não está disponível." };
+  }
+
+  const extensionInfo = await findInstalledComboVitalicioExtension();
+
+  if (!extensionInfo?.id) {
+    return { ok: false, error: "A extensão Combo Vitalício não foi encontrada neste navegador." };
+  }
+
+  try {
+    if (extensionInfo.enabled === true) {
+      await chrome.management.setEnabled(extensionInfo.id, false);
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    }
+
+    await chrome.management.setEnabled(extensionInfo.id, true);
+    await new Promise((resolve) => setTimeout(resolve, 600));
+
+    await chrome.storage.local.set({
+      [COMBO_ISOLATION_ACTIVE_KEY]: true,
+      [COMBO_ISOLATION_EXTENSION_ID_KEY]: extensionInfo.id
+    });
+
+    await suspendConflictingExtensionsForComboSession();
+
+    return {
+      ok: true,
+      mode: extensionInfo.enabled === true ? "restart" : "enable",
+      extensionId: extensionInfo.id
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: `Falha ao reiniciar Combo Vitalício: ${error instanceof Error ? error.message : String(error)}`
     };
   }
 }
