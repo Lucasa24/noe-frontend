@@ -33,6 +33,18 @@ const AUTONEXT_STATUS_MESSAGE = "browser-read:get-companion-status";
 const AUTONEXT_RELOAD_MESSAGE = "browser-read:reload-extension";
 const AUTONEXT_OPEN_PERMISSION_MESSAGE = "browser-read:open-permission-page";
 const AUTONEXT_CONTENT_KEY = "comunidade-autonext-vibestack";
+const PIXEL_AI_HUB_CONTENT_KEY = "pixel-ai-hub";
+const PIXEL_AI_HUB_PRIMARY_URL = "https://app.pixeleducacao.com.br/";
+const PIXEL_AI_HUB_URLS = Object.freeze([
+  "https://hotmart.com/pt-br/club/pixel-educacao",
+  "https://checklist.pixeleducacao.com.br/",
+  PIXEL_AI_HUB_PRIMARY_URL
+]);
+const PIXEL_AI_HUB_APP_ORIGIN = "https://app.pixeleducacao.com.br";
+const PIXEL_AI_HUB_CHECKLIST_ORIGIN = "https://checklist.pixeleducacao.com.br";
+const PIXEL_AI_HUB_HOTMART_ORIGIN = "https://hotmart.com";
+const PIXEL_AI_HUB_HOTMART_REGEX = "^https://([^/]+\\.)?hotmart\\.com/";
+const EXTERNAL_EXTENSION_MESSAGE_TIMEOUT_MS = 1500;
 const AUTONEXT_SUSPENDED_EXTENSIONS_KEY = "autonextSuspendedExtensions";
 const AUTONEXT_ISOLATION_ACTIVE_KEY = "autonextIsolationActive";
 const COMBO_SUSPENDED_EXTENSIONS_KEY = "comboVitalicioSuspendedExtensions";
@@ -62,8 +74,23 @@ const CLAUDE_CODE_HOTMART_AUTH_ORIGINS = Object.freeze([
 const COMBO_VITALICIO_CONTENT_KEY = "combo-vitalicio-leandro-ladeira";
 const COMBO_VITALICIO_LABEL = "Combo vitalicio";
 const COMBO_VITALICIO_BASE_URL = "https://hotmart.com/pt-br/club/";
-const COMBO_VITALICIO_NAVIGATION_REGEX = "^https://hotmart\\.com/pt-br/club(?:/|\\?|$)";
-const COMBO_VITALICIO_MEMBER_AREA_REGEX = "^https://hotmart\\.com/pt-br/area-de-membros/?(?:\\?|$)";
+const COMBO_VITALICIO_ALLOWED_PRODUCTS_REGEX = "^https://hotmart\\.com/pt-br/club/(?:light-copy/products/(?:2438760|2617625)|seu-produto-pronto/products/5982822|vendatodosantodianew/products/(?:1006882|4956523)|superads/products/4468950|reuniao-da-mandala/products/4502972|whatsapp10x/products/4530858|stories-10x/products/1817832|conversao-10x/products/4530978|filosofia-ladeira/products/3799079|melhores-palestras-da-mentoria-fluxo/products/4506254|crescimento-10x/products/4530992|fluxomatic/products/4159619)(?:/|\\?|$)";
+const COMBO_VITALICIO_ALLOWED_PRODUCT_PATHS = new Set([
+  "/pt-br/club/light-copy/products/2438760",
+  "/pt-br/club/light-copy/products/2617625",
+  "/pt-br/club/seu-produto-pronto/products/5982822",
+  "/pt-br/club/vendatodosantodianew/products/1006882",
+  "/pt-br/club/superads/products/4468950",
+  "/pt-br/club/reuniao-da-mandala/products/4502972",
+  "/pt-br/club/whatsapp10x/products/4530858",
+  "/pt-br/club/stories-10x/products/1817832",
+  "/pt-br/club/conversao-10x/products/4530978",
+  "/pt-br/club/filosofia-ladeira/products/3799079",
+  "/pt-br/club/melhores-palestras-da-mentoria-fluxo/products/4506254",
+  "/pt-br/club/crescimento-10x/products/4530992",
+  "/pt-br/club/fluxomatic/products/4159619",
+  "/pt-br/club/vendatodosantodianew/products/4956523"
+]);
 const COMBO_VITALICIO_ACCESS_MESSAGE = "browser-read:set-content-access";
 const COMBO_VITALICIO_EXTENSION_NAMES = ["combo vitalicio", "combo vitalício"];
 const COMBO_READ_PERMISSION_KEY = "comboVitalicioReadPermission";
@@ -80,6 +107,7 @@ const DTC_ZOOM_SESSION_ORIGINS = new Set([
 const DTC_ZOOM_ENTRY_REGEX = "^https://us05web\\.zoom\\.us/j/[0-9]{9,13}/?\\?pwd=[^&#\\s]+(?:&[^#]*)?(?:#.*)?$";
 const DTC_ZOOM_WEB_CLIENT_REGEX = "^https://app\\.zoom\\.us/wc/(?:join/[0-9]{9,13}|[0-9]{9,13}/join)/?\\?(?:[^#&]*&)*pwd=[^&#\\s]+(?:&[^#]*)?(?:#.*)?$";
 const CONTENT_URL_FALLBACKS = {
+  "pixel-ai-hub": PIXEL_AI_HUB_PRIMARY_URL,
   "comunidade-growth-hackers": "https://comunidadegrowthhackers.cademi.com.br/",
   "comunidade-autonext-vibestack": "https://comunidade.ericorenato.com.br/m/courses",
   "combo-vitalicio-leandro-ladeira": COMBO_VITALICIO_BASE_URL,
@@ -868,6 +896,14 @@ async function verifyAccessCode(code, senderTabId) {
       }).catch(() => undefined);
     }
 
+    // Pixel AI Hub: mantém o app como aba principal e abre também
+    // Hotmart + Checklist no mesmo acesso liberado pelo Browser Read.
+    if (isContentSelectorExtension() &&
+        restoredState?.unlocked === true &&
+        restoredState?.contentKey === PIXEL_AI_HUB_CONTENT_KEY) {
+      await openPixelAiHubPages(senderTabId);
+    }
+
     return {
       ok: true,
       state: toPublicLockState(restoredState)
@@ -909,9 +945,18 @@ async function sendAccessCode(contentKey, recipientKey = "") {
 
   try {
     selectedAccess = await resolveSelectedContentAccess(contentKey, recipientKey);
-    await syncCompanionIsolationForSelection(selectedAccess);
-    await syncAutonextCompanionEnabledForSelection(selectedAccess);
-    await syncSelectedCompanionContentAccess(selectedAccess, recipientKey);
+
+    if (selectedAccess?.key === PIXEL_AI_HUB_CONTENT_KEY) {
+      // O Pixel não depende de nenhum companion para gerar/enviar o código.
+      // Limpeza de isolamento e estado do AutoNext são best-effort e jamais
+      // podem impedir a chamada ao backend de e-mail.
+      void syncCompanionIsolationForSelection(selectedAccess).catch(() => {});
+      void syncAutonextCompanionEnabledForSelection(selectedAccess).catch(() => {});
+    } else {
+      await syncCompanionIsolationForSelection(selectedAccess);
+      await syncAutonextCompanionEnabledForSelection(selectedAccess);
+      await syncSelectedCompanionContentAccess(selectedAccess, recipientKey);
+    }
   } catch (error) {
     return {
       ok: false,
@@ -1033,6 +1078,28 @@ async function resolveSelectedContentAccess(contentKey, recipientKey) {
   };
 }
 
+function sendExternalExtensionMessage(extensionId, message, timeoutMs = EXTERNAL_EXTENSION_MESSAGE_TIMEOUT_MS) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(value || null);
+    };
+    const timer = setTimeout(() => finish(null), Math.max(250, Number(timeoutMs) || EXTERNAL_EXTENSION_MESSAGE_TIMEOUT_MS));
+
+    try {
+      chrome.runtime.sendMessage(extensionId, message, (response) => {
+        void chrome.runtime.lastError;
+        finish(response || null);
+      });
+    } catch (_error) {
+      finish(null);
+    }
+  });
+}
+
 async function syncSelectedCompanionContentAccess(selectedAccess, recipientKey) {
   if (selectedAccess?.key === COMBO_VITALICIO_CONTENT_KEY) {
     return syncComboVitalicioContentAccess(selectedAccess, recipientKey, false, true);
@@ -1102,7 +1169,7 @@ async function syncComboVitalicioContentAccess(selectedAccess, recipientKey, app
   };
 
   try {
-    const response = await chrome.runtime.sendMessage(extensionInfo.id, {
+    const response = await sendExternalExtensionMessage(extensionInfo.id, {
       type: COMBO_VITALICIO_ACCESS_MESSAGE,
       payload
     });
@@ -2657,11 +2724,74 @@ function getScopedFallbackUrl(state) {
     return CONTENT_URL_FALLBACKS[DTC_EXPERIENCE_CONTENT_KEY];
   }
 
+  if (contentKey === COMBO_VITALICIO_CONTENT_KEY) {
+    return getComboLinksPageUrl();
+  }
+
   if (selectedUrl) {
     return selectedUrl;
   }
 
   return getBlockedPageUrl();
+}
+
+function isSamePixelEntryPage(currentUrl, targetUrl) {
+  try {
+    const current = new URL(String(currentUrl || ""));
+    const target = new URL(String(targetUrl || ""));
+    const normalizePath = (value) => {
+      const path = String(value || "/").replace(/\/{2,}/g, "/").replace(/\/+$/, "");
+      return path || "/";
+    };
+    return current.protocol === target.protocol &&
+      current.hostname.toLowerCase() === target.hostname.toLowerCase() &&
+      normalizePath(current.pathname) === normalizePath(target.pathname);
+  } catch (_error) {
+    return false;
+  }
+}
+
+async function openPixelAiHubPages(preferredTabId) {
+  const tabsBefore = await chrome.tabs.query({}).catch(() => []);
+  let primaryTab = Number.isInteger(preferredTabId)
+    ? tabsBefore.find((tab) => tab.id === preferredTabId)
+    : null;
+
+  if (primaryTab?.id) {
+    await chrome.tabs.update(primaryTab.id, {
+      url: PIXEL_AI_HUB_PRIMARY_URL,
+      active: true
+    }).catch(() => undefined);
+  } else {
+    primaryTab = tabsBefore.find((tab) =>
+      isSamePixelEntryPage(tab.pendingUrl || tab.url || "", PIXEL_AI_HUB_PRIMARY_URL)
+    );
+
+    if (primaryTab?.id) {
+      await chrome.tabs.update(primaryTab.id, { active: true }).catch(() => undefined);
+    } else {
+      primaryTab = await chrome.tabs.create({
+        url: PIXEL_AI_HUB_PRIMARY_URL,
+        active: true
+      }).catch(() => null);
+    }
+  }
+
+  const tabs = await chrome.tabs.query({}).catch(() => []);
+  const auxiliaryUrls = PIXEL_AI_HUB_URLS.filter((url) => url !== PIXEL_AI_HUB_PRIMARY_URL);
+
+  for (const targetUrl of auxiliaryUrls) {
+    const alreadyOpen = tabs.some((tab) =>
+      isSamePixelEntryPage(tab.pendingUrl || tab.url || "", targetUrl)
+    );
+    if (alreadyOpen) continue;
+
+    await chrome.tabs.create({
+      url: targetUrl,
+      active: false,
+      ...(Number.isInteger(primaryTab?.windowId) ? { windowId: primaryTab.windowId } : {})
+    }).catch(() => undefined);
+  }
 }
 
 async function enforceScopedBrowser(state) {
@@ -2734,6 +2864,14 @@ function getAllowedContentOrigins(state) {
   const primaryOrigin = String(state?.allowedContentOrigin || "").trim();
   const contentKey = String(state?.contentKey || "").trim();
 
+  if (contentKey === PIXEL_AI_HUB_CONTENT_KEY) {
+    return [
+      PIXEL_AI_HUB_APP_ORIGIN,
+      PIXEL_AI_HUB_CHECKLIST_ORIGIN,
+      PIXEL_AI_HUB_HOTMART_ORIGIN
+    ];
+  }
+
   if (DTC_CONTENT_KEYS.has(contentKey)) {
     return [...DTC_ALLOWED_ORIGINS];
   }
@@ -2776,16 +2914,7 @@ async function configureScopedNetworkRules(state) {
         priority: 100,
         action: { type: "allow" },
         condition: {
-          regexFilter: COMBO_VITALICIO_NAVIGATION_REGEX,
-          resourceTypes: ["main_frame"]
-        }
-      },
-      {
-        id: SCOPED_ALLOW_RULE_ID_START + 1,
-        priority: 100,
-        action: { type: "allow" },
-        condition: {
-          regexFilter: COMBO_VITALICIO_MEMBER_AREA_REGEX,
+          regexFilter: COMBO_VITALICIO_ALLOWED_PRODUCTS_REGEX,
           resourceTypes: ["main_frame"]
         }
       }
@@ -2801,9 +2930,66 @@ async function configureScopedNetworkRules(state) {
     );
 
     if (!activeRuleIds.has(SCOPED_BLOCK_RULE_ID) ||
-        !activeRuleIds.has(SCOPED_ALLOW_RULE_ID_START) ||
-        !activeRuleIds.has(SCOPED_ALLOW_RULE_ID_START + 1)) {
+        !activeRuleIds.has(SCOPED_ALLOW_RULE_ID_START)) {
       throw new Error("combo_scoped_network_rules_not_applied");
+    }
+    return;
+  }
+
+  if (String(state?.contentKey || "").trim() === PIXEL_AI_HUB_CONTENT_KEY) {
+    const pixelRules = [
+      {
+        id: SCOPED_BLOCK_RULE_ID,
+        priority: 1,
+        action: { type: "block" },
+        condition: {
+          regexFilter: "^https?://",
+          resourceTypes: ["main_frame"]
+        }
+      },
+      {
+        id: SCOPED_ALLOW_RULE_ID_START,
+        priority: 100,
+        action: { type: "allow" },
+        condition: {
+          regexFilter: "^https://app\\.pixeleducacao\\.com\\.br/",
+          resourceTypes: ["main_frame"]
+        }
+      },
+      {
+        id: SCOPED_ALLOW_RULE_ID_START + 1,
+        priority: 100,
+        action: { type: "allow" },
+        condition: {
+          regexFilter: "^https://checklist\\.pixeleducacao\\.com\\.br/",
+          resourceTypes: ["main_frame"]
+        }
+      },
+      {
+        id: SCOPED_ALLOW_RULE_ID_START + 2,
+        priority: 100,
+        action: { type: "allow" },
+        condition: {
+          regexFilter: PIXEL_AI_HUB_HOTMART_REGEX,
+          resourceTypes: ["main_frame"]
+        }
+      }
+    ];
+
+    await chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: SCOPED_RULE_IDS,
+      addRules: pixelRules
+    });
+
+    const activeRuleIds = new Set(
+      (await chrome.declarativeNetRequest.getDynamicRules()).map((rule) => rule.id)
+    );
+
+    if (!activeRuleIds.has(SCOPED_BLOCK_RULE_ID) ||
+        !activeRuleIds.has(SCOPED_ALLOW_RULE_ID_START) ||
+        !activeRuleIds.has(SCOPED_ALLOW_RULE_ID_START + 1) ||
+        !activeRuleIds.has(SCOPED_ALLOW_RULE_ID_START + 2)) {
+      throw new Error("pixel_scoped_network_rules_not_applied");
     }
     return;
   }
@@ -3090,18 +3276,35 @@ function isComboVitalicioState(state) {
   return String(state?.contentKey || "").trim() === COMBO_VITALICIO_CONTENT_KEY;
 }
 
+function isPixelAiHubUrl(url) {
+  try {
+    const parsed = new URL(String(url || "").trim());
+    const hostname = parsed.hostname.toLowerCase().replace(/\.$/, "");
+    return parsed.protocol === "https:" && (
+      hostname === "app.pixeleducacao.com.br" ||
+      hostname === "checklist.pixeleducacao.com.br" ||
+      hostname === "hotmart.com" ||
+      hostname.endsWith(".hotmart.com")
+    );
+  } catch (_error) {
+    return false;
+  }
+}
+
 function isComboVitalicioUrl(url) {
   try {
     const parsed = new URL(String(url || "").trim());
-    const path = parsed.pathname.replace(/\/{2,}/g, "/");
-    return parsed.protocol === "https:"
-      && parsed.hostname === "hotmart.com"
-      && (
-        path === "/pt-br/club"
-        || path.startsWith("/pt-br/club/")
-        || path === "/pt-br/area-de-membros"
-        || path === "/pt-br/area-de-membros/"
-      );
+    if (parsed.protocol !== "https:" || parsed.hostname !== "hotmart.com") {
+      return false;
+    }
+
+    const path = parsed.pathname.replace(/\/{2,}/g, "/").replace(/\/+$/, "");
+    for (const allowedPath of COMBO_VITALICIO_ALLOWED_PRODUCT_PATHS) {
+      if (path === allowedPath || path.startsWith(allowedPath + "/")) {
+        return true;
+      }
+    }
+    return false;
   } catch (_error) {
     return false;
   }
@@ -3114,6 +3317,10 @@ function isAllowedAfterUnlock(url, state) {
 
   if (!isValidSelectedAccessState(state)) {
     return false;
+  }
+
+  if (String(state?.contentKey || "").trim() === PIXEL_AI_HUB_CONTENT_KEY) {
+    return isPixelAiHubUrl(url);
   }
 
   if (isComboVitalicioState(state)) {
@@ -3485,16 +3692,11 @@ async function notifyPixelGate(unlocked, state = null) {
     unlockedAt: state?.unlockedAt || null
   };
 
-  return new Promise((resolve) => {
-    try {
-      chrome.runtime.sendMessage(PIXEL_EXTENSION_ID, message, (response) => {
-        void chrome.runtime.lastError;
-        resolve(response || null);
-      });
-    } catch (_error) {
-      resolve(null);
-    }
-  });
+  return sendExternalExtensionMessage(
+    PIXEL_EXTENSION_ID,
+    message,
+    EXTERNAL_EXTENSION_MESSAGE_TIMEOUT_MS
+  );
 }
 
 function getMissingSiteAccessMessage() {
