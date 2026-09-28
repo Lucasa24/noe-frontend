@@ -35,6 +35,9 @@ const AUTONEXT_OPEN_PERMISSION_MESSAGE = "browser-read:open-permission-page";
 const AUTONEXT_CONTENT_KEY = "comunidade-autonext-vibestack";
 const AUTONEXT_SUSPENDED_EXTENSIONS_KEY = "autonextSuspendedExtensions";
 const AUTONEXT_ISOLATION_ACTIVE_KEY = "autonextIsolationActive";
+const COMBO_SUSPENDED_EXTENSIONS_KEY = "comboVitalicioSuspendedExtensions";
+const COMBO_ISOLATION_ACTIVE_KEY = "comboVitalicioIsolationActive";
+const COMBO_ISOLATION_EXTENSION_ID_KEY = "comboVitalicioIsolationExtensionId";
 const SCOPED_BLOCK_RULE_ID = 9101;
 const SCOPED_ALLOW_RULE_ID_START = 9102;
 const SCOPED_ZOOM_ENTRY_RULE_ID = SCOPED_ALLOW_RULE_ID_START + 2;
@@ -86,14 +89,14 @@ const ALLOWED_WHILE_LOCKED_ORIGINS = new Set([]);
 
 chrome.runtime.onInstalled.addListener(() => {
   void (async () => {
-    await reconcileAutonextIsolationState();
+    await reconcileCompanionIsolationState();
     await bootstrapLock("installed");
   })();
 });
 
 chrome.runtime.onStartup.addListener(() => {
   void (async () => {
-    await reconcileAutonextIsolationState();
+    await reconcileCompanionIsolationState();
     await bootstrapLock("startup");
   })();
 });
@@ -101,7 +104,7 @@ chrome.runtime.onStartup.addListener(() => {
 chrome.tabs.onCreated.addListener((tab) => {
   const tabUrl = tab.pendingUrl || tab.url || "";
 
-  void reconcileAutonextIsolationState();
+  void reconcileCompanionIsolationState();
   void rememberTabSnapshot(tab);
 
   if (!tabUrl) {
@@ -900,7 +903,7 @@ async function sendAccessCode(contentKey, recipientKey = "") {
 
   try {
     selectedAccess = await resolveSelectedContentAccess(contentKey, recipientKey);
-    await syncAutonextIsolationForSelection(selectedAccess);
+    await syncCompanionIsolationForSelection(selectedAccess);
     await syncAutonextCompanionEnabledForSelection(selectedAccess);
     await syncSelectedCompanionContentAccess(selectedAccess, recipientKey);
   } catch (error) {
@@ -1269,6 +1272,182 @@ async function syncAutonextIsolationForSelection(selectedAccess) {
 
   if (await getAutonextIsolationActive()) {
     return restoreAutonextSuspendedExtensions();
+  }
+
+  return [];
+}
+
+
+function isComboConflictingGuardExtension(item, comboExtensionId) {
+  if (!item || item.type !== "extension" || item.enabled !== true) {
+    return false;
+  }
+
+  if (item.id === chrome.runtime.id || item.id === comboExtensionId) {
+    return false;
+  }
+
+  const name = String(item.name || "").trim();
+
+  return item.id === AUTONEXT_EXTENSION_ID
+    || /^\(BAN\)/i.test(name)
+    || /privacy\s+shield\s+admin/i.test(name)
+    || /\bclean\b/i.test(name)
+    || /^combo\s+vitali[íi]cio\b/i.test(name);
+}
+
+async function getComboIsolationActive() {
+  const stored = await chrome.storage.local.get(COMBO_ISOLATION_ACTIVE_KEY);
+  return stored[COMBO_ISOLATION_ACTIVE_KEY] === true;
+}
+
+async function getStoredComboIsolationExtensionId() {
+  const stored = await chrome.storage.local.get(COMBO_ISOLATION_EXTENSION_ID_KEY);
+  return String(stored[COMBO_ISOLATION_EXTENSION_ID_KEY] || "").trim();
+}
+
+async function suspendConflictingExtensionsForComboSession() {
+  if (!chrome.management?.getAll || !chrome.management?.setEnabled) {
+    return [];
+  }
+
+  let comboExtension = await findComboVitalicioExtension();
+  let comboExtensionId = comboExtension?.id || await getStoredComboIsolationExtensionId();
+
+  if (!comboExtensionId) {
+    throw new Error("A extensao Combo vitalicio nao foi encontrada ou esta desativada.");
+  }
+
+  if (!comboExtension?.id && chrome.management?.get) {
+    try {
+      comboExtension = await chrome.management.get(comboExtensionId);
+    } catch (_error) {
+      comboExtension = null;
+    }
+  }
+
+  if (!comboExtension?.enabled) {
+    try {
+      await chrome.management.setEnabled(comboExtensionId, true);
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    } catch (_error) {
+      throw new Error("A extensao Combo vitalicio esta instalada, mas nao pode ser ativada.");
+    }
+  }
+
+  const stored = await chrome.storage.local.get(COMBO_SUSPENDED_EXTENSIONS_KEY);
+  const previouslyDisabled = Array.isArray(stored[COMBO_SUSPENDED_EXTENSIONS_KEY])
+    ? stored[COMBO_SUSPENDED_EXTENSIONS_KEY].filter((id) => typeof id === "string" && id)
+    : [];
+
+  const allItems = await chrome.management.getAll().catch(() => []);
+  const candidates = Array.isArray(allItems)
+    ? allItems.filter((item) => isComboConflictingGuardExtension(item, comboExtensionId))
+    : [];
+
+  const disabledIds = new Set(previouslyDisabled);
+
+  for (const item of candidates) {
+    try {
+      await chrome.management.setEnabled(item.id, false);
+      disabledIds.add(item.id);
+    } catch (_error) {
+      // Uma extensão não desativável não deve impedir o Combo vitalício.
+    }
+  }
+
+  const ids = [...disabledIds];
+  await chrome.storage.local.set({
+    [COMBO_ISOLATION_ACTIVE_KEY]: true,
+    [COMBO_ISOLATION_EXTENSION_ID_KEY]: comboExtensionId,
+    [COMBO_SUSPENDED_EXTENSIONS_KEY]: ids
+  });
+
+  return ids;
+}
+
+async function restoreComboSuspendedExtensions() {
+  if (!chrome.management?.setEnabled) {
+    return [];
+  }
+
+  const stored = await chrome.storage.local.get([
+    COMBO_SUSPENDED_EXTENSIONS_KEY,
+    COMBO_ISOLATION_EXTENSION_ID_KEY
+  ]);
+  const ids = Array.isArray(stored[COMBO_SUSPENDED_EXTENSIONS_KEY])
+    ? stored[COMBO_SUSPENDED_EXTENSIONS_KEY]
+    : [];
+  const comboExtensionId = String(stored[COMBO_ISOLATION_EXTENSION_ID_KEY] || "").trim();
+  const restored = [];
+
+  for (const id of ids) {
+    if (id === chrome.runtime.id || id === comboExtensionId) continue;
+    try {
+      await chrome.management.setEnabled(id, true);
+      restored.push(id);
+    } catch (_error) {
+      // Tenta os demais.
+    }
+  }
+
+  await chrome.storage.local.remove([
+    COMBO_SUSPENDED_EXTENSIONS_KEY,
+    COMBO_ISOLATION_ACTIVE_KEY,
+    COMBO_ISOLATION_EXTENSION_ID_KEY
+  ]);
+
+  return restored;
+}
+
+async function reconcileComboIsolationState() {
+  if (await getComboIsolationActive()) {
+    await suspendConflictingExtensionsForComboSession();
+    return;
+  }
+
+  const stored = await chrome.storage.local.get(COMBO_SUSPENDED_EXTENSIONS_KEY);
+  const ids = Array.isArray(stored[COMBO_SUSPENDED_EXTENSIONS_KEY])
+    ? stored[COMBO_SUSPENDED_EXTENSIONS_KEY]
+    : [];
+
+  if (ids.length > 0) {
+    await restoreComboSuspendedExtensions();
+  }
+}
+
+async function reconcileCompanionIsolationState() {
+  const comboActive = await getComboIsolationActive();
+
+  if (comboActive) {
+    await reconcileComboIsolationState();
+    return;
+  }
+
+  await reconcileAutonextIsolationState();
+}
+
+async function syncCompanionIsolationForSelection(selectedAccess) {
+  if (selectedAccess?.key === COMBO_VITALICIO_CONTENT_KEY) {
+    if (await getAutonextIsolationActive()) {
+      await restoreAutonextSuspendedExtensions();
+    }
+    return suspendConflictingExtensionsForComboSession();
+  }
+
+  if (selectedAccess?.key === AUTONEXT_CONTENT_KEY) {
+    if (await getComboIsolationActive()) {
+      await restoreComboSuspendedExtensions();
+    }
+    return suspendConflictingExtensionsForAutonextSession();
+  }
+
+  if (await getComboIsolationActive()) {
+    await restoreComboSuspendedExtensions();
+  }
+
+  if (await getAutonextIsolationActive()) {
+    await restoreAutonextSuspendedExtensions();
   }
 
   return [];
