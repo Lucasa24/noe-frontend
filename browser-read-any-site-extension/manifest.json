@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Browser Read Any Site",
-  "version": "1.3.52",
-  "description": "Browser Read com Combo Vitalicio restrito aos 14 produtos autorizados usando 14 regras DNR separadas para compatibilidade com AdsPower.",
+  "version": "1.3.53",
+  "description": "Browser Read com EDU-LED Growth integrado: isolamento de companion, reutilizacao da sessao Hotmart e fluxo SSO/autologin controlado.",
   "permissions": [
     "scripting",
     "storage",
