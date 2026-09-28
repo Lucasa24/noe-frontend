@@ -1167,6 +1167,13 @@ async function syncSelectedCompanionContentAccess(selectedAccess, recipientKey) 
 
   if (selectedAccess?.key === EDU_LED_CONTENT_KEY) {
     await syncComboVitalicioContentAccess(null, "", false, false).catch(() => {});
+
+    const comboInfo = await findInstalledComboVitalicioExtension();
+    if (comboInfo?.enabled === true && chrome.management?.setEnabled) {
+      await chrome.management.setEnabled(comboInfo.id, false).catch(() => {});
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+
     return syncEduLedContentAccess(selectedAccess, recipientKey, false, true);
   }
 
@@ -1251,14 +1258,24 @@ async function syncComboVitalicioContentAccess(selectedAccess, recipientKey, app
   return false;
 }
 
+function isEduLedExtensionItem(item) {
+  if (!item || item.type !== "extension") return false;
+
+  const name = normalizeExtensionDisplayName(item.name);
+  const allowedNames = EDU_LED_EXTENSION_NAMES.map(normalizeExtensionDisplayName);
+
+  if (allowedNames.includes(name)) return true;
+
+  return name.startsWith("(ban) hotmart full stack marketing")
+    || name.startsWith("(ban) edu-led growth")
+    || name.startsWith("edu-led growth");
+}
+
 async function findInstalledEduLedExtension() {
   if (!chrome.management?.getAll) return null;
   const extensions = await chrome.management.getAll();
-  const allowedNames = EDU_LED_EXTENSION_NAMES.map(normalizeExtensionDisplayName);
-  return extensions.find((item) => {
-    if (item?.type !== "extension") return false;
-    return allowedNames.includes(normalizeExtensionDisplayName(item.name));
-  }) || null;
+  const matches = extensions.filter(isEduLedExtensionItem);
+  return matches.find((item) => item.enabled === true) || matches[0] || null;
 }
 
 async function syncEduLedContentAccess(selectedAccess, recipientKey, approved, required) {
