@@ -34,6 +34,7 @@ const AUTONEXT_RELOAD_MESSAGE = "browser-read:reload-extension";
 const AUTONEXT_OPEN_PERMISSION_MESSAGE = "browser-read:open-permission-page";
 const AUTONEXT_CONTENT_KEY = "comunidade-autonext-vibestack";
 const AUTONEXT_SUSPENDED_EXTENSIONS_KEY = "autonextSuspendedExtensions";
+const AUTONEXT_ISOLATION_ACTIVE_KEY = "autonextIsolationActive";
 const SCOPED_BLOCK_RULE_ID = 9101;
 const SCOPED_ALLOW_RULE_ID_START = 9102;
 const SCOPED_ZOOM_ENTRY_RULE_ID = SCOPED_ALLOW_RULE_ID_START + 2;
@@ -85,14 +86,14 @@ const ALLOWED_WHILE_LOCKED_ORIGINS = new Set([]);
 
 chrome.runtime.onInstalled.addListener(() => {
   void (async () => {
-    await restoreAutonextSuspendedExtensions();
+    await reconcileAutonextIsolationState();
     await bootstrapLock("installed");
   })();
 });
 
 chrome.runtime.onStartup.addListener(() => {
   void (async () => {
-    await restoreAutonextSuspendedExtensions();
+    await reconcileAutonextIsolationState();
     await bootstrapLock("startup");
   })();
 });
@@ -100,7 +101,7 @@ chrome.runtime.onStartup.addListener(() => {
 chrome.tabs.onCreated.addListener((tab) => {
   const tabUrl = tab.pendingUrl || tab.url || "";
 
-  void maybeRestoreAutonextSuspendedExtensions();
+  void reconcileAutonextIsolationState();
   void rememberTabSnapshot(tab);
 
   if (!tabUrl) {
@@ -734,7 +735,7 @@ async function verifyAccessCode(code, senderTabId) {
         await saveLockState(permissionState);
         await notifyPixelGate(false, permissionState);
         await updateBadge(permissionState);
-        await suspendConflictingExtensionsForAutonextPermission();
+        await suspendConflictingExtensionsForAutonextSession();
 
         return {
           ok: true,
@@ -899,6 +900,7 @@ async function sendAccessCode(contentKey, recipientKey = "") {
 
   try {
     selectedAccess = await resolveSelectedContentAccess(contentKey, recipientKey);
+    await syncAutonextIsolationForSelection(selectedAccess);
     await syncSelectedCompanionContentAccess(selectedAccess, recipientKey);
   } catch (error) {
     return {
@@ -1174,36 +1176,44 @@ function isAutonextConflictingGuardExtension(item) {
     || /^combo\s+vitali[íi]cio\b/i.test(name);
 }
 
-async function suspendConflictingExtensionsForAutonextPermission() {
+async function getAutonextIsolationActive() {
+  const stored = await chrome.storage.local.get(AUTONEXT_ISOLATION_ACTIVE_KEY);
+  return stored[AUTONEXT_ISOLATION_ACTIVE_KEY] === true;
+}
+
+async function suspendConflictingExtensionsForAutonextSession() {
   if (!chrome.management?.getAll || !chrome.management?.setEnabled) {
     return [];
   }
+
+  const stored = await chrome.storage.local.get(AUTONEXT_SUSPENDED_EXTENSIONS_KEY);
+  const previouslyDisabled = Array.isArray(stored[AUTONEXT_SUSPENDED_EXTENSIONS_KEY])
+    ? stored[AUTONEXT_SUSPENDED_EXTENSIONS_KEY].filter((id) => typeof id === "string" && id)
+    : [];
 
   const allItems = await chrome.management.getAll().catch(() => []);
   const candidates = Array.isArray(allItems)
     ? allItems.filter(isAutonextConflictingGuardExtension)
     : [];
 
-  const disabledIds = [];
+  const disabledIds = new Set(previouslyDisabled);
 
   for (const item of candidates) {
     try {
       await chrome.management.setEnabled(item.id, false);
-      disabledIds.push(item.id);
+      disabledIds.add(item.id);
     } catch (_error) {
       // Uma extensão não desativável não deve impedir o restante do fluxo.
     }
   }
 
-  if (disabledIds.length > 0) {
-    await chrome.storage.local.set({
-      [AUTONEXT_SUSPENDED_EXTENSIONS_KEY]: disabledIds
-    });
-  } else {
-    await chrome.storage.local.remove(AUTONEXT_SUSPENDED_EXTENSIONS_KEY);
-  }
+  const ids = [...disabledIds];
+  await chrome.storage.local.set({
+    [AUTONEXT_ISOLATION_ACTIVE_KEY]: true,
+    [AUTONEXT_SUSPENDED_EXTENSIONS_KEY]: ids
+  });
 
-  return disabledIds;
+  return ids;
 }
 
 async function restoreAutonextSuspendedExtensions() {
@@ -1216,13 +1226,10 @@ async function restoreAutonextSuspendedExtensions() {
     ? stored[AUTONEXT_SUSPENDED_EXTENSIONS_KEY]
     : [];
 
-  if (ids.length === 0) {
-    return [];
-  }
-
   const restored = [];
 
   for (const id of ids) {
+    if (id === chrome.runtime.id || id === AUTONEXT_EXTENSION_ID) continue;
     try {
       await chrome.management.setEnabled(id, true);
       restored.push(id);
@@ -1231,25 +1238,39 @@ async function restoreAutonextSuspendedExtensions() {
     }
   }
 
-  await chrome.storage.local.remove(AUTONEXT_SUSPENDED_EXTENSIONS_KEY);
+  await chrome.storage.local.remove([
+    AUTONEXT_SUSPENDED_EXTENSIONS_KEY,
+    AUTONEXT_ISOLATION_ACTIVE_KEY
+  ]);
   return restored;
 }
 
-async function maybeRestoreAutonextSuspendedExtensions() {
+async function reconcileAutonextIsolationState() {
+  if (await getAutonextIsolationActive()) {
+    await suspendConflictingExtensionsForAutonextSession();
+    return;
+  }
+
   const stored = await chrome.storage.local.get(AUTONEXT_SUSPENDED_EXTENSIONS_KEY);
   const ids = Array.isArray(stored[AUTONEXT_SUSPENDED_EXTENSIONS_KEY])
     ? stored[AUTONEXT_SUSPENDED_EXTENSIONS_KEY]
     : [];
 
-  if (ids.length === 0) {
-    return;
-  }
-
-  const status = await getAutonextStatus().catch(() => null);
-
-  if (status?.hasPermission === true) {
+  if (ids.length > 0) {
     await restoreAutonextSuspendedExtensions();
   }
+}
+
+async function syncAutonextIsolationForSelection(selectedAccess) {
+  if (selectedAccess?.key === AUTONEXT_CONTENT_KEY) {
+    return suspendConflictingExtensionsForAutonextSession();
+  }
+
+  if (await getAutonextIsolationActive()) {
+    return restoreAutonextSuspendedExtensions();
+  }
+
+  return [];
 }
 
 async function getAutonextExtensionInfo() {
@@ -1340,7 +1361,7 @@ async function openAutonextPermissionPage(sender, message = {}) {
     return { ok: false, error: "A extensao AutoNext Clean esta instalada, mas desativada." };
   }
 
-  await suspendConflictingExtensionsForAutonextPermission();
+  await suspendConflictingExtensionsForAutonextSession();
 
   const permissionUrl = `${AUTONEXT_BLOCKED_URL}?permissionGate=1`;
   const requestedTabId = Number(message?.tabId);
