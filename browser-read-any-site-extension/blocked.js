@@ -68,6 +68,7 @@
   const AUTONEXT_EXTENSION_ID = "ajbahhfleppkggefflekfencifmodjed";
   const DTC_EXPERIENCE_CONTENT_KEY = "dtc-experience";
   const AUTONEXT_CONTENT_KEY = "comunidade-autonext-vibestack";
+  const COMBO_VITALICIO_CONTENT_KEY = "combo-vitalicio-leandro-ladeira";
 
   init().catch((error) => {
     updateStatus(`Falha ao iniciar o bloqueio: ${error.message}`);
@@ -315,6 +316,7 @@
     const sharedBrowser = isSharedBrowserRead();
     const coursesDvd = sharedBrowser && selectedContentKey === DTC_EXPERIENCE_CONTENT_KEY;
     const autonext = sharedBrowser && selectedContentKey === AUTONEXT_CONTENT_KEY;
+    const comboVitalicio = sharedBrowser && selectedContentKey === COMBO_VITALICIO_CONTENT_KEY;
     const ownHelp = document.querySelector("#reload-extension-help");
     const companionHelp = document.querySelector("#reload-companion-help");
 
@@ -323,7 +325,7 @@
     }
 
     if (elements.companionReloadButton) {
-      elements.companionReloadButton.hidden = !(academyPass || coursesDvd || autonext);
+      elements.companionReloadButton.hidden = !(academyPass || coursesDvd || autonext || comboVitalicio);
 
       if (academyPass) {
         elements.companionReloadButton.textContent = "♻ Recarregar Academy Pass Clean";
@@ -331,6 +333,8 @@
         elements.companionReloadButton.textContent = "♻ Recarregar extensão Cursos DVD";
       } else if (autonext) {
         elements.companionReloadButton.textContent = "♻ Recarregar extensão AutoNext";
+      } else if (comboVitalicio) {
+        elements.companionReloadButton.textContent = "♻ Recarregar Combo Vitalício";
       }
     }
 
@@ -339,7 +343,7 @@
     }
 
     if (companionHelp) {
-      companionHelp.hidden = !(academyPass || coursesDvd || autonext);
+      companionHelp.hidden = !(academyPass || coursesDvd || autonext || comboVitalicio);
 
       if (academyPass) {
         companionHelp.textContent = "Recarrega a extensão Academy Pass Clean ativa neste navegador sem fechar esta tela.";
@@ -347,6 +351,8 @@
         companionHelp.textContent = "Recarrega a extensão Cursos DVD instalada no mesmo navegador sem fechar esta tela.";
       } else if (autonext) {
         companionHelp.textContent = "Recarrega a extensão AutoNext Clean instalada no mesmo navegador sem fechar esta tela.";
+      } else if (comboVitalicio) {
+        companionHelp.textContent = "Reinicia somente a extensão Combo Vitalício e mantém as outras extensões de bloqueio suspensas.";
       }
     }
   }
@@ -389,8 +395,9 @@
     const sharedBrowser = isSharedBrowserRead();
     const coursesDvd = sharedBrowser && selectedContentKey === DTC_EXPERIENCE_CONTENT_KEY;
     const autonext = sharedBrowser && selectedContentKey === AUTONEXT_CONTENT_KEY;
+    const comboVitalicio = sharedBrowser && selectedContentKey === COMBO_VITALICIO_CONTENT_KEY;
 
-    if ((!academyPass && !coursesDvd && !autonext) || elements.companionReloadButton?.disabled) {
+    if ((!academyPass && !coursesDvd && !autonext && !comboVitalicio) || elements.companionReloadButton?.disabled) {
       return;
     }
 
@@ -445,6 +452,32 @@
         if (elements.companionReloadButton) {
           elements.companionReloadButton.disabled = false;
           elements.companionReloadButton.textContent = "♻ Recarregar extensão Cursos DVD";
+        }
+      }
+      return;
+    }
+
+    if (comboVitalicio) {
+      if (elements.companionReloadButton) {
+        elements.companionReloadButton.disabled = true;
+        elements.companionReloadButton.textContent = "♻ Recarregando Combo Vitalício...";
+      }
+
+      updateStatus("Reiniciando somente a extensão Combo Vitalício...");
+
+      try {
+        const response = await sendMessage({ type: "lock:reloadComboVitalicio" });
+        if (response?.ok) {
+          updateStatus("Combo Vitalício recarregado. As outras extensões de bloqueio continuam suspensas; tente o acesso novamente.");
+        } else {
+          updateStatus(response?.error || "Não foi possível recarregar o Combo Vitalício.");
+        }
+      } catch (error) {
+        updateStatus(`Não foi possível recarregar o Combo Vitalício: ${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        if (elements.companionReloadButton) {
+          elements.companionReloadButton.disabled = false;
+          elements.companionReloadButton.textContent = "♻ Recarregar Combo Vitalício";
         }
       }
       return;
