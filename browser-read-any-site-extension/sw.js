@@ -7,7 +7,7 @@ const DEFAULT_WEBHOOK_URL = "https://noe-frontend.vercel.app/api/send-code";
 const DEFAULT_WEBHOOK_TOKEN = "b4b7f9f9e7c64f3d9c1a8d2f6e3b7a91";
 const BLOCKED_PAGE_PATH = "blocked.html";
 const TEMP_DISABLE_BROWSER_LOCK = false;
-const EXTENSION_CONFIG_CACHE_SCHEMA_VERSION = 3;
+const EXTENSION_CONFIG_CACHE_SCHEMA_VERSION = 4;
 const CONTENT_SELECTOR_EXTENSION_ID = "nicnjmokndbjnpjlikgmnfkihkklobce";
 const CONTENT_SELECTOR_EXTENSION_IDS = new Set([
   CONTENT_SELECTOR_EXTENSION_ID,
@@ -50,6 +50,9 @@ const AUTONEXT_ISOLATION_ACTIVE_KEY = "autonextIsolationActive";
 const COMBO_SUSPENDED_EXTENSIONS_KEY = "comboVitalicioSuspendedExtensions";
 const COMBO_ISOLATION_ACTIVE_KEY = "comboVitalicioIsolationActive";
 const COMBO_ISOLATION_EXTENSION_ID_KEY = "comboVitalicioIsolationExtensionId";
+const EDU_LED_SUSPENDED_EXTENSIONS_KEY = "eduLedSuspendedExtensions";
+const EDU_LED_ISOLATION_ACTIVE_KEY = "eduLedIsolationActive";
+const EDU_LED_ISOLATION_EXTENSION_ID_KEY = "eduLedIsolationExtensionId";
 const SCOPED_BLOCK_RULE_ID = 9101;
 const SCOPED_ALLOW_RULE_ID_START = 9102;
 const SCOPED_ZOOM_ENTRY_RULE_ID = SCOPED_ALLOW_RULE_ID_START + 2;
@@ -100,6 +103,21 @@ const COMBO_VITALICIO_ALLOWED_PRODUCT_PATHS = new Set([
 const COMBO_VITALICIO_ACCESS_MESSAGE = "browser-read:set-content-access";
 const COMBO_VITALICIO_EXTENSION_NAMES = ["combo vitalicio", "combo vitalício"];
 const COMBO_READ_PERMISSION_KEY = "comboVitalicioReadPermission";
+
+const EDU_LED_CONTENT_KEY = "edu-led-growth";
+const EDU_LED_LABEL = "EDU-LED GROWTH";
+const EDU_LED_MAIN_URL = "https://hotmart.com/pt-br/club/full-stack-marketing/";
+const EDU_LED_ACCESS_MESSAGE = "browser-read:set-content-access";
+const EDU_LED_EXTENSION_NAMES = [
+  "(BAN) EDU-LED Growth",
+  "(BAN) Hotmart Full Stack Marketing",
+  "EDU-LED Growth"
+];
+const EDU_LED_ALLOWED_AUTH_HOSTS = new Set([
+  "sso.hotmart.com",
+  "sso-surrogate.hotmart.com",
+  "consumer.hotmart.com"
+]);
 const COMBO_PERMISSION_PAGE_PATH = "combo-permission.html";
 const COMBO_LINKS_PAGE_PATH = "combo-links.html";
 
@@ -117,6 +135,7 @@ const CONTENT_URL_FALLBACKS = {
   "comunidade-growth-hackers": "https://comunidadegrowthhackers.cademi.com.br/",
   "comunidade-autonext-vibestack": "https://comunidade.ericorenato.com.br/m/courses",
   "combo-vitalicio-leandro-ladeira": COMBO_VITALICIO_BASE_URL,
+  "edu-led-growth": EDU_LED_MAIN_URL,
   "dtc-viral-lab": "https://dtcvirallab.com/",
   "dtc-experience": "https://v2.aionmembers.com/"
 };
@@ -874,6 +893,27 @@ async function verifyAccessCode(code, senderTabId) {
       };
     }
 
+    if (String(updatedState?.contentKey || "").trim() === EDU_LED_CONTENT_KEY) {
+      try {
+        await syncEduLedContentAccess({
+          key: updatedState.contentKey,
+          label: updatedState.allowedContentLabel || EDU_LED_LABEL,
+          url: updatedState.allowedContentUrl || EDU_LED_MAIN_URL
+        }, updatedState.recipientKey, true, true);
+      } catch (error) {
+        const relockedState = buildSiteAccessLockedState(updatedState, config);
+        await saveLockState(relockedState);
+        await syncEduLedContentAccess(null, "", false, false).catch(() => {});
+        await notifyPixelGate(false, relockedState);
+        await updateBadge(relockedState);
+        await enforceLockedBrowser(relockedState);
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : "Nao foi possivel ativar o EDU-LED Growth."
+        };
+      }
+    }
+
     const restoredState = await enforceScopedBrowser(updatedState);
     await saveLockState(restoredState);
     await notifyPixelGate(restoredState?.unlocked === true, restoredState);
@@ -899,6 +939,19 @@ async function verifyAccessCode(code, senderTabId) {
         typeof senderTabId === "number") {
       await chrome.tabs.update(senderTabId, {
         url: CONTENT_URL_FALLBACKS[AUTONEXT_CONTENT_KEY]
+      }).catch(() => undefined);
+    }
+
+    // direct_edu_led_after_unlock:
+    // O Hotmart compartilha a sessao/cookies dentro do mesmo perfil.
+    // Se o Combo ja autenticou o perfil, o EDU-LED entra sem novo login.
+    // Se a sessao expirou, o companion permite SSO e usa o helper de login existente.
+    if (isContentSelectorExtension() &&
+        restoredState?.unlocked === true &&
+        restoredState?.contentKey === EDU_LED_CONTENT_KEY &&
+        typeof senderTabId === "number") {
+      await chrome.tabs.update(senderTabId, {
+        url: EDU_LED_MAIN_URL
       }).catch(() => undefined);
     }
 
@@ -1108,10 +1161,17 @@ function sendExternalExtensionMessage(extensionId, message, timeoutMs = EXTERNAL
 
 async function syncSelectedCompanionContentAccess(selectedAccess, recipientKey) {
   if (selectedAccess?.key === COMBO_VITALICIO_CONTENT_KEY) {
+    await syncEduLedContentAccess(null, "", false, false).catch(() => {});
     return syncComboVitalicioContentAccess(selectedAccess, recipientKey, false, true);
   }
 
+  if (selectedAccess?.key === EDU_LED_CONTENT_KEY) {
+    await syncComboVitalicioContentAccess(null, "", false, false).catch(() => {});
+    return syncEduLedContentAccess(selectedAccess, recipientKey, false, true);
+  }
+
   await syncComboVitalicioContentAccess(null, "", false, false).catch(() => {});
+  await syncEduLedContentAccess(null, "", false, false).catch(() => {});
 
   const shouldUseClaudeClean =
     chrome.runtime.id === CLAUDE_BROWSER_READ_EXTENSION_ID
@@ -1186,6 +1246,62 @@ async function syncComboVitalicioContentAccess(selectedAccess, recipientKey, app
     if (required) {
       throw new Error("Atualize e mantenha ativa a extensao Combo vitalicio para liberar este conteudo.");
     }
+  }
+
+  return false;
+}
+
+async function findInstalledEduLedExtension() {
+  if (!chrome.management?.getAll) return null;
+  const extensions = await chrome.management.getAll();
+  const allowedNames = EDU_LED_EXTENSION_NAMES.map(normalizeExtensionDisplayName);
+  return extensions.find((item) => {
+    if (item?.type !== "extension") return false;
+    return allowedNames.includes(normalizeExtensionDisplayName(item.name));
+  }) || null;
+}
+
+async function syncEduLedContentAccess(selectedAccess, recipientKey, approved, required) {
+  let extensionInfo = await findInstalledEduLedExtension();
+
+  if (!extensionInfo?.id) {
+    if (required) {
+      throw new Error("A extensao EDU-LED Growth nao foi encontrada neste navegador.");
+    }
+    return false;
+  }
+
+  if (extensionInfo.enabled !== true && required && chrome.management?.setEnabled) {
+    await chrome.management.setEnabled(extensionInfo.id, true);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    extensionInfo = await findInstalledEduLedExtension();
+  }
+
+  if (extensionInfo?.enabled !== true) {
+    if (required) {
+      throw new Error("A extensao EDU-LED Growth esta instalada, mas desativada.");
+    }
+    return false;
+  }
+
+  const payload = {
+    approved: approved === true,
+    contentKey: selectedAccess?.key || EDU_LED_CONTENT_KEY,
+    contentLabel: selectedAccess?.label || EDU_LED_LABEL,
+    contentUrl: selectedAccess?.url || EDU_LED_MAIN_URL,
+    recipientKey: String(recipientKey || "").trim(),
+    browserReadExtensionId: chrome.runtime.id
+  };
+
+  const response = await sendExternalExtensionMessage(extensionInfo.id, {
+    type: EDU_LED_ACCESS_MESSAGE,
+    payload
+  });
+
+  if (response?.ok === true) return true;
+
+  if (required) {
+    throw new Error(response?.error || "Nao foi possivel sincronizar a extensao EDU-LED Growth.");
   }
 
   return false;
@@ -1500,10 +1616,137 @@ async function reconcileComboIsolationState() {
   }
 }
 
-async function reconcileCompanionIsolationState() {
-  const comboActive = await getComboIsolationActive();
+function isEduLedConflictingGuardExtension(item, eduExtensionId) {
+  if (!item || item.type !== "extension" || item.enabled !== true) {
+    return false;
+  }
 
-  if (comboActive) {
+  if (item.id === chrome.runtime.id || item.id === eduExtensionId) {
+    return false;
+  }
+
+  const name = String(item.name || "").trim();
+
+  return item.id === AUTONEXT_EXTENSION_ID
+    || /^\(BAN\)/i.test(name)
+    || /privacy\s+shield\s+admin/i.test(name)
+    || /\bclean\b/i.test(name)
+    || /^combo\s+vitali[íi]cio\b/i.test(name);
+}
+
+async function getEduLedIsolationActive() {
+  const stored = await chrome.storage.local.get(EDU_LED_ISOLATION_ACTIVE_KEY);
+  return stored[EDU_LED_ISOLATION_ACTIVE_KEY] === true;
+}
+
+async function suspendConflictingExtensionsForEduLedSession() {
+  if (!chrome.management?.getAll || !chrome.management?.setEnabled) {
+    return [];
+  }
+
+  let eduExtension = await findInstalledEduLedExtension();
+  if (!eduExtension?.id) {
+    throw new Error("A extensao EDU-LED Growth nao foi encontrada neste navegador.");
+  }
+
+  if (eduExtension.enabled !== true) {
+    await chrome.management.setEnabled(eduExtension.id, true);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    eduExtension = await findInstalledEduLedExtension();
+  }
+
+  if (!eduExtension?.id || eduExtension.enabled !== true) {
+    throw new Error("A extensao EDU-LED Growth nao pode ser ativada.");
+  }
+
+  const stored = await chrome.storage.local.get(EDU_LED_SUSPENDED_EXTENSIONS_KEY);
+  const previous = Array.isArray(stored[EDU_LED_SUSPENDED_EXTENSIONS_KEY])
+    ? stored[EDU_LED_SUSPENDED_EXTENSIONS_KEY].filter((id) => typeof id === "string" && id)
+    : [];
+
+  const allItems = await chrome.management.getAll().catch(() => []);
+  const candidates = Array.isArray(allItems)
+    ? allItems.filter((item) => isEduLedConflictingGuardExtension(item, eduExtension.id))
+    : [];
+
+  const disabledIds = new Set(previous);
+
+  for (const item of candidates) {
+    try {
+      await chrome.management.setEnabled(item.id, false);
+      disabledIds.add(item.id);
+    } catch (_error) {
+      // Continua com as demais extensoes.
+    }
+  }
+
+  const ids = [...disabledIds];
+  await chrome.storage.local.set({
+    [EDU_LED_ISOLATION_ACTIVE_KEY]: true,
+    [EDU_LED_ISOLATION_EXTENSION_ID_KEY]: eduExtension.id,
+    [EDU_LED_SUSPENDED_EXTENSIONS_KEY]: ids
+  });
+
+  return ids;
+}
+
+async function restoreEduLedSuspendedExtensions() {
+  if (!chrome.management?.setEnabled) {
+    return [];
+  }
+
+  const stored = await chrome.storage.local.get([
+    EDU_LED_SUSPENDED_EXTENSIONS_KEY,
+    EDU_LED_ISOLATION_EXTENSION_ID_KEY
+  ]);
+  const ids = Array.isArray(stored[EDU_LED_SUSPENDED_EXTENSIONS_KEY])
+    ? stored[EDU_LED_SUSPENDED_EXTENSIONS_KEY]
+    : [];
+  const eduExtensionId = String(stored[EDU_LED_ISOLATION_EXTENSION_ID_KEY] || "").trim();
+  const restored = [];
+
+  for (const id of ids) {
+    if (id === chrome.runtime.id || id === eduExtensionId) continue;
+    try {
+      await chrome.management.setEnabled(id, true);
+      restored.push(id);
+    } catch (_error) {
+      // Tenta os demais.
+    }
+  }
+
+  await chrome.storage.local.remove([
+    EDU_LED_SUSPENDED_EXTENSIONS_KEY,
+    EDU_LED_ISOLATION_ACTIVE_KEY,
+    EDU_LED_ISOLATION_EXTENSION_ID_KEY
+  ]);
+
+  return restored;
+}
+
+async function reconcileEduLedIsolationState() {
+  if (await getEduLedIsolationActive()) {
+    await suspendConflictingExtensionsForEduLedSession();
+    return;
+  }
+
+  const stored = await chrome.storage.local.get(EDU_LED_SUSPENDED_EXTENSIONS_KEY);
+  const ids = Array.isArray(stored[EDU_LED_SUSPENDED_EXTENSIONS_KEY])
+    ? stored[EDU_LED_SUSPENDED_EXTENSIONS_KEY]
+    : [];
+
+  if (ids.length > 0) {
+    await restoreEduLedSuspendedExtensions();
+  }
+}
+
+async function reconcileCompanionIsolationState() {
+  if (await getEduLedIsolationActive()) {
+    await reconcileEduLedIsolationState();
+    return;
+  }
+
+  if (await getComboIsolationActive()) {
     await reconcileComboIsolationState();
     return;
   }
@@ -1512,7 +1755,20 @@ async function reconcileCompanionIsolationState() {
 }
 
 async function syncCompanionIsolationForSelection(selectedAccess) {
+  if (selectedAccess?.key === EDU_LED_CONTENT_KEY) {
+    if (await getComboIsolationActive()) {
+      await restoreComboSuspendedExtensions();
+    }
+    if (await getAutonextIsolationActive()) {
+      await restoreAutonextSuspendedExtensions();
+    }
+    return suspendConflictingExtensionsForEduLedSession();
+  }
+
   if (selectedAccess?.key === COMBO_VITALICIO_CONTENT_KEY) {
+    if (await getEduLedIsolationActive()) {
+      await restoreEduLedSuspendedExtensions();
+    }
     if (await getAutonextIsolationActive()) {
       await restoreAutonextSuspendedExtensions();
     }
@@ -1520,16 +1776,21 @@ async function syncCompanionIsolationForSelection(selectedAccess) {
   }
 
   if (selectedAccess?.key === AUTONEXT_CONTENT_KEY) {
+    if (await getEduLedIsolationActive()) {
+      await restoreEduLedSuspendedExtensions();
+    }
     if (await getComboIsolationActive()) {
       await restoreComboSuspendedExtensions();
     }
     return suspendConflictingExtensionsForAutonextSession();
   }
 
+  if (await getEduLedIsolationActive()) {
+    await restoreEduLedSuspendedExtensions();
+  }
   if (await getComboIsolationActive()) {
     await restoreComboSuspendedExtensions();
   }
-
   if (await getAutonextIsolationActive()) {
     await restoreAutonextSuspendedExtensions();
   }
@@ -2904,6 +3165,74 @@ async function configureScopedNetworkRules(state) {
 
   await clearZoomMeetingSessions();
 
+  if (String(state?.contentKey || "").trim() === EDU_LED_CONTENT_KEY) {
+    const eduRules = [
+      {
+        id: SCOPED_BLOCK_RULE_ID,
+        priority: 1,
+        action: { type: "block" },
+        condition: {
+          regexFilter: "^https?://",
+          resourceTypes: ["main_frame"]
+        }
+      },
+      {
+        id: SCOPED_ALLOW_RULE_ID_START,
+        priority: 100,
+        action: { type: "allow" },
+        condition: {
+          regexFilter: "^https://hotmart\\.com/pt-br/club/full-stack-marketing(?:/|\\?|$)",
+          resourceTypes: ["main_frame"]
+        }
+      },
+      {
+        id: SCOPED_ALLOW_RULE_ID_START + 1,
+        priority: 100,
+        action: { type: "allow" },
+        condition: {
+          regexFilter: "^https://sso\\.hotmart\\.com/",
+          resourceTypes: ["main_frame"]
+        }
+      },
+      {
+        id: SCOPED_ALLOW_RULE_ID_START + 2,
+        priority: 100,
+        action: { type: "allow" },
+        condition: {
+          regexFilter: "^https://sso-surrogate\\.hotmart\\.com/",
+          resourceTypes: ["main_frame"]
+        }
+      },
+      {
+        id: SCOPED_ALLOW_RULE_ID_START + 3,
+        priority: 100,
+        action: { type: "allow" },
+        condition: {
+          regexFilter: "^https://consumer\\.hotmart\\.com/",
+          resourceTypes: ["main_frame"]
+        }
+      }
+    ];
+
+    await chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: SCOPED_RULE_IDS,
+      addRules: eduRules
+    });
+
+    const activeRuleIds = new Set(
+      (await chrome.declarativeNetRequest.getDynamicRules()).map((rule) => rule.id)
+    );
+
+    if (!activeRuleIds.has(SCOPED_BLOCK_RULE_ID) ||
+        !activeRuleIds.has(SCOPED_ALLOW_RULE_ID_START) ||
+        !activeRuleIds.has(SCOPED_ALLOW_RULE_ID_START + 1) ||
+        !activeRuleIds.has(SCOPED_ALLOW_RULE_ID_START + 2) ||
+        !activeRuleIds.has(SCOPED_ALLOW_RULE_ID_START + 3)) {
+      throw new Error("edu_led_scoped_network_rules_not_applied");
+    }
+    return;
+  }
+
   if (isComboVitalicioState(state)) {
     const comboRules = [
       {
@@ -3297,6 +3626,27 @@ function isPixelAiHubUrl(url) {
   }
 }
 
+function isEduLedUrl(url) {
+  try {
+    const parsed = new URL(String(url || "").trim());
+    if (parsed.protocol !== "https:") {
+      return false;
+    }
+
+    const host = parsed.hostname.toLowerCase();
+    const path = parsed.pathname.replace(/\/{2,}/g, "/");
+
+    if (host === "hotmart.com") {
+      return path === "/pt-br/club/full-stack-marketing"
+        || path.startsWith("/pt-br/club/full-stack-marketing/");
+    }
+
+    return EDU_LED_ALLOWED_AUTH_HOSTS.has(host);
+  } catch (_error) {
+    return false;
+  }
+}
+
 function isComboVitalicioUrl(url) {
   try {
     const parsed = new URL(String(url || "").trim());
@@ -3327,6 +3677,10 @@ function isAllowedAfterUnlock(url, state) {
 
   if (String(state?.contentKey || "").trim() === PIXEL_AI_HUB_CONTENT_KEY) {
     return isPixelAiHubUrl(url);
+  }
+
+  if (String(state?.contentKey || "").trim() === EDU_LED_CONTENT_KEY) {
+    return isEduLedUrl(url);
   }
 
   if (isComboVitalicioState(state)) {
