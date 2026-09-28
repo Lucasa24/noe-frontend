@@ -33,6 +33,7 @@ const AUTONEXT_STATUS_MESSAGE = "browser-read:get-companion-status";
 const AUTONEXT_RELOAD_MESSAGE = "browser-read:reload-extension";
 const AUTONEXT_OPEN_PERMISSION_MESSAGE = "browser-read:open-permission-page";
 const AUTONEXT_CONTENT_KEY = "comunidade-autonext-vibestack";
+const AUTONEXT_SUSPENDED_EXTENSIONS_KEY = "autonextSuspendedExtensions";
 const SCOPED_BLOCK_RULE_ID = 9101;
 const SCOPED_ALLOW_RULE_ID_START = 9102;
 const SCOPED_ZOOM_ENTRY_RULE_ID = SCOPED_ALLOW_RULE_ID_START + 2;
@@ -83,16 +84,23 @@ const CONTENT_URL_FALLBACKS = {
 const ALLOWED_WHILE_LOCKED_ORIGINS = new Set([]);
 
 chrome.runtime.onInstalled.addListener(() => {
-  void bootstrapLock("installed");
+  void (async () => {
+    await restoreAutonextSuspendedExtensions();
+    await bootstrapLock("installed");
+  })();
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  void bootstrapLock("startup");
+  void (async () => {
+    await restoreAutonextSuspendedExtensions();
+    await bootstrapLock("startup");
+  })();
 });
 
 chrome.tabs.onCreated.addListener((tab) => {
   const tabUrl = tab.pendingUrl || tab.url || "";
 
+  void maybeRestoreAutonextSuspendedExtensions();
   void rememberTabSnapshot(tab);
 
   if (!tabUrl) {
@@ -726,6 +734,7 @@ async function verifyAccessCode(code, senderTabId) {
         await saveLockState(permissionState);
         await notifyPixelGate(false, permissionState);
         await updateBadge(permissionState);
+        await suspendConflictingExtensionsForAutonextPermission();
 
         return {
           ok: true,
@@ -1149,6 +1158,100 @@ async function syncClaudeCleanContentAccess(selectedAccess, recipientKey) {
   });
 }
 
+function isAutonextConflictingGuardExtension(item) {
+  if (!item || item.type !== "extension" || item.enabled !== true) {
+    return false;
+  }
+
+  if (item.id === chrome.runtime.id || item.id === AUTONEXT_EXTENSION_ID) {
+    return false;
+  }
+
+  const name = String(item.name || "").trim();
+
+  return /^\(BAN\)/i.test(name)
+    || /privacy\s+shield\s+admin/i.test(name)
+    || /^combo\s+vitali[íi]cio\b/i.test(name);
+}
+
+async function suspendConflictingExtensionsForAutonextPermission() {
+  if (!chrome.management?.getAll || !chrome.management?.setEnabled) {
+    return [];
+  }
+
+  const allItems = await chrome.management.getAll().catch(() => []);
+  const candidates = Array.isArray(allItems)
+    ? allItems.filter(isAutonextConflictingGuardExtension)
+    : [];
+
+  const disabledIds = [];
+
+  for (const item of candidates) {
+    try {
+      await chrome.management.setEnabled(item.id, false);
+      disabledIds.push(item.id);
+    } catch (_error) {
+      // Uma extensão não desativável não deve impedir o restante do fluxo.
+    }
+  }
+
+  if (disabledIds.length > 0) {
+    await chrome.storage.local.set({
+      [AUTONEXT_SUSPENDED_EXTENSIONS_KEY]: disabledIds
+    });
+  } else {
+    await chrome.storage.local.remove(AUTONEXT_SUSPENDED_EXTENSIONS_KEY);
+  }
+
+  return disabledIds;
+}
+
+async function restoreAutonextSuspendedExtensions() {
+  if (!chrome.management?.setEnabled) {
+    return [];
+  }
+
+  const stored = await chrome.storage.local.get(AUTONEXT_SUSPENDED_EXTENSIONS_KEY);
+  const ids = Array.isArray(stored[AUTONEXT_SUSPENDED_EXTENSIONS_KEY])
+    ? stored[AUTONEXT_SUSPENDED_EXTENSIONS_KEY]
+    : [];
+
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const restored = [];
+
+  for (const id of ids) {
+    try {
+      await chrome.management.setEnabled(id, true);
+      restored.push(id);
+    } catch (_error) {
+      // Tenta os demais.
+    }
+  }
+
+  await chrome.storage.local.remove(AUTONEXT_SUSPENDED_EXTENSIONS_KEY);
+  return restored;
+}
+
+async function maybeRestoreAutonextSuspendedExtensions() {
+  const stored = await chrome.storage.local.get(AUTONEXT_SUSPENDED_EXTENSIONS_KEY);
+  const ids = Array.isArray(stored[AUTONEXT_SUSPENDED_EXTENSIONS_KEY])
+    ? stored[AUTONEXT_SUSPENDED_EXTENSIONS_KEY]
+    : [];
+
+  if (ids.length === 0) {
+    return;
+  }
+
+  const status = await getAutonextStatus().catch(() => null);
+
+  if (status?.hasPermission === true) {
+    await restoreAutonextSuspendedExtensions();
+  }
+}
+
 async function getAutonextExtensionInfo() {
   if (!chrome.management?.get) {
     return null;
@@ -1236,6 +1339,8 @@ async function openAutonextPermissionPage(sender, message = {}) {
   if (!extensionInfo.enabled) {
     return { ok: false, error: "A extensao AutoNext Clean esta instalada, mas desativada." };
   }
+
+  await suspendConflictingExtensionsForAutonextPermission();
 
   const permissionUrl = `${AUTONEXT_BLOCKED_URL}?permissionGate=1`;
   const requestedTabId = Number(message?.tabId);
