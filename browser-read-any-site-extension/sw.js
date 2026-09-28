@@ -105,6 +105,7 @@ const COMBO_VITALICIO_EXTENSION_NAMES = ["combo vitalicio", "combo vitalício"];
 const COMBO_READ_PERMISSION_KEY = "comboVitalicioReadPermission";
 
 const EDU_LED_CONTENT_KEY = "edu-led-growth";
+const EDU_LED_EXTENSION_ID = "kboehlnbpllkohfhcacjpjpgkbiaebmh";
 const EDU_LED_LABEL = "EDU-LED GROWTH";
 const EDU_LED_MAIN_URL = "https://hotmart.com/pt-br/club/full-stack-marketing/";
 const EDU_LED_ACCESS_MESSAGE = "browser-read:set-content-access";
@@ -1273,6 +1274,18 @@ function isEduLedExtensionItem(item) {
 
 async function findInstalledEduLedExtension() {
   if (!chrome.management?.getAll) return null;
+
+  if (chrome.management?.get) {
+    try {
+      const exact = await chrome.management.get(EDU_LED_EXTENSION_ID);
+      if (exact?.type === "extension") {
+        return exact;
+      }
+    } catch (_error) {
+      // Fallback por nome para instalações antigas ou perfis diferentes.
+    }
+  }
+
   const extensions = await chrome.management.getAll();
   const matches = extensions.filter(isEduLedExtensionItem);
   return matches.find((item) => item.enabled === true) || matches[0] || null;
@@ -1315,7 +1328,38 @@ async function syncEduLedContentAccess(selectedAccess, recipientKey, approved, r
     payload
   });
 
-  if (response?.ok === true) return true;
+  if (response?.ok === true) {
+    await chrome.storage.local.set({
+      eduLedCompanionStatus: {
+        extensionId: extensionInfo.id,
+        version: String(extensionInfo.version || ""),
+        protocol: "browser-read",
+        approved: approved === true,
+        checkedAt: Date.now()
+      }
+    });
+    return true;
+  }
+
+  // Compatibilidade com o companion EDU-LED 1.3.3:
+  // essa versão não possui onMessageExternal/browser-read:set-content-access.
+  // A presença + estado habilitado da extensão é suficiente; o próprio
+  // Browser Read aplica as regras de navegação do EDU-LED.
+  const version = String(extensionInfo.version || "").trim();
+  if (extensionInfo.id === EDU_LED_EXTENSION_ID &&
+      extensionInfo.enabled === true &&
+      (!response || version === "1.3.3")) {
+    await chrome.storage.local.set({
+      eduLedCompanionStatus: {
+        extensionId: extensionInfo.id,
+        version,
+        protocol: "legacy",
+        approved: approved === true,
+        checkedAt: Date.now()
+      }
+    });
+    return true;
+  }
 
   if (required) {
     throw new Error(response?.error || "Nao foi possivel sincronizar a extensao EDU-LED Growth.");
