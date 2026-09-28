@@ -63,6 +63,7 @@ const COMBO_VITALICIO_CONTENT_KEY = "combo-vitalicio-leandro-ladeira";
 const COMBO_VITALICIO_LABEL = "Combo vitalicio";
 const COMBO_VITALICIO_BASE_URL = "https://hotmart.com/pt-br/club/";
 const COMBO_VITALICIO_NAVIGATION_REGEX = "^https://hotmart\\.com/pt-br/club(?:/|\\?|$)";
+const COMBO_VITALICIO_MEMBER_AREA_REGEX = "^https://hotmart\\.com/pt-br/area-de-membros/?(?:\\?|$)";
 const COMBO_VITALICIO_ACCESS_MESSAGE = "browser-read:set-content-access";
 const COMBO_VITALICIO_EXTENSION_NAMES = ["combo vitalicio", "combo vitalício"];
 const COMBO_READ_PERMISSION_KEY = "comboVitalicioReadPermission";
@@ -2728,6 +2729,15 @@ async function configureScopedNetworkRules(state) {
           regexFilter: COMBO_VITALICIO_NAVIGATION_REGEX,
           resourceTypes: ["main_frame"]
         }
+      },
+      {
+        id: SCOPED_ALLOW_RULE_ID_START + 1,
+        priority: 100,
+        action: { type: "allow" },
+        condition: {
+          regexFilter: COMBO_VITALICIO_MEMBER_AREA_REGEX,
+          resourceTypes: ["main_frame"]
+        }
       }
     ];
 
@@ -2741,7 +2751,8 @@ async function configureScopedNetworkRules(state) {
     );
 
     if (!activeRuleIds.has(SCOPED_BLOCK_RULE_ID) ||
-        !activeRuleIds.has(SCOPED_ALLOW_RULE_ID_START)) {
+        !activeRuleIds.has(SCOPED_ALLOW_RULE_ID_START) ||
+        !activeRuleIds.has(SCOPED_ALLOW_RULE_ID_START + 1)) {
       throw new Error("combo_scoped_network_rules_not_applied");
     }
     return;
@@ -3035,7 +3046,12 @@ function isComboVitalicioUrl(url) {
     const path = parsed.pathname.replace(/\/{2,}/g, "/");
     return parsed.protocol === "https:"
       && parsed.hostname === "hotmart.com"
-      && (path === "/pt-br/club" || path.startsWith("/pt-br/club/"));
+      && (
+        path === "/pt-br/club"
+        || path.startsWith("/pt-br/club/")
+        || path === "/pt-br/area-de-membros"
+        || path === "/pt-br/area-de-membros/"
+      );
   } catch (_error) {
     return false;
   }
