@@ -226,11 +226,12 @@
         configureReloadButtons();
       }
 
-      if (response?.action === "autonext_permission") {
-        selectedContentKey = AUTONEXT_CONTENT_KEY;
-        await refreshAutonextControls();
-        configureReloadButtons();
-      }
+      return;
+    }
+
+    if (response?.action === "autonext_permission" && response?.pageUrl) {
+      updateStatus("Código validado. Abrindo a página para permitir a leitura do AutoNext...");
+      window.location.replace(response.pageUrl);
       return;
     }
 
