@@ -66,6 +66,7 @@
   ]);
   const COURSES_DVD_EXTENSION_ID = "jamchgcokehlhclhjgooeihlhnoblmji";
   const AUTONEXT_EXTENSION_ID = "ajbahhfleppkggefflekfencifmodjed";
+  const EDU_LED_EXTENSION_ID = "kboehlnbpllkohfhcacjpjpgkbiaebmh";
   const DTC_EXPERIENCE_CONTENT_KEY = "dtc-experience";
   const AUTONEXT_CONTENT_KEY = "comunidade-autonext-vibestack";
   const COMBO_VITALICIO_CONTENT_KEY = "combo-vitalicio-leandro-ladeira";
@@ -470,15 +471,45 @@
         elements.companionReloadButton.textContent = "♻ Recarregando EDU-LED GROWTH...";
       }
 
-      updateStatus("Reiniciando somente o EDU-LED GROWTH...");
+      updateStatus("Reiniciando diretamente o EDU-LED GROWTH...");
 
       try {
-        const response = await sendMessage({ type: "lock:reloadEduLed" });
-        if (response?.ok) {
-          updateStatus("EDU-LED GROWTH recarregado. Browser Read continua ativo e as outras extensões de bloqueio permanecem suspensas.");
-        } else {
-          updateStatus(response?.error || "Não foi possível recarregar o EDU-LED GROWTH.");
+        if (!chrome.management?.get || !chrome.management?.setEnabled) {
+          throw new Error("A API chrome.management não está disponível.");
         }
+
+        const extensionInfo = await chrome.management.get(EDU_LED_EXTENSION_ID);
+
+        if (!extensionInfo?.id) {
+          throw new Error("A extensão EDU-LED GROWTH não foi encontrada pelo ID configurado.");
+        }
+
+        if (extensionInfo.enabled === true) {
+          await chrome.management.setEnabled(EDU_LED_EXTENSION_ID, false);
+          await new Promise((resolve) => setTimeout(resolve, 450));
+        }
+
+        await chrome.management.setEnabled(EDU_LED_EXTENSION_ID, true);
+        await new Promise((resolve) => setTimeout(resolve, 700));
+
+        const verification = await chrome.management.get(EDU_LED_EXTENSION_ID);
+        if (verification?.enabled !== true) {
+          throw new Error("O EDU-LED GROWTH não permaneceu ativado após a recarga.");
+        }
+
+        // Se o service worker atual conhecer o comando, reaplica o isolamento.
+        // Se for uma instalação misturada/antiga, a recarga direta já foi concluída.
+        try {
+          const response = await sendMessage({ type: "lock:reloadEduLed" });
+          if (response?.ok !== true && response?.error !== "unsupported_message") {
+            updateStatus(`EDU-LED GROWTH recarregado diretamente. Aviso de isolamento: ${response?.error || "não confirmado"}`);
+            return;
+          }
+        } catch (_error) {
+          // Compatibilidade com service workers antigos.
+        }
+
+        updateStatus("EDU-LED GROWTH recarregado diretamente pelo ID correto.");
       } catch (error) {
         updateStatus(`Não foi possível recarregar o EDU-LED GROWTH: ${error instanceof Error ? error.message : String(error)}`);
       } finally {
