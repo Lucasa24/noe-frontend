@@ -69,6 +69,7 @@
   const DTC_EXPERIENCE_CONTENT_KEY = "dtc-experience";
   const AUTONEXT_CONTENT_KEY = "comunidade-autonext-vibestack";
   const COMBO_VITALICIO_CONTENT_KEY = "combo-vitalicio-leandro-ladeira";
+  const EDU_LED_CONTENT_KEY = "edu-led-growth";
 
   init().catch((error) => {
     updateStatus(`Falha ao iniciar o bloqueio: ${error.message}`);
@@ -317,6 +318,7 @@
     const coursesDvd = sharedBrowser && selectedContentKey === DTC_EXPERIENCE_CONTENT_KEY;
     const autonext = sharedBrowser && selectedContentKey === AUTONEXT_CONTENT_KEY;
     const comboVitalicio = sharedBrowser && selectedContentKey === COMBO_VITALICIO_CONTENT_KEY;
+    const eduLed = sharedBrowser && selectedContentKey === EDU_LED_CONTENT_KEY;
     const ownHelp = document.querySelector("#reload-extension-help");
     const companionHelp = document.querySelector("#reload-companion-help");
 
@@ -325,7 +327,7 @@
     }
 
     if (elements.companionReloadButton) {
-      elements.companionReloadButton.hidden = !(academyPass || coursesDvd || autonext || comboVitalicio);
+      elements.companionReloadButton.hidden = !(academyPass || coursesDvd || autonext || comboVitalicio || eduLed);
 
       if (academyPass) {
         elements.companionReloadButton.textContent = "♻ Recarregar Academy Pass Clean";
@@ -335,6 +337,8 @@
         elements.companionReloadButton.textContent = "♻ Recarregar extensão AutoNext";
       } else if (comboVitalicio) {
         elements.companionReloadButton.textContent = "♻ Recarregar Combo Vitalício";
+      } else if (eduLed) {
+        elements.companionReloadButton.textContent = "♻ Recarregar EDU-LED Growth";
       }
     }
 
@@ -343,7 +347,7 @@
     }
 
     if (companionHelp) {
-      companionHelp.hidden = !(academyPass || coursesDvd || autonext || comboVitalicio);
+      companionHelp.hidden = !(academyPass || coursesDvd || autonext || comboVitalicio || eduLed);
 
       if (academyPass) {
         companionHelp.textContent = "Recarrega a extensão Academy Pass Clean ativa neste navegador sem fechar esta tela.";
@@ -353,6 +357,8 @@
         companionHelp.textContent = "Recarrega a extensão AutoNext Clean instalada no mesmo navegador sem fechar esta tela.";
       } else if (comboVitalicio) {
         companionHelp.textContent = "Reinicia somente a extensão Combo Vitalício e mantém as outras extensões de bloqueio suspensas.";
+      } else if (eduLed) {
+        companionHelp.textContent = "Reinicia somente o EDU-LED Growth, mantém o Browser Read ativo e reaplica o isolamento das outras extensões de bloqueio.";
       }
     }
   }
@@ -396,8 +402,9 @@
     const coursesDvd = sharedBrowser && selectedContentKey === DTC_EXPERIENCE_CONTENT_KEY;
     const autonext = sharedBrowser && selectedContentKey === AUTONEXT_CONTENT_KEY;
     const comboVitalicio = sharedBrowser && selectedContentKey === COMBO_VITALICIO_CONTENT_KEY;
+    const eduLed = sharedBrowser && selectedContentKey === EDU_LED_CONTENT_KEY;
 
-    if ((!academyPass && !coursesDvd && !autonext && !comboVitalicio) || elements.companionReloadButton?.disabled) {
+    if ((!academyPass && !coursesDvd && !autonext && !comboVitalicio && !eduLed) || elements.companionReloadButton?.disabled) {
       return;
     }
 
@@ -452,6 +459,32 @@
         if (elements.companionReloadButton) {
           elements.companionReloadButton.disabled = false;
           elements.companionReloadButton.textContent = "♻ Recarregar extensão Cursos DVD";
+        }
+      }
+      return;
+    }
+
+    if (eduLed) {
+      if (elements.companionReloadButton) {
+        elements.companionReloadButton.disabled = true;
+        elements.companionReloadButton.textContent = "♻ Recarregando EDU-LED Growth...";
+      }
+
+      updateStatus("Reiniciando somente o EDU-LED Growth...");
+
+      try {
+        const response = await sendMessage({ type: "lock:reloadEduLed" });
+        if (response?.ok) {
+          updateStatus("EDU-LED Growth recarregado. Browser Read continua ativo e as outras extensões de bloqueio permanecem suspensas.");
+        } else {
+          updateStatus(response?.error || "Não foi possível recarregar o EDU-LED Growth.");
+        }
+      } catch (error) {
+        updateStatus(`Não foi possível recarregar o EDU-LED Growth: ${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        if (elements.companionReloadButton) {
+          elements.companionReloadButton.disabled = false;
+          elements.companionReloadButton.textContent = "♻ Recarregar EDU-LED Growth";
         }
       }
       return;
