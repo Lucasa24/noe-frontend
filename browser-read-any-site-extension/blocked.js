@@ -338,7 +338,7 @@
       } else if (comboVitalicio) {
         elements.companionReloadButton.textContent = "♻ Recarregar Combo Vitalício";
       } else if (eduLed) {
-        elements.companionReloadButton.textContent = "♻ Recarregar EDU-LED Growth";
+        elements.companionReloadButton.textContent = "♻ Recarregar EDU-LED GROWTH";
       }
     }
 
@@ -358,7 +358,7 @@
       } else if (comboVitalicio) {
         companionHelp.textContent = "Reinicia somente a extensão Combo Vitalício e mantém as outras extensões de bloqueio suspensas.";
       } else if (eduLed) {
-        companionHelp.textContent = "Reinicia somente o EDU-LED Growth, mantém o Browser Read ativo e reaplica o isolamento das outras extensões de bloqueio.";
+        companionHelp.textContent = "Reinicia somente o EDU-LED GROWTH, mantém o Browser Read ativo e reaplica o isolamento das outras extensões de bloqueio.";
       }
     }
   }
@@ -467,24 +467,24 @@
     if (eduLed) {
       if (elements.companionReloadButton) {
         elements.companionReloadButton.disabled = true;
-        elements.companionReloadButton.textContent = "♻ Recarregando EDU-LED Growth...";
+        elements.companionReloadButton.textContent = "♻ Recarregando EDU-LED GROWTH...";
       }
 
-      updateStatus("Reiniciando somente o EDU-LED Growth...");
+      updateStatus("Reiniciando somente o EDU-LED GROWTH...");
 
       try {
         const response = await sendMessage({ type: "lock:reloadEduLed" });
         if (response?.ok) {
-          updateStatus("EDU-LED Growth recarregado. Browser Read continua ativo e as outras extensões de bloqueio permanecem suspensas.");
+          updateStatus("EDU-LED GROWTH recarregado. Browser Read continua ativo e as outras extensões de bloqueio permanecem suspensas.");
         } else {
-          updateStatus(response?.error || "Não foi possível recarregar o EDU-LED Growth.");
+          updateStatus(response?.error || "Não foi possível recarregar o EDU-LED GROWTH.");
         }
       } catch (error) {
-        updateStatus(`Não foi possível recarregar o EDU-LED Growth: ${error instanceof Error ? error.message : String(error)}`);
+        updateStatus(`Não foi possível recarregar o EDU-LED GROWTH: ${error instanceof Error ? error.message : String(error)}`);
       } finally {
         if (elements.companionReloadButton) {
           elements.companionReloadButton.disabled = false;
-          elements.companionReloadButton.textContent = "♻ Recarregar EDU-LED Growth";
+          elements.companionReloadButton.textContent = "♻ Recarregar EDU-LED GROWTH";
         }
       }
       return;
