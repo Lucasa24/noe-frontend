@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Browser Read Any Site",
-  "version": "1.3.56",
-  "description": "Browser Read com EDU-LED Growth integrado: isolamento de companion, reutilizacao da sessao Hotmart e fluxo SSO/autologin controlado.",
+  "version": "1.3.57",
+  "description": "Browser Read com botão contextual para recarregar o EDU-LED GROWTH diretamente no blocked.html.",
   "permissions": [
     "scripting",
     "storage",
