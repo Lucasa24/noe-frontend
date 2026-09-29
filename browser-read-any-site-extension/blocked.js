@@ -484,6 +484,26 @@
           throw new Error("A extensão EDU-LED GROWTH não foi encontrada pelo ID configurado.");
         }
 
+        const normalizedEduName = String(extensionInfo.name || "")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+          .trim();
+
+        const isEduLedPackage =
+          normalizedEduName.startsWith("(ban) hotmart full stack marketing")
+          || normalizedEduName.startsWith("(ban) edu-led growth")
+          || normalizedEduName.startsWith("edu-led growth");
+
+        if (!isEduLedPackage) {
+          throw new Error(
+            "O ID " + EDU_LED_EXTENSION_ID +
+            " está carregando \"" + (extensionInfo.name || "extensão desconhecida") +
+            "\" versão " + (extensionInfo.version || "sem versão") +
+            ". Atualize essa mesma entrada com o ZIP correto do EDU-LED 1.4.1."
+          );
+        }
+
         if (extensionInfo.enabled === true) {
           await chrome.management.setEnabled(EDU_LED_EXTENSION_ID, false);
           await new Promise((resolve) => setTimeout(resolve, 450));
