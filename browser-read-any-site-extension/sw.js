@@ -1278,18 +1278,30 @@ function isEduLedExtensionItem(item) {
     || name.startsWith("edu-led growth");
 }
 
+async function getExactEduLedIdOccupant() {
+  if (!chrome.management?.get) return null;
+  try {
+    const exact = await chrome.management.get(EDU_LED_EXTENSION_ID);
+    return exact?.type === "extension" ? exact : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function formatEduLedIdentityMismatch(extensionInfo) {
+  const name = String(extensionInfo?.name || "extensão desconhecida").trim();
+  const version = String(extensionInfo?.version || "sem versão").trim();
+  return "O ID do EDU-LED (" + EDU_LED_EXTENSION_ID + ") está carregando \"" +
+    name + "\" versão " + version +
+    ", e não o pacote EDU-LED Growth. Atualize essa mesma entrada com o ZIP correto do EDU-LED 1.4.1.";
+}
+
 async function findInstalledEduLedExtension() {
   if (!chrome.management?.getAll) return null;
 
-  if (chrome.management?.get) {
-    try {
-      const exact = await chrome.management.get(EDU_LED_EXTENSION_ID);
-      if (exact?.type === "extension") {
-        return exact;
-      }
-    } catch (_error) {
-      // Fallback por nome para instalações antigas ou perfis diferentes.
-    }
+  const exact = await getExactEduLedIdOccupant();
+  if (exact && isEduLedExtensionItem(exact)) {
+    return exact;
   }
 
   const extensions = await chrome.management.getAll();
@@ -1340,6 +1352,10 @@ async function syncEduLedContentAccess(selectedAccess, recipientKey, approved, r
 
   if (!extensionInfo?.id) {
     if (required) {
+      const exactOccupant = await getExactEduLedIdOccupant();
+      if (exactOccupant && !isEduLedExtensionItem(exactOccupant)) {
+        throw new Error(formatEduLedIdentityMismatch(exactOccupant));
+      }
       throw new Error("A extensao EDU-LED Growth nao foi encontrada neste navegador.");
     }
     return false;
@@ -2073,6 +2089,10 @@ async function reloadEduLedCompanion() {
   let extensionInfo = await findInstalledEduLedExtension();
 
   if (!extensionInfo?.id) {
+    const exactOccupant = await getExactEduLedIdOccupant();
+    if (exactOccupant && !isEduLedExtensionItem(exactOccupant)) {
+      return { ok: false, error: formatEduLedIdentityMismatch(exactOccupant) };
+    }
     return { ok: false, error: "A extensao EDU-LED Growth nao foi encontrada neste navegador." };
   }
 
