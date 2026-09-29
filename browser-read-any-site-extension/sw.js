@@ -106,6 +106,7 @@ const COMBO_READ_PERMISSION_KEY = "comboVitalicioReadPermission";
 
 const EDU_LED_CONTENT_KEY = "edu-led-growth";
 const EDU_LED_EXTENSION_ID = "kboehlnbpllkohfhcacjpjpgkbiaebmh";
+const EDU_LED_MIN_VERSION = "1.4.1";
 const EDU_LED_LABEL = "EDU-LED GROWTH";
 const EDU_LED_MAIN_URL = "https://hotmart.com/pt-br/club/full-stack-marketing/";
 const EDU_LED_ACCESS_MESSAGE = "browser-read:set-content-access";
@@ -309,6 +310,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       if (message?.type === "lock:reloadComboVitalicio") {
         sendResponse(await reloadComboVitalicioCompanion());
+        return;
+      }
+
+      if (message?.type === "lock:reloadEduLed") {
+        sendResponse(await reloadEduLedCompanion());
         return;
       }
 
@@ -1291,6 +1297,44 @@ async function findInstalledEduLedExtension() {
   return matches.find((item) => item.enabled === true) || matches[0] || null;
 }
 
+function compareVersionParts(left, right) {
+  const a = String(left || "").split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const b = String(right || "").split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const length = Math.max(a.length, b.length);
+
+  for (let index = 0; index < length; index += 1) {
+    const av = a[index] || 0;
+    const bv = b[index] || 0;
+    if (av > bv) return 1;
+    if (av < bv) return -1;
+  }
+
+  return 0;
+}
+
+async function ensureEduLedCompanionCompatible(extensionInfo) {
+  if (!extensionInfo?.id) {
+    throw new Error("A extensao EDU-LED Growth nao foi encontrada neste navegador.");
+  }
+
+  const version = String(extensionInfo.version || "").trim();
+  if (compareVersionParts(version, EDU_LED_MIN_VERSION) >= 0) {
+    return extensionInfo;
+  }
+
+  if (extensionInfo.enabled === true && chrome.management?.setEnabled) {
+    await chrome.management.setEnabled(extensionInfo.id, false).catch(() => {});
+  }
+
+  throw new Error(
+    "Atualize a extensao EDU-LED Growth para a versao "
+      + EDU_LED_MIN_VERSION
+      + " ou superior. A versao "
+      + (version || "antiga")
+      + " causa loop antes da validacao."
+  );
+}
+
 async function syncEduLedContentAccess(selectedAccess, recipientKey, approved, required) {
   let extensionInfo = await findInstalledEduLedExtension();
 
@@ -1299,6 +1343,10 @@ async function syncEduLedContentAccess(selectedAccess, recipientKey, approved, r
       throw new Error("A extensao EDU-LED Growth nao foi encontrada neste navegador.");
     }
     return false;
+  }
+
+  if (required) {
+    extensionInfo = await ensureEduLedCompanionCompatible(extensionInfo);
   }
 
   if (extensionInfo.enabled !== true && required && chrome.management?.setEnabled) {
@@ -1334,26 +1382,6 @@ async function syncEduLedContentAccess(selectedAccess, recipientKey, approved, r
         extensionId: extensionInfo.id,
         version: String(extensionInfo.version || ""),
         protocol: "browser-read",
-        approved: approved === true,
-        checkedAt: Date.now()
-      }
-    });
-    return true;
-  }
-
-  // Compatibilidade com o companion EDU-LED 1.3.3:
-  // essa versão não possui onMessageExternal/browser-read:set-content-access.
-  // A presença + estado habilitado da extensão é suficiente; o próprio
-  // Browser Read aplica as regras de navegação do EDU-LED.
-  const version = String(extensionInfo.version || "").trim();
-  if (extensionInfo.id === EDU_LED_EXTENSION_ID &&
-      extensionInfo.enabled === true &&
-      (!response || version === "1.3.3")) {
-    await chrome.storage.local.set({
-      eduLedCompanionStatus: {
-        extensionId: extensionInfo.id,
-        version,
-        protocol: "legacy",
         approved: approved === true,
         checkedAt: Date.now()
       }
@@ -1710,6 +1738,8 @@ async function suspendConflictingExtensionsForEduLedSession() {
     throw new Error("A extensao EDU-LED Growth nao foi encontrada neste navegador.");
   }
 
+  eduExtension = await ensureEduLedCompanionCompatible(eduExtension);
+
   if (eduExtension.enabled !== true) {
     await chrome.management.setEnabled(eduExtension.id, true);
     await new Promise((resolve) => setTimeout(resolve, 400));
@@ -2031,6 +2061,58 @@ async function openAutonextPermissionPage(sender, message = {}) {
     return {
       ok: false,
       error: `Nao foi possivel abrir a pagina de ativacao do AutoNext: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+}
+
+async function reloadEduLedCompanion() {
+  if (!chrome.management?.setEnabled) {
+    return { ok: false, error: "A API de gerenciamento da extensao nao esta disponivel." };
+  }
+
+  let extensionInfo = await findInstalledEduLedExtension();
+
+  if (!extensionInfo?.id) {
+    return { ok: false, error: "A extensao EDU-LED Growth nao foi encontrada neste navegador." };
+  }
+
+  try {
+    extensionInfo = await ensureEduLedCompanionCompatible(extensionInfo);
+
+    if (extensionInfo.enabled === true) {
+      await chrome.management.setEnabled(extensionInfo.id, false);
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    }
+
+    await chrome.management.setEnabled(extensionInfo.id, true);
+    await new Promise((resolve) => setTimeout(resolve, 650));
+
+    extensionInfo = await findInstalledEduLedExtension();
+    await ensureEduLedCompanionCompatible(extensionInfo);
+
+    await chrome.storage.local.set({
+      [EDU_LED_ISOLATION_ACTIVE_KEY]: true,
+      [EDU_LED_ISOLATION_EXTENSION_ID_KEY]: extensionInfo.id
+    });
+
+    await suspendConflictingExtensionsForEduLedSession();
+
+    await syncEduLedContentAccess({
+      key: EDU_LED_CONTENT_KEY,
+      label: EDU_LED_LABEL,
+      url: EDU_LED_MAIN_URL
+    }, "", false, true);
+
+    return {
+      ok: true,
+      mode: "restart",
+      extensionId: extensionInfo.id,
+      version: String(extensionInfo.version || "")
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Falha ao reiniciar EDU-LED Growth."
     };
   }
 }
