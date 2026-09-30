@@ -34,14 +34,14 @@ const AUTONEXT_RELOAD_MESSAGE = "browser-read:reload-extension";
 const AUTONEXT_OPEN_PERMISSION_MESSAGE = "browser-read:open-permission-page";
 const AUTONEXT_CONTENT_KEY = "comunidade-autonext-vibestack";
 const PIXEL_AI_HUB_CONTENT_KEY = "pixel-ai-hub";
-const PIXEL_AI_HUB_PRIMARY_URL = "https://app.pixeleducacao.com.br/";
+const PIXEL_AI_HUB_PRIMARY_URL = "https://hotmart.com/pt-br/club/pixel-educacao";
 const PIXEL_AI_HUB_URLS = Object.freeze([
-  "https://hotmart.com/pt-br/club/pixel-educacao",
-  "https://checklist.pixeleducacao.com.br/",
-  PIXEL_AI_HUB_PRIMARY_URL
+  PIXEL_AI_HUB_PRIMARY_URL,
+  "https://checklist.pixeleducacao.com.br/"
 ]);
 const PIXEL_AI_HUB_APP_ORIGIN = "https://app.pixeleducacao.com.br";
 const PIXEL_AI_HUB_CHECKLIST_ORIGIN = "https://checklist.pixeleducacao.com.br";
+const PIXEL_AI_HUB_CASES_ORIGIN = "https://cases.pixeleducacao.com.br";
 const PIXEL_AI_HUB_HOTMART_ORIGIN = "https://hotmart.com";
 const PIXEL_AI_HUB_HOTMART_REGEX = "^https://([^/]+\\.)?hotmart\\.com/";
 const EXTERNAL_EXTENSION_MESSAGE_TIMEOUT_MS = 1500;
@@ -64,12 +64,14 @@ const COMBO_SCOPED_ALLOW_RULE_IDS = Array.from(
   (_, index) => COMBO_SCOPED_ALLOW_RULE_ID_START + index
 );
 const ZOOM_SESSION_ALLOW_RULE_ID = 9201;
+const PIXEL_AI_HUB_CASES_RULE_ID = 9251;
 const SCOPED_RULE_IDS = [
   SCOPED_BLOCK_RULE_ID,
   SCOPED_ALLOW_RULE_ID_START,
   SCOPED_ALLOW_RULE_ID_START + 1,
   SCOPED_ZOOM_ENTRY_RULE_ID,
   SCOPED_ZOOM_WEB_CLIENT_RULE_ID,
+  PIXEL_AI_HUB_CASES_RULE_ID,
   ...COMBO_SCOPED_ALLOW_RULE_IDS
 ];
 const CLAUDE_BROWSER_READ_EXTENSION_ID = "hbokpkaoocpcecbfgfadoplblcfannke";
@@ -133,7 +135,7 @@ const DTC_ZOOM_SESSION_ORIGINS = new Set([
 const DTC_ZOOM_ENTRY_REGEX = "^https://us05web\\.zoom\\.us/j/[0-9]{9,13}/?\\?pwd=[^&#\\s]+(?:&[^#]*)?(?:#.*)?$";
 const DTC_ZOOM_WEB_CLIENT_REGEX = "^https://app\\.zoom\\.us/wc/(?:join/[0-9]{9,13}|[0-9]{9,13}/join)/?\\?(?:[^#&]*&)*pwd=[^&#\\s]+(?:&[^#]*)?(?:#.*)?$";
 const CONTENT_URL_FALLBACKS = {
-  "pixel-ai-hub": PIXEL_AI_HUB_PRIMARY_URL,
+  "pixel-ai-hub": "https://hotmart.com/pt-br/club/pixel-educacao",
   "comunidade-growth-hackers": "https://comunidadegrowthhackers.cademi.com.br/",
   "comunidade-autonext-vibestack": "https://comunidade.ericorenato.com.br/m/courses",
   "combo-vitalicio-leandro-ladeira": COMBO_VITALICIO_BASE_URL,
@@ -962,8 +964,8 @@ async function verifyAccessCode(code, senderTabId) {
       }).catch(() => undefined);
     }
 
-    // Pixel AI Hub: mantém o app como aba principal e abre também
-    // Hotmart + Checklist no mesmo acesso liberado pelo Browser Read.
+    // Pixel AI Hub: após validar o código, abre somente Hotmart + Checklist.
+    // app.pixeleducacao.com.br continua permitido, mas nunca é aberto automaticamente.
     if (isContentSelectorExtension() &&
         restoredState?.unlocked === true &&
         restoredState?.contentKey === PIXEL_AI_HUB_CONTENT_KEY) {
@@ -1300,12 +1302,34 @@ async function findInstalledEduLedExtension() {
   if (!chrome.management?.getAll) return null;
 
   const exact = await getExactEduLedIdOccupant();
+  const extensions = await chrome.management.getAll();
+  const matches = extensions.filter(isEduLedExtensionItem);
+
+  const compatibleMatches = matches
+    .filter((item) => compareVersionParts(item?.version, EDU_LED_MIN_VERSION) >= 0)
+    .sort((left, right) => compareVersionParts(right?.version, left?.version));
+
+  if (
+    exact &&
+    isEduLedExtensionItem(exact) &&
+    compareVersionParts(exact.version, EDU_LED_MIN_VERSION) >= 0
+  ) {
+    return exact;
+  }
+
+  const enabledCompatible = compatibleMatches.find((item) => item.enabled === true);
+  if (enabledCompatible) {
+    return enabledCompatible;
+  }
+
+  if (compatibleMatches.length > 0) {
+    return compatibleMatches[0];
+  }
+
   if (exact && isEduLedExtensionItem(exact)) {
     return exact;
   }
 
-  const extensions = await chrome.management.getAll();
-  const matches = extensions.filter(isEduLedExtensionItem);
   return matches.find((item) => item.enabled === true) || matches[0] || null;
 }
 
@@ -1339,11 +1363,11 @@ async function ensureEduLedCompanionCompatible(extensionInfo) {
   }
 
   throw new Error(
-    "Atualize a extensao EDU-LED Growth para a versao "
-      + EDU_LED_MIN_VERSION
-      + " ou superior. A versao "
+    "O navegador ainda esta carregando EDU-LED Growth "
       + (version || "antiga")
-      + " causa loop antes da validacao."
+      + ". O projeto atualizado exige "
+      + EDU_LED_MIN_VERSION
+      + " ou superior. Recarregue a mesma extensao a partir da pasta edu-led-clean-extension; nao instale uma copia antiga em outro caminho."
   );
 }
 
@@ -3158,6 +3182,10 @@ function getScopedFallbackUrl(state) {
     return getComboLinksPageUrl();
   }
 
+  if (contentKey === PIXEL_AI_HUB_CONTENT_KEY) {
+    return "https://hotmart.com/pt-br/club/pixel-educacao";
+  }
+
   if (selectedUrl) {
     return selectedUrl;
   }
@@ -3298,6 +3326,7 @@ function getAllowedContentOrigins(state) {
     return [
       PIXEL_AI_HUB_APP_ORIGIN,
       PIXEL_AI_HUB_CHECKLIST_ORIGIN,
+      PIXEL_AI_HUB_CASES_ORIGIN,
       PIXEL_AI_HUB_HOTMART_ORIGIN
     ];
   }
@@ -3471,6 +3500,15 @@ async function configureScopedNetworkRules(state) {
           regexFilter: PIXEL_AI_HUB_HOTMART_REGEX,
           resourceTypes: ["main_frame"]
         }
+      },
+      {
+        id: PIXEL_AI_HUB_CASES_RULE_ID,
+        priority: 100,
+        action: { type: "allow" },
+        condition: {
+          regexFilter: "^https://cases\\.pixeleducacao\\.com\\.br/",
+          resourceTypes: ["main_frame"]
+        }
       }
     ];
 
@@ -3486,7 +3524,8 @@ async function configureScopedNetworkRules(state) {
     if (!activeRuleIds.has(SCOPED_BLOCK_RULE_ID) ||
         !activeRuleIds.has(SCOPED_ALLOW_RULE_ID_START) ||
         !activeRuleIds.has(SCOPED_ALLOW_RULE_ID_START + 1) ||
-        !activeRuleIds.has(SCOPED_ALLOW_RULE_ID_START + 2)) {
+        !activeRuleIds.has(SCOPED_ALLOW_RULE_ID_START + 2) ||
+        !activeRuleIds.has(PIXEL_AI_HUB_CASES_RULE_ID)) {
       throw new Error("pixel_scoped_network_rules_not_applied");
     }
     return;
@@ -3781,6 +3820,7 @@ function isPixelAiHubUrl(url) {
     return parsed.protocol === "https:" && (
       hostname === "app.pixeleducacao.com.br" ||
       hostname === "checklist.pixeleducacao.com.br" ||
+      hostname === "cases.pixeleducacao.com.br" ||
       hostname === "hotmart.com" ||
       hostname.endsWith(".hotmart.com")
     );
