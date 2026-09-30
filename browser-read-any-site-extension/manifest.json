@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Browser Read Any Site",
-  "version": "1.3.62",
-  "description": "Browser Read Pixel + correção EDU-LED: reconhece a instância compatível mais nova sem deixar uma cópia antiga mascarar a versão atual.",
+  "version": "1.3.63",
+  "description": "Browser Read libera toda a arvore EDU-LED Full Stack Marketing, incluindo links /products/.../content/... e variantes pt-BR.",
   "permissions": [
     "scripting",
     "storage",
