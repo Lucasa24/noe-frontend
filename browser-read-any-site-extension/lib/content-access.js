@@ -24,7 +24,7 @@ const ACCESS_CONTENTS = [
       "https://checklist.pixeleducacao.com.br/",
       "https://app.pixeleducacao.com.br/"
     ],
-    allowedRecipientNames: ["Davidson", "Deivis", "Vitor", "LGA", "adspc7", "~ Solicitar Ativação com Adm", "Sam", "Gabriel Solano", "Lira", "Moisés", "Daniel Lins", "Solano", "John"]
+    allowedRecipientNames: ["Davidson", "Janderson", "Nathan", "LGA", "André", "Deivis", "Vitor", "Leila", "adspc7", "~ Solicitar Ativação com Adm", "Sam", "Gabriel Solano", "Lira", "Moisés", "Daniel Lins", "Solano", "John"]
   },
   { key: "comunidade-growth-hackers", label: "Comunidade Growth Hackers", url: "https://comunidadegrowthhackers.cademi.com.br/", allowedRecipientNames: ["andre", "Janderson", "~ Solicitar Ativação com Adm", "Sam", "Moisés", "Daniel Lins", "John"] },
   { key: "combo-vitalicio-leandro-ladeira", label: "COMBO VITALICIO", url: "https://hotmart.com/pt-br/club/", allowedRecipientNames: ["Gabriel Solano", "Moisés", "~ Solicitar Ativação com Adm"] },
