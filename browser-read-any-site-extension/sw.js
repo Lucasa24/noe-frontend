@@ -3373,7 +3373,7 @@ async function configureScopedNetworkRules(state) {
         priority: 100,
         action: { type: "allow" },
         condition: {
-          regexFilter: "^https://hotmart\\.com/pt-br/club/full-stack-marketing(?:/|\\?|$)",
+          regexFilter: "^https://hotmart\\.com/[pP][tT]-[bB][rR]/club/full-stack-marketing(?:/|\\?|$)",
           resourceTypes: ["main_frame"]
         }
       },
@@ -3837,7 +3837,7 @@ function isEduLedUrl(url) {
     }
 
     const host = parsed.hostname.toLowerCase();
-    const path = parsed.pathname.replace(/\/{2,}/g, "/");
+    const path = parsed.pathname.replace(/\/{2,}/g, "/").toLowerCase();
 
     if (host === "hotmart.com") {
       return path === "/pt-br/club/full-stack-marketing"
