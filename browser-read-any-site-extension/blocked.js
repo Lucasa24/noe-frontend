@@ -478,41 +478,73 @@
           throw new Error("A API chrome.management não está disponível.");
         }
 
-        const extensionInfo = await chrome.management.get(EDU_LED_EXTENSION_ID);
-
-        if (!extensionInfo?.id) {
-          throw new Error("A extensão EDU-LED GROWTH não foi encontrada pelo ID configurado.");
-        }
-
-        const normalizedEduName = String(extensionInfo.name || "")
+        const normalizeName = (value) => String(value || "")
           .normalize("NFD")
           .replace(/[\u0300-\u036f]/g, "")
           .toLowerCase()
           .trim();
 
-        const isEduLedPackage =
-          normalizedEduName.startsWith("(ban) hotmart full stack marketing")
-          || normalizedEduName.startsWith("(ban) edu-led growth")
-          || normalizedEduName.startsWith("edu-led growth");
+        const isEduPackage = (item) => {
+          if (!item || item.type !== "extension") return false;
+          const name = normalizeName(item.name);
+          return name.startsWith("(ban) hotmart full stack marketing")
+            || name.startsWith("(ban) edu-led growth")
+            || name.startsWith("edu-led growth");
+        };
 
-        if (!isEduLedPackage) {
+        const compareVersions = (left, right) => {
+          const a = String(left || "").split(".").map((part) => Number.parseInt(part, 10) || 0);
+          const b = String(right || "").split(".").map((part) => Number.parseInt(part, 10) || 0);
+          const length = Math.max(a.length, b.length);
+          for (let index = 0; index < length; index += 1) {
+            const av = a[index] || 0;
+            const bv = b[index] || 0;
+            if (av > bv) return 1;
+            if (av < bv) return -1;
+          }
+          return 0;
+        };
+
+        let exactExtension = null;
+        try {
+          exactExtension = await chrome.management.get(EDU_LED_EXTENSION_ID);
+        } catch (_error) {
+          exactExtension = null;
+        }
+
+        const allExtensions = await chrome.management.getAll();
+        const compatible = allExtensions
+          .filter((item) => isEduPackage(item) && compareVersions(item.version, "1.4.1") >= 0)
+          .sort((left, right) => compareVersions(right.version, left.version));
+
+        let extensionInfo =
+          exactExtension &&
+          isEduPackage(exactExtension) &&
+          compareVersions(exactExtension.version, "1.4.1") >= 0
+            ? exactExtension
+            : compatible.find((item) => item.enabled === true) || compatible[0] || exactExtension;
+
+        if (!extensionInfo?.id || !isEduPackage(extensionInfo)) {
+          throw new Error("A extensão EDU-LED GROWTH não foi encontrada neste navegador.");
+        }
+
+        if (compareVersions(extensionInfo.version, "1.4.1") < 0) {
           throw new Error(
-            "O ID " + EDU_LED_EXTENSION_ID +
-            " está carregando \"" + (extensionInfo.name || "extensão desconhecida") +
-            "\" versão " + (extensionInfo.version || "sem versão") +
-            ". Atualize essa mesma entrada com o ZIP correto do EDU-LED 1.4.1."
+            "O navegador ainda está carregando EDU-LED GROWTH " +
+            (extensionInfo.version || "antiga") +
+            ". Recarregue a mesma extensão usando a pasta edu-led-clean-extension atualizada."
           );
         }
 
         if (extensionInfo.enabled === true) {
-          await chrome.management.setEnabled(EDU_LED_EXTENSION_ID, false);
+          await chrome.management.setEnabled(extensionInfo.id, false);
           await new Promise((resolve) => setTimeout(resolve, 450));
         }
 
-        await chrome.management.setEnabled(EDU_LED_EXTENSION_ID, true);
+        await chrome.management.setEnabled(extensionInfo.id, true);
         await new Promise((resolve) => setTimeout(resolve, 700));
 
-        const verification = await chrome.management.get(EDU_LED_EXTENSION_ID);
+        const verification = await chrome.management.get(extensionInfo.id);
         if (verification?.enabled !== true) {
           throw new Error("O EDU-LED GROWTH não permaneceu ativado após a recarga.");
         }
@@ -529,7 +561,7 @@
           // Compatibilidade com service workers antigos.
         }
 
-        updateStatus("EDU-LED GROWTH recarregado diretamente pelo ID correto.");
+        updateStatus(`EDU-LED GROWTH ${verification.version || ""} recarregado e reconhecido pelo Browser Read.`);
       } catch (error) {
         updateStatus(`Não foi possível recarregar o EDU-LED GROWTH: ${error instanceof Error ? error.message : String(error)}`);
       } finally {
