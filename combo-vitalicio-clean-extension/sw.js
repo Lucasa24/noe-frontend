@@ -364,6 +364,11 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
       if (page.protocol !== "chrome-extension:" || page.hostname !== sender.id || page.pathname !== "/combo-links.html") {
         return { ok: false, error: "invalid_combo_source_tab" };
       }
+      const installedRules = new Set((await chrome.declarativeNetRequest.getDynamicRules()).map(rule => rule.id));
+      if (!installedRules.has(RULE_BLOCK_ALL) || RULE_ALLOW_COMBO_IDS.some(id => !installedRules.has(id))) {
+        await enableGate({ contentKey: CONTENT_KEY, contentUrl: BASE_URL,
+          contentLabel: CONTENT_LABEL, browserReadExtensionId: sender.id });
+      }
       await setLocalAuthTab(message.tabId, true);
       return { ok: true };
     }

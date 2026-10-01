@@ -255,6 +255,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse(await openComboProduct(message.url, sender, message.tabId));
         return;
       }
+      if (message?.type === "combo:get-versions") {
+        const companion = await findComboVitalicioExtension();
+        sendResponse({ ok: true, browserRead: chrome.runtime.getManifest().version,
+          combo: companion?.version || "não encontrado", comboId: companion?.id || "" });
+        return;
+      }
       if (message?.type === "lock:getState") {
         sendResponse(await getPublicLockState());
         return;
@@ -1292,10 +1298,12 @@ async function findInstalledComboVitalicioExtension() {
   if (!chrome.management?.getAll) return null;
   const extensions = await chrome.management.getAll();
   const allowedNames = COMBO_VITALICIO_EXTENSION_NAMES.map(normalizeExtensionDisplayName);
-  return extensions.find((item) => {
+  const candidates = extensions.filter((item) => {
     if (item?.type !== "extension") return false;
     return allowedNames.includes(normalizeExtensionDisplayName(item.name));
-  }) || null;
+  });
+  const storedId = await getStoredComboIsolationExtensionId();
+  return candidates.find((item) => item.id === storedId) || candidates.find((item) => item.enabled) || candidates[0] || null;
 }
 
 async function findComboVitalicioExtension() {
@@ -4459,17 +4467,26 @@ async function openComboProduct(url, sender, requestedTabId) {
   const state = await ensureCurrentLockState("combo_open_product");
   if (!state?.unlocked || !isValidSelectedAccessState(state) || !isComboVitalicioState(state) ||
       !await hasRequiredSiteAccess()) throw new Error("Valide novamente o acesso ao Combo.");
-  await configureScopedNetworkRules(state);
-  await syncComboVitalicioContentAccess({ key: state.contentKey, label: state.allowedContentLabel,
-    url: state.allowedContentUrl }, state.recipientKey, true, true);
+  const extensions = await chrome.management.getAll();
+  const duplicateRead = extensions.filter(item => item.type === "extension" && item.enabled &&
+    item.id !== chrome.runtime.id && normalizeExtensionDisplayName(item.name) === "browser read any site");
+  if (duplicateRead.length) throw new Error("Há outro Browser Read ativo neste perfil. Desative a cópia duplicada.");
+  const activeRules = new Set((await chrome.declarativeNetRequest.getDynamicRules()).map(rule => rule.id));
+  if (!activeRules.has(SCOPED_BLOCK_RULE_ID) || COMBO_SCOPED_ALLOW_RULE_IDS.some(id => !activeRules.has(id))) {
+    await configureScopedNetworkRules(state);
+  }
   const companion = await findComboVitalicioExtension();
+  if (!companion?.id) throw new Error("Extensão Combo Vitalício não encontrada ou desativada.");
+  const duplicateCombo = extensions.filter(item => item.type === "extension" && item.enabled &&
+    item.id !== companion.id && COMBO_VITALICIO_EXTENSION_NAMES.includes(normalizeExtensionDisplayName(item.name)));
+  if (duplicateCombo.length) throw new Error("Há outro Combo Vitalício ativo neste perfil. Desative a cópia duplicada.");
   await chrome.storage.local.set({ [COMBO_ISOLATION_EXTENSION_ID_KEY]: companion.id });
   await setComboAuthTabAuthorized(tabId, true);
   try {
     const result = await sendExternalExtensionMessage(companion.id, {
       type: "browser-read:prepare-combo-navigation", tabId, url
-    });
-    if (result?.ok !== true) throw new Error("Atualize o Combo Vitalício para 1.5.3 e tente novamente.");
+    }, 10000);
+    if (result?.ok !== true) throw new Error(result?.error || "Atualize o Combo Vitalício para 1.5.4 e tente novamente.");
     const current = await ensureCurrentLockState("combo_open_product");
     const tab = await chrome.tabs.get(tabId);
     if (!current.unlocked || current.contentKey !== state.contentKey || current.recipientKey !== state.recipientKey ||

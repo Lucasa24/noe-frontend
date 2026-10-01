@@ -1,6 +1,10 @@
-# Correção de navegação — Browser Read 1.3.67 / Combo Vitalício 1.5.3
+# Correção de navegação — Browser Read 1.3.68 / Combo Vitalício 1.5.4
 
 ## Resultado da investigação
+
+Após os pacotes 1.3.67/1.5.3, o problema continuou. A nova captura mostra a aba no menu e apenas a consulta `extension-config` no painel Network. Isso não comprova se o clique foi bloqueado pelo worker nem qual versão está instalada: o painel não preservava o registro das navegações anteriores. O perfil AdsPower da captura não está acessível pelas abas conectadas nesta sessão.
+
+Encontrei um defeito adicional no fluxo que impede abrir qualquer produto: o script do menu cancela o clique normal e aguarda uma **nova aprovação completa** do companion a cada clique, com tempo limite de 1,5 segundo. Se a resposta falha ou chega depois disso, a página permanece no menu. O único erro era escrito depois dos 14 links, fora da região visível na captura. A versão 1.3.68 usa a aprovação já feita na liberação do código, verifica as regras instaladas e prepara a mesma aba no companion antes de navegar. O tempo limite dessa etapa é de dez segundos. O resultado do clique e as versões carregadas aparecem acima dos links.
 
 As fontes examinadas eram Browser Read 1.3.66 e Combo Vitalício 1.5.2. A cópia do Browser Read no Box corresponde ao conteúdo do GitHub no commit `0b25413`, desconsiderando quebras de linha. O manifesto antigo na raiz do repositório (1.3.2, worker `sw-v132.js`) é outro pacote; o pacote correto fica em `browser-read-any-site-extension/`.
 
@@ -44,7 +48,7 @@ O Browser Read registra a última rejeição em `chrome.storage.local.comboLastN
 
 ## Validação
 
-- 122 asserções automatizadas, executando os workers em ambiente Node com APIs do Chrome simuladas.
+- 125 asserções automatizadas, executando os workers e o script do menu em ambiente Node com APIs do Chrome simuladas.
 - Regressões na versão antiga e correção do retorno por evento obsoleto.
 - Os 14 URLs, variações `pt-br`/`pt-BR` e caminhos de aulas.
 - Preparação e confirmação dos dois workers; precedência block/allow representada no teste.
@@ -57,13 +61,13 @@ O Browser Read registra a última rejeição em `chrome.storage.local.comboLastN
 
 ## Instalação no AdsPower
 
-1. Atualize/substitua o ZIP na entrada já existente do **Combo vitalicio**, usando a versão **1.5.3**.
-2. Atualize/substitua o ZIP na entrada já existente do **Browser Read Any Site**, usando a versão **1.3.67**.
+1. Atualize/substitua o ZIP na entrada já existente do **Combo vitalicio**, usando a versão **1.5.4**.
+2. Atualize/substitua o ZIP na entrada já existente do **Browser Read Any Site**, usando a versão **1.3.68**.
 3. Não cadastre novas extensões. Reabra o perfil e valide novamente o acesso ao Combo; confirme as versões nas extensões.
-4. Clique normalmente em um produto no menu. Se a preparação falhar, o menu agora mostra o erro em vez de navegar sem a autorização das duas extensões.
+4. Confira no aviso azul acima dos produtos que aparecem **Browser Read 1.3.68 • Combo Vitalício 1.5.4**. Clique normalmente em um produto. Se a preparação falhar, o aviso mostra o erro no alto da página. Envie o texto exato desse aviso se persistir.
 
 As credenciais continuam nas opções da extensão; esta correção não adiciona credenciais aos arquivos. A identidade final no AdsPower depende de atualizar as entradas existentes.
 
 ## Executar os testes
 
-`node tests/combo-navigation.cjs` executa 115 verificações da versão corrigida. A execução local de investigação acrescenta sete regressões com os workers originais via `COMBO_BASELINE_DIR`, totalizando 122. Nenhum teste acessa contas ou servidores externos.
+`node tests/combo-navigation.cjs` executa 118 verificações da versão corrigida. A execução local de investigação acrescenta sete regressões com os workers originais via `COMBO_BASELINE_DIR`, totalizando 125. Nenhum teste acessa contas ou servidores externos.

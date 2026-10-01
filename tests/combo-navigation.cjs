@@ -18,7 +18,7 @@ function create(which, baseline=false) {
   const storage=data=>({async get(k){ if(typeof k==='string')return {[k]:data[k]}; if(Array.isArray(k))return Object.fromEntries(k.map(x=>[x,data[x]])); return {...data}; },async set(x){Object.assign(data,x);},async remove(k){ for(const x of [].concat(k))delete data[x];}});
   const rules=map=>async ({removeRuleIds=[],addRules=[]})=>{for(const id of removeRuleIds)map.delete(id);for(const r of addRules){new RegExp(r.condition.regexFilter);map.set(r.id,r);}};
   const chrome={
-    runtime:{id:which==='browser'?B:C,getURL:p=>`chrome-extension://${which==='browser'?B:C}/${p}`,onMessage:event('internal'),onMessageExternal:event('external'),onInstalled:event('installed'),onStartup:event('startup'),sendMessage:async()=>({ok:false})},
+    runtime:{id:which==='browser'?B:C,getURL:p=>`chrome-extension://${which==='browser'?B:C}/${p}`,getManifest:()=>manifest,onMessage:event('internal'),onMessageExternal:event('external'),onInstalled:event('installed'),onStartup:event('startup'),sendMessage:async()=>({ok:false})},
     storage:{local:storage(local),session:storage(memory),onChanged:event('storage')},
     tabs:{onCreated:event('created'),onUpdated:event('updated'),onRemoved:event('removed'),onActivated:event('activated'),async query(){return [...tabs.values()];},async get(id){if(!tabs.has(id))throw Error('missing tab');return {...tabs.get(id)};},async update(id,change){updates.push({id,...change});tabs.set(id,{...tabs.get(id),...change});return tabs.get(id);},async reload(){throw Error('unexpected reload');}},
     declarativeNetRequest:{updateDynamicRules:rules(dynamic),updateSessionRules:rules(session),async getDynamicRules(){return [...dynamic.values()];},async getSessionRules(){return [...session.values()];}},
@@ -63,12 +63,17 @@ function action(ext,url,tabId){
   }
   const login='https://sso.hotmart.com/login';
   const b=create('browser'),c=create('combo');
+  const messages=[];
   b.local.comboVitalicioIsolationExtensionId=C;
-  function connect(from,to,id){from.chrome.runtime.sendMessage=async(target,message,callback)=>{assert.equal(target,id);const ids=to.manifest.externally_connectable?.ids;if(ids&&!ids.includes('*')&&!ids.includes(from.chrome.runtime.id))throw Error('manifest denied');const result=await to.external(message,{id:from.chrome.runtime.id}); if(callback)callback(result); return result;};}
+  function connect(from,to,id){from.chrome.runtime.sendMessage=async(target,message,callback)=>{assert.equal(target,id);messages.push(message.type);const ids=to.manifest.externally_connectable?.ids;if(ids&&!ids.includes('*')&&!ids.includes(from.chrome.runtime.id))throw Error('manifest denied');const result=await to.external(message,{id:from.chrome.runtime.id}); if(callback)callback(result); return result;};}
   connect(b,c,C);connect(c,b,B);
   for(const e of [b,c])e.tabs.set(1,{id:1,url:menu});
+  await c.run('enableGate({contentKey:CONTENT_KEY,contentUrl:BASE_URL,browserReadExtensionId:'+JSON.stringify(B)+'})');
+  c.dynamic.clear(); // Prior approval remains, but the companion's DNR rules were lost.
   b.context.sender={id:B,url:menu,tab:{id:1,url:menu}};
   await b.run(`openComboProduct(${JSON.stringify(product)},sender)`);
+  ok(messages.filter(type=>type==='browser-read:prepare-combo-navigation').length===1 &&
+    !messages.includes('browser-read:set-content-access'),'click prepares once without repeating approval');
   ok(b.updates.at(-1).url===product,'preflight navigates after both acks');
   ok(await b.run(`isAuthorizedComboCompanionSender({id:${JSON.stringify(C)}})`),'normalizer and stored identity accept companion');
   const urls=[...fs.readFileSync(path.join(__dirname,'../browser-read-any-site-extension/combo-links.html'),'utf8').matchAll(/class="card" href="([^"]+)"/g)].map(x=>x[1]);
@@ -116,6 +121,19 @@ function action(ext,url,tabId){
   ok(failed.ok===false&&action(c,login,1)==='block','failed sync rolls back local auth');
   const refused=await b.external({type:'combo-vitalicio:auth-flow',active:true,tabId:1},{id:'dddddddddddddddddddddddddddddddd'});
   ok(refused.ok===false,'other extension identity cannot authorize auth');
+  const status={textContent:'',classList:{toggle(){}}};
+  let clickListener;
+  let prevented=false;
+  const ui={
+    document:{body:{dataset:{}},querySelector:()=>status,addEventListener:(name,fn)=>{if(name==='click')clickListener=fn;}},
+    chrome:{runtime:{sendMessage:async msg=>msg.type==='combo:get-versions'
+      ? {ok:true,browserRead:'1.3.68',combo:'1.5.4'} : {ok:false,error:'DNR ainda bloqueado'}},
+      tabs:{getCurrent:async()=>({id:1})}},Error
+  };
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../browser-read-any-site-extension/combo-links.js'),'utf8'),ui);
+  await clickListener({target:{closest:()=>({href:product})},preventDefault(){prevented=true;}});
+  ok(prevented,'menu intercepts normal click');
+  ok(status.textContent.includes('DNR ainda bloqueado'),'click failure is shown above cards');
   report.push(`Fixed: ${checks} assertions passed, covering all 14 products, auth preflight, two-extension DNR arbitration, stale navigation, concurrent leases, expiry, revoked/foreign tabs, negative URLs and invalid state.`);
   console.log(report.join('\n'));
 
