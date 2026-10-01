@@ -18,10 +18,12 @@ const ACCESS_CONTENTS = [
   {
     key: "pixel-ai-hub",
     label: "PIXEL AI HUB",
-    url: "https://app.pixeleducacao.com.br/",
+    url: "https://hotmart.com/pt-br/club/pixel-educacao",
     urls: [
       "https://hotmart.com/pt-br/club/pixel-educacao",
       "https://checklist.pixeleducacao.com.br/",
+      "https://cases.pixeleducacao.com.br/",
+      "https://app.pixeleducacao.com.br/sign-in",
       "https://app.pixeleducacao.com.br/"
     ],
     allowedRecipientNames: ["Davidson", "Janderson", "Nathan", "LGA", "André", "Deivis", "Vitor", "Leila", "adspc7", "~ Solicitar Ativação com Adm", "Sam", "Gabriel Solano", "Lira", "Moisés", "Daniel Lins", "Solano", "John"]
