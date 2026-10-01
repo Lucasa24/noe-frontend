@@ -38,12 +38,22 @@ assert(sw.includes('Navegação recusada antes do produto'));
 assert(sw.includes('urlFilter: "|https://hotmart.com" + allowedPath + "^"'));
 assert(!sw.includes('allowAllRequests'));
 assert(auth.includes('COMBO_TRANSIT_CLUB_SLUGS'));
-assert(auth.includes("isUrlFilterCaseSensitive: false"));
+assert(auth.includes('isUrlFilterCaseSensitive: false'));
+
+// Regression for AdsPower/Chromium tabs.create race.
+assert(sw.includes('function isTransientCreatedTabUrl'));
+assert(sw.includes('async function enforceCreatedTabAfterUrlSettles'));
+assert(sw.includes('async function waitForComboLaunchPage'));
+assert(sw.includes('recordComboNavigationEvent(tabId, "waiting_launch_page")'));
+assert(sw.includes('recordComboNavigationEvent(tabId, "launch_page_ready")'));
+const onCreated = sw.slice(sw.indexOf('chrome.tabs.onCreated.addListener'), sw.indexOf('chrome.tabs.onUpdated.addListener'));
+assert(!onCreated.includes('enforceLockedTab(tab.id, tabUrl)'));
+assert(onCreated.includes('enforceCreatedTabAfterUrlSettles'));
 
 for (const product of products) {
   const slug = product.split('/')[3];
-  assert(auth.includes("'"+slug+"'"), 'club root missing from tab-scoped transit: '+slug);
-  assert(product.startsWith('/pt-br/club/'+slug+'/products/'));
+  assert(auth.includes("'" + slug + "'"), 'club root missing from tab-scoped transit: ' + slug);
+  assert(product.startsWith('/pt-br/club/' + slug + '/products/'));
 }
 
 const forbidden = [
@@ -51,8 +61,6 @@ const forbidden = [
   '/pt-br/club/unknown-course/products/1',
   '/pt-br/marketplace'
 ];
-for (const item of forbidden) {
-  assert(!products.includes(item));
-}
+for (const item of forbidden) assert(!products.includes(item));
 
-console.log('PASS: 14/14 Combo product routes + launch states + narrow DNR regression checks.');
+console.log('PASS: 14/14 Combo routes + state machine + DNR + tabs.onCreated race regression.');
