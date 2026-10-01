@@ -1,0 +1,57 @@
+{
+  "manifest_version": 3,
+  "name": "Combo vitalicio",
+  "version": "1.5.3",
+  "description": "Acesso coordenado aos 14 produtos Combo, com autenticacao temporaria por aba e protecao contra redirecionamentos obsoletos.",
+  "permissions": [
+    "storage",
+    "declarativeNetRequest",
+    "tabs",
+    "management",
+    "alarms"
+  ],
+  "background": {
+    "service_worker": "sw.js"
+  },
+  "action": {
+    "default_title": "Combo vitalicio"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://hotmart.com/pt-br/club/*",
+        "https://hotmart.com/pt-BR/club/*",
+        "https://hotmart.com/pt-br/area-de-membros*",
+        "https://hotmart.com/pt-BR/area-de-membros*"
+      ],
+      "js": [
+        "content.js",
+        "autologin.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://sso.hotmart.com/login*",
+        "https://sso-surrogate.hotmart.com/*",
+        "https://consumer.hotmart.com/*"
+      ],
+      "js": [
+        "autologin.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+  "host_permissions": [
+    "https://hotmart.com/*",
+    "https://sso.hotmart.com/*",
+    "https://sso-surrogate.hotmart.com/*",
+    "https://consumer.hotmart.com/*"
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  }
+}

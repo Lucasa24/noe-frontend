@@ -1,3 +1,5 @@
+importScripts("combo-auth-session.js");
+const comboAuthSessions = createComboAuthSessions(9350);
 const AUTH_CONFIG_KEY = "authConfig";
 const LOCK_STATE_KEY = "lockState";
 const LAST_ACTIVE_TAB_KEY = "lastActiveTabSnapshot";
@@ -204,6 +206,7 @@ chrome.tabs.onCreated.addListener((tab) => {
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (!changeInfo.url && !changeInfo.status) return;
   const tabUrl = changeInfo.url || tab.pendingUrl || tab.url || "";
 
   if (tab.active) {
@@ -248,6 +251,10 @@ chrome.permissions?.onRemoved?.addListener(() => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   void (async () => {
     try {
+      if (message?.type === "combo:open-product") {
+        sendResponse(await openComboProduct(message.url, sender, message.tabId));
+        return;
+      }
       if (message?.type === "lock:getState") {
         sendResponse(await getPublicLockState());
         return;
@@ -399,6 +406,11 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
         return { ok: false, error: "tab_not_found" };
       }
 
+      const currentUrl = tab.pendingUrl || tab.url || "";
+      if (message.active === true && !isComboVitalicioUrl(currentUrl) &&
+          !isComboAuthEntryUrl(currentUrl) && !(isComboAuthUrl(currentUrl) && await isComboAuthTabAuthorized(tabId))) {
+        return { ok: false, error: "combo_auth_origin_rejected" };
+      }
       await setComboAuthTabAuthorized(tabId, message.active === true);
       return { ok: true, active: message.active === true, tabId };
     })().then(sendResponse).catch((error) => {
@@ -2966,6 +2978,8 @@ async function enforceLockedTab(tabId, tabUrl) {
 
   const state = await ensureCurrentLockState("startup");
   const siteAccessGranted = await hasRequiredSiteAccess();
+  const currentTab = await chrome.tabs.get(tabId).catch(() => null);
+  if (!currentTab || (currentTab.pendingUrl || currentTab.url || "") !== tabUrl) return;
 
   if (!state) {
     return;
@@ -2973,7 +2987,7 @@ async function enforceLockedTab(tabId, tabUrl) {
 
   if (state.unlocked && siteAccessGranted) {
     if (!(await isAllowedTabAfterUnlock(tabId, tabUrl, state))) {
-      await chrome.tabs.update(tabId, { url: getScopedFallbackUrl(state), active: true }).catch(() => undefined);
+      await redirectScopedTabIfCurrent(tabId, tabUrl, state);
     }
     return;
   }
@@ -3348,9 +3362,7 @@ async function enforceScopedBrowser(state) {
       return;
     }
 
-    await chrome.tabs.update(tab.id, {
-      url: getScopedFallbackUrl(state)
-    }).catch(() => undefined);
+    await redirectScopedTabIfCurrent(tab.id, url, state);
   }));
 
   return {
@@ -3417,6 +3429,7 @@ async function configureScopedNetworkRules(state) {
   }
 
   await clearZoomMeetingSessions();
+  if (!isComboVitalicioState(state)) await clearComboAuthSessions();
 
   if (String(state?.contentKey || "").trim() === EDU_LED_CONTENT_KEY) {
     const eduRules = [
@@ -3515,15 +3528,7 @@ async function configureScopedNetworkRules(state) {
           resourceTypes: ["main_frame"]
         }
       })),
-      {
-        id: COMBO_OIDC_AUTHORIZE_RULE_ID,
-        priority: 170,
-        action: { type: "allow" },
-        condition: {
-          regexFilter: "^https://sso\\.hotmart\\.com/oidc/authorize(?:\\?|$)",
-          resourceTypes: ["main_frame"]
-        }
-      }
+
     ];
 
     await chrome.declarativeNetRequest.updateDynamicRules({
@@ -3537,8 +3542,7 @@ async function configureScopedNetworkRules(state) {
 
     if (!activeRuleIds.has(SCOPED_BLOCK_RULE_ID) ||
         COMBO_SCOPED_ALLOW_RULE_IDS.some((ruleId) => !activeRuleIds.has(ruleId)) ||
-        COMBO_AUTH_ENTRY_RULE_IDS.some((ruleId) => !activeRuleIds.has(ruleId)) ||
-        !activeRuleIds.has(COMBO_OIDC_AUTHORIZE_RULE_ID)) {
+        COMBO_AUTH_ENTRY_RULE_IDS.some((ruleId) => !activeRuleIds.has(ruleId))) {
       throw new Error("combo_scoped_network_rules_not_applied");
     }
     return;
@@ -3754,12 +3758,12 @@ async function isAllowedTabAfterUnlock(tabId, url, state) {
   const origin = getUrlOrigin(url);
 
   if (isComboVitalicioState(state)) {
+    if (!isValidSelectedAccessState(state)) return false;
     if (isComboVitalicioUrl(url)) {
-      await setComboAuthTabAuthorized(tabId, false);
       return true;
     }
 
-    if (isComboAuthEntryUrl(url) || isComboOidcAuthorizeUrl(url)) {
+    if (isComboAuthEntryUrl(url)) {
       await setComboAuthTabAuthorized(tabId, true);
       return true;
     }
@@ -3767,6 +3771,7 @@ async function isAllowedTabAfterUnlock(tabId, url, state) {
     if (isComboAuthUrl(url) && await isComboAuthTabAuthorized(tabId)) {
       return true;
     }
+    await setComboAuthTabAuthorized(tabId, false);
   }
 
   if (isAllowedAfterUnlock(url, state)) {
@@ -3897,6 +3902,10 @@ function isValidSelectedAccessState(state) {
   const allowedUrl = String(state?.allowedContentUrl || "").trim();
   const allowedOrigin = String(state?.allowedContentOrigin || "").trim();
 
+  if (isComboVitalicioState(state) &&
+      (allowedOrigin !== "https://hotmart.com" ||
+       (allowedUrl !== COMBO_VITALICIO_BASE_URL && !isComboVitalicioUrl(allowedUrl)))) return false;
+
   return Boolean(
     state?.contentKey
     && state?.recipientKey
@@ -3938,22 +3947,7 @@ function isComboOidcAuthorizeUrl(url) {
 }
 
 function isComboAuthUrl(url) {
-  try {
-    const parsed = new URL(String(url || "").trim());
-    if (parsed.protocol !== "https:") return false;
-
-    const host = parsed.hostname.toLowerCase();
-    if (COMBO_AUTH_HOSTS.has(host)) return true;
-
-    if (host === "hotmart.com") {
-      const path = parsed.pathname.replace(/\/{2,}/g, "/").replace(/\/+$/, "").toLowerCase();
-      return path === "/pt-br/club" || path === "/pt-br/area-de-membros";
-    }
-
-    return false;
-  } catch (_error) {
-    return false;
-  }
+  return new RegExp(COMBO_AUTH_TRANSIT_REGEX).test(String(url || ""));
 }
 
 async function isAuthorizedComboCompanionSender(sender) {
@@ -3961,8 +3955,9 @@ async function isAuthorizedComboCompanionSender(sender) {
   if (!senderId || !chrome.management?.get) return false;
   try {
     const info = await chrome.management.get(senderId);
-    const name = normalizeExtensionName(info?.name);
-    return info?.enabled === true && COMBO_VITALICIO_EXTENSION_NAMES.includes(name);
+    const name = normalizeExtensionDisplayName(info?.name);
+    return info?.enabled === true && COMBO_VITALICIO_EXTENSION_NAMES.includes(name)
+      && senderId === await getStoredComboIsolationExtensionId();
   } catch (_error) {
     return false;
   }
@@ -3975,43 +3970,13 @@ async function getComboAuthSessionRule() {
 }
 
 async function setComboAuthTabAuthorized(tabId, active) {
-  if (!Number.isInteger(tabId) || !chrome.declarativeNetRequest?.updateSessionRules) {
-    return false;
-  }
-
-  const existing = await getComboAuthSessionRule();
-  const tabIds = new Set(Array.isArray(existing?.condition?.tabIds) ? existing.condition.tabIds : []);
-  if (active) tabIds.add(tabId);
-  else tabIds.delete(tabId);
-
-  await chrome.declarativeNetRequest.updateSessionRules({
-    removeRuleIds: [COMBO_AUTH_SESSION_ALLOW_RULE_ID],
-    addRules: tabIds.size > 0 ? [{
-      id: COMBO_AUTH_SESSION_ALLOW_RULE_ID,
-      priority: 300,
-      action: { type: "allow" },
-      condition: {
-        regexFilter: "^https://(?:(?:sso\\.hotmart\\.com|sso-surrogate\\.hotmart\\.com|consumer\\.hotmart\\.com)/|hotmart\\.com/[pP][tT]-[bB][rR]/(?:club/?(?:[?#]|$)|area-de-membros(?:[/?#]|$)))",
-        resourceTypes: ["main_frame"],
-        tabIds: [...tabIds]
-      }
-    }] : []
-  });
-
-  return true;
+  return comboAuthSessions.set(tabId, active);
 }
-
 async function isComboAuthTabAuthorized(tabId) {
-  if (!Number.isInteger(tabId)) return false;
-  const rule = await getComboAuthSessionRule();
-  return Array.isArray(rule?.condition?.tabIds) && rule.condition.tabIds.includes(tabId);
+  return comboAuthSessions.has(tabId);
 }
-
 async function clearComboAuthSessions() {
-  if (!chrome.declarativeNetRequest?.updateSessionRules) return;
-  await chrome.declarativeNetRequest.updateSessionRules({
-    removeRuleIds: [COMBO_AUTH_SESSION_ALLOW_RULE_ID]
-  }).catch(() => undefined);
+  return comboAuthSessions.clear();
 }
 
 function isComboVitalicioState(state) {
@@ -4482,4 +4447,55 @@ function maskEmail(email) {
     : `${localPart.slice(0, 2)}***`;
 
   return `${safeLocalPart}@${domain}`;
+}
+async function openComboProduct(url, sender, requestedTabId) {
+  const tabId = sender?.tab?.id ?? requestedTabId;
+  if (sender?.id !== chrome.runtime.id || !isComboLinksPageUrl(sender.url) ||
+      !Number.isInteger(tabId) || !isComboVitalicioUrl(url)) {
+    throw new Error("Solicitação de produto inválida.");
+  }
+  const sourceTab = await chrome.tabs.get(tabId);
+  if (!isComboLinksPageUrl(sourceTab.pendingUrl || sourceTab.url)) throw new Error("A aba de origem mudou.");
+  const state = await ensureCurrentLockState("combo_open_product");
+  if (!state?.unlocked || !isValidSelectedAccessState(state) || !isComboVitalicioState(state) ||
+      !await hasRequiredSiteAccess()) throw new Error("Valide novamente o acesso ao Combo.");
+  await configureScopedNetworkRules(state);
+  await syncComboVitalicioContentAccess({ key: state.contentKey, label: state.allowedContentLabel,
+    url: state.allowedContentUrl }, state.recipientKey, true, true);
+  const companion = await findComboVitalicioExtension();
+  await chrome.storage.local.set({ [COMBO_ISOLATION_EXTENSION_ID_KEY]: companion.id });
+  await setComboAuthTabAuthorized(tabId, true);
+  try {
+    const result = await sendExternalExtensionMessage(companion.id, {
+      type: "browser-read:prepare-combo-navigation", tabId, url
+    });
+    if (result?.ok !== true) throw new Error("Atualize o Combo Vitalício para 1.5.3 e tente novamente.");
+    const current = await ensureCurrentLockState("combo_open_product");
+    const tab = await chrome.tabs.get(tabId);
+    if (!current.unlocked || current.contentKey !== state.contentKey || current.recipientKey !== state.recipientKey ||
+        !isComboLinksPageUrl(tab.pendingUrl || tab.url)) throw new Error("O acesso ou a aba mudou; tente novamente.");
+    await chrome.tabs.update(tabId, { url });
+    return { ok: true };
+  } catch (error) {
+    await setComboAuthTabAuthorized(tabId, false);
+    throw error;
+  }
+}
+
+async function redirectScopedTabIfCurrent(tabId, rejectedUrl, state) {
+  const tab = await chrome.tabs.get(tabId).catch(() => null);
+  if (!tab || (tab.pendingUrl || tab.url || "") !== rejectedUrl) return;
+  const current = await getLockState();
+  if (!current?.unlocked || current.contentKey !== state.contentKey || current.recipientKey !== state.recipientKey) return;
+  if (await isAllowedTabAfterUnlock(tabId, rejectedUrl, current)) return;
+  const freshTab = await chrome.tabs.get(tabId).catch(() => null);
+  if (!freshTab || (freshTab.pendingUrl || freshTab.url || "") !== rejectedUrl) return;
+  if (isComboVitalicioState(current)) {
+    let path = "";
+    try { const parsed = new URL(rejectedUrl); path = parsed.origin + parsed.pathname; } catch (_) {}
+    await chrome.storage.local.set({ comboLastNavigationRejection: {
+      at: Date.now(), tabId, path, reason: "outside_products_or_active_auth", source: "tabs.onUpdated/scoped_enforcement"
+    } });
+  }
+  await chrome.tabs.update(tabId, { url: getScopedFallbackUrl(current), active: true });
 }

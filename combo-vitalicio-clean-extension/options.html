@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Combo Vitalício — Autologin</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; background: #0f172a; color: #e5e7eb; }
+    main { max-width: 680px; margin: 40px auto; padding: 24px; }
+    .card { background: #111827; border: 1px solid #334155; border-radius: 14px; padding: 24px; }
+    h1 { margin-top: 0; font-size: 24px; }
+    p { color: #cbd5e1; line-height: 1.5; }
+    label { display: block; margin: 18px 0 6px; font-weight: 700; }
+    input { width: 100%; box-sizing: border-box; padding: 12px; border-radius: 8px; border: 1px solid #475569; background: #020617; color: #fff; }
+    button { margin-top: 20px; padding: 12px 18px; border: 0; border-radius: 8px; font-weight: 700; cursor: pointer; }
+    #status { margin-top: 14px; min-height: 22px; }
+    .hint { font-size: 13px; color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="card">
+      <h1>Combo Vitalício — Autologin Hotmart</h1>
+      <p>As credenciais são salvas somente no armazenamento local desta extensão e não ficam gravadas nos arquivos do projeto.</p>
+      <label for="email">E-mail da conta Combo Vitalício</label>
+      <input id="email" type="email" autocomplete="username" spellcheck="false">
+      <label for="secret">Senha</label>
+      <input id="secret" type="password" autocomplete="current-password" placeholder="Digite para salvar ou trocar a senha">
+      <div id="secretHint" class="hint"></div>
+      <button id="save" type="button">Salvar configuração</button>
+      <div id="status" role="status" aria-live="polite"></div>
+    </div>
+  </main>
+  <script src="options.js"></script>
+</body>
+</html>
