@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Browser Read Any Site",
-  "version": "1.3.71",
-  "description": "Combo Vitalicio com maquina de estados diagnostica, leases por aba e suporte aos roots autorizados antes do OIDC.",
+  "version": "1.3.72",
+  "description": "Corrige a corrida do tabs.onCreated no Combo, aguardando combo-launch.html antes de aplicar escopo e mantendo diagnÃ³stico por aba.",
   "permissions": [
     "scripting",
     "storage",
