@@ -37,7 +37,8 @@ const PIXEL_AI_HUB_CONTENT_KEY = "pixel-ai-hub";
 const PIXEL_AI_HUB_PRIMARY_URL = "https://hotmart.com/pt-br/club/pixel-educacao";
 const PIXEL_AI_HUB_URLS = Object.freeze([
   PIXEL_AI_HUB_PRIMARY_URL,
-  "https://checklist.pixeleducacao.com.br/"
+  "https://checklist.pixeleducacao.com.br/",
+  "https://app.pixeleducacao.com.br/sign-in"
 ]);
 const PIXEL_AI_HUB_APP_ORIGIN = "https://app.pixeleducacao.com.br";
 const PIXEL_AI_HUB_CHECKLIST_ORIGIN = "https://checklist.pixeleducacao.com.br";
@@ -414,17 +415,27 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
     return false;
   }
 
-  void getPublicLockState()
-    .then((state) => sendResponse({
+  void (async () => {
+    const [publicState, rawState] = await Promise.all([
+      getPublicLockState(),
+      ensureCurrentLockState("pixel_state_query")
+    ]);
+
+    const unlocked = publicState?.unlocked === true;
+    sendResponse({
       ok: true,
-      unlocked: state?.unlocked === true,
-      sessionId: state?.unlocked === true ? String(state?.sessionId || "") : ""
-    }))
-    .catch((error) => sendResponse({
-      ok: false,
-      unlocked: false,
-      error: error instanceof Error ? error.message : "browser_read_state_unavailable"
-    }));
+      unlocked,
+      sessionId: unlocked ? String(publicState?.sessionId || "") : "",
+      recipientKey: unlocked ? String(rawState?.recipientKey || "") : "",
+      contentKey: unlocked ? String(rawState?.contentKey || "") : ""
+    });
+  })().catch((error) => sendResponse({
+    ok: false,
+    unlocked: false,
+    recipientKey: "",
+    contentKey: "",
+    error: error instanceof Error ? error.message : "browser_read_state_unavailable"
+  }));
 
   return true;
 });
@@ -1024,8 +1035,8 @@ async function verifyAccessCode(code, senderTabId) {
       }).catch(() => undefined);
     }
 
-    // Pixel AI Hub: após validar o código, abre somente Hotmart + Checklist.
-    // app.pixeleducacao.com.br continua permitido, mas nunca é aberto automaticamente.
+    // Pixel AI Hub: após validar o código, abre Hotmart + Checklist + /sign-in.
+    // A raiz app.pixeleducacao.com.br continua permitida, mas não é aberta automaticamente.
     if (isContentSelectorExtension() &&
         restoredState?.unlocked === true &&
         restoredState?.contentKey === PIXEL_AI_HUB_CONTENT_KEY) {
