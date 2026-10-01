@@ -1,73 +1,37 @@
-# Correção de navegação — Browser Read 1.3.68 / Combo Vitalício 1.5.4
+# Correção do erro DNR — Browser Read 1.3.69 / Combo Vitalício 1.5.5
 
-## Resultado da investigação
+## Causa confirmada pela captura
 
-Após os pacotes 1.3.67/1.5.3, o problema continuou. A nova captura mostra a aba no menu e apenas a consulta `extension-config` no painel Network. Isso não comprova se o clique foi bloqueado pelo worker nem qual versão está instalada: o painel não preservava o registro das navegações anteriores. O perfil AdsPower da captura não está acessível pelas abas conectadas nesta sessão.
+O aviso vermelho no `combo-links.html` informa que o Chrome ignorou a regra de sessão `9350`: o `regexFilter` ultrapassou 2 KB depois da compilação. O clique chama `openComboProduct`, que prepara a aba para autenticação nas duas extensões antes de navegar. A instalação dessa regra falha e o clique termina no menu com o erro. A mesma expressão era instalada pelo Combo Vitalício como regra `7490`; corrigir apenas o Browser Read deixaria o bloqueio global da outra extensão ativo.
 
-Encontrei um defeito adicional no fluxo que impede abrir qualquer produto: o script do menu cancela o clique normal e aguarda uma **nova aprovação completa** do companion a cada clique, com tempo limite de 1,5 segundo. Se a resposta falha ou chega depois disso, a página permanece no menu. O único erro era escrito depois dos 14 links, fora da região visível na captura. A versão 1.3.68 usa a aprovação já feita na liberação do código, verifica as regras instaladas e prepara a mesma aba no companion antes de navegar. O tempo limite dessa etapa é de dez segundos. O resultado do clique e as versões carregadas aparecem acima dos links.
+A documentação oficial do Chrome confirma o limite compilado de 2 KB por regra de expressão regular e que, entre extensões, uma ação `block` prevalece sobre `allow`: [Declarative Net Request](https://developer.chrome.com/docs/extensions/reference/api/declarativeNetRequest).
 
-As fontes examinadas eram Browser Read 1.3.66 e Combo Vitalício 1.5.2. A cópia do Browser Read no Box corresponde ao conteúdo do GitHub no commit `0b25413`, desconsiderando quebras de linha. O manifesto antigo na raiz do repositório (1.3.2, worker `sw-v132.js`) é outro pacote; o pacote correto fica em `browser-read-any-site-extension/`.
+## Alteração
 
-O retorno para `chrome-extension://miipjameglmiodjjgghegcidmkiefmlg/combo-links.html` é executado pelo Browser Read:
+As regras temporárias `9350` e `7490` foram substituídas em **ambas** as extensões por 129 `urlFilter` curtos por pacote. Eles não usam `regexFilter`, portanto não estão sujeitos ao limite que gerou o aviso. Cada regra tem ação `allow`, prioridade 300, vale apenas para navegação principal (`main_frame`) e para a aba preparada (`tabIds`). A autorização expira em dez minutos, é revogada ao sair do fluxo e é removida de ambos os pacotes quando a navegação falha após a aprovação.
 
-`tabs.onUpdated → enforceLockedTab → isAllowedTabAfterUnlock(false) → getScopedFallbackUrl → tabs.update`.
+Os filtros começam com o esquema HTTPS e o host completo. As rotas de autenticação do SSO, SSO surrogate e consumer são delimitadas por fim de URL, `/`, `?` ou `#`; `/login;evil`, `/login+evil` e `/login-not-auth` não correspondem. As páginas intermediárias do Hotmart ficam limitadas à raiz de `/pt-br/club` e `/pt-br/area-de-membros`. Os 14 produtos e seus caminhos de aulas continuam listados individualmente nas regras permanentes; outros produtos e a biblioteca do consumer continuam bloqueados.
 
-`enforceScopedBrowser` também usa esse destino ao rejeitar uma aba. As regras DNR globais `9101` (Browser Read) e `7401` (Combo) têm ação **block**, e não redirect; por si só não abrem o menu.
-
-### Reprodução lógica comprovada
-
-1. Um evento antigo guarda um URL não permitido, por exemplo `about:blank`.
-2. O listener aguarda leitura do estado e das permissões.
-3. A mesma aba já navega para Light Copy, produto `2438760`.
-4. A implementação antiga avalia o URL antigo e chama `tabs.update` com o menu, sobrescrevendo o produto.
-5. O teste executa o worker original com as APIs do Chrome simuladas e reproduz exatamente esse destino. O worker corrigido verifica o URL atual e descarta a decisão antiga.
-
-Isso comprova um caminho de falha no código; não identifica, sem um registro do perfil real, qual evento ocorreu na instalação do usuário. Os 14 URLs diretos, com estado válido e as regras atuais instaladas, já passavam nas verificações antigas. Não foi encontrada uma regra que rejeite incondicionalmente os 14 URLs.
-
-### Outros defeitos encontrados
-
-- O manifesto do Browser Read admitia mensagens externas somente do Pixel, bloqueando a mensagem de autenticação enviada pelo Combo.
-- `isAuthorizedComboCompanionSender` chamava `normalizeExtensionName`, inexistente nesse worker; o erro era capturado e o remetente rejeitado.
-- Toda consulta de produto em `isAllowedTabAfterUnlock` revogava a autenticação. Eventos de título, favicon e carregamento podiam desfazer a preparação do login.
-- Alterações simultâneas da lista de abas autorizadas podiam sobrescrever uma à outra.
-- `enableGate` recarregava produtos e redirecionava páginas de autenticação em cada aprovação, mesmo quando o gate já estava ativo.
-- `setAuthFlowForTab` devolvia sucesso mesmo quando o Browser Read não aceitava a sincronização.
-- A permissão temporária não tinha expiração no DNR. O endpoint OIDC era permitido globalmente.
-
-## Correção aplicada
-
-O clique normal no menu passa por `combo-links.js`. O worker confirma a página interna de origem, o estado desbloqueado, o destinatário, `allowedContentUrl`, `allowedContentOrigin` e o produto solicitado. Ele instala as regras nos dois workers, prepara a mesma aba nas duas extensões e aguarda as confirmações antes de navegar.
-
-As duas extensões continuam com seus próprios bloqueios globais. Uma regra `allow` de uma não vence o `block` da outra. A preparação coordenada resolve essa divergência; aumentar a prioridade ou mudar a ordem de instalação não resolve. Referência: [avaliação de regras DNR do Chrome](https://developer.chrome.com/docs/extensions/reference/api/declarativeNetRequest#rule-evaluation).
-
-As mensagens externas podem alcançar o Browser Read, mas o handler exige o ID do companion selecionado, nome reconhecido, extensão ativa e sessão Combo desbloqueada. Não foi liberada comunicação de páginas web.
-
-Os 14 produtos e seus caminhos internos permanecem como lista de conteúdo permitido. O OIDC deixou de ter exceção global. As rotas de autenticação em SSO, SSO surrogate e consumer, e as páginas intermediárias previstas, exigem uma autorização de aba com expiração em dez minutos. A liberação não abrange a biblioteca de produtos do consumer. As alterações de sessão são serializadas e a expiração usa alarmes do Chrome. O retorno ao produto encerra a autorização; o autologin em andamento é preservado enquanto ainda prepara o envio das credenciais.
-
-O Browser Read registra a última rejeição em `chrome.storage.local.comboLastNavigationRejection`, sem query string nem fragmento. Isso permite identificar a rota real rejeitada se o perfil apresentar outro caminho de autenticação.
+O menu ainda exige estado desbloqueado, URL e origem de conteúdo válidos, remetente interno e extensão companion selecionada. A aprovação é instalada nos dois workers antes de `tabs.update`. Um erro após essa aprovação agora envia uma revogação ao companion. As regras globais de bloqueio continuam ativas; a liberação de uma extensão não substitui a da outra.
 
 ## Validação
 
-- 125 asserções automatizadas, executando os workers e o script do menu em ambiente Node com APIs do Chrome simuladas.
-- Regressões na versão antiga e correção do retorno por evento obsoleto.
-- Os 14 URLs, variações `pt-br`/`pt-BR` e caminhos de aulas.
-- Preparação e confirmação dos dois workers; precedência block/allow representada no teste.
-- URLs de outros produtos, IDs com sufixos, HTTP, domínio falso, biblioteca consumer e abas não autorizadas continuam bloqueados.
-- Concorrência, expiração, revogação e estado inválido.
-- Sintaxe dos JavaScripts, referências de manifesto e scripts HTML, integridade CRC dos ZIPs e comparação byte a byte com os arquivos empacotados.
-- Manifesto na raiz, sem arquivos duplicados; nomes e ausência de `key` preservados. SHA-256 em `SHA256.txt`.
+- 144 verificações automatizadas dos workers e do clique, com APIs Chrome simuladas: os 14 links, variação `pt-BR`, fluxo OIDC, precedência das duas extensões, expiração e revogação por aba.
+- Regressão da regra legada: os IDs antigos são removidos; as novas regras de sessão não têm `regexFilter`.
+- Testes negativos para outros produtos, domínios semelhantes, HTTP, rotas alheias, aba não autorizada e limites de caminho como `/login;evil`.
+- Sintaxe dos JavaScripts, referências do manifesto e do HTML, integridade CRC e comparação byte a byte dos ZIPs com as fontes empacotadas. Hashes SHA-256 em `SHA256.txt`.
 
-**Limite:** não foi executado um login real na Hotmart/AdsPower. O teste simula DNR; não substitui a validação do motor do Chrome nem comprova todos os redirects do servidor. Uma rota de autenticação não contemplada continuará bloqueada e poderá ser identificada pelo registro de rejeição.
+O perfil AdsPower da captura não está disponível nesta sessão. Os testes simulados verificam a lógica e o escopo, mas o clique real e os redirecionamentos da conta Hotmart só podem ser confirmados nesse perfil. O Chrome local não pôde ser usado como ambiente de teste isolado nesta sessão; a correção do limite de regex baseia-se no aviso exato da captura e na documentação do Chrome.
 
 ## Instalação no AdsPower
 
-1. Atualize/substitua o ZIP na entrada já existente do **Combo vitalicio**, usando a versão **1.5.4**.
-2. Atualize/substitua o ZIP na entrada já existente do **Browser Read Any Site**, usando a versão **1.3.68**.
-3. Não cadastre novas extensões. Reabra o perfil e valide novamente o acesso ao Combo; confirme as versões nas extensões.
-4. Confira no aviso azul acima dos produtos que aparecem **Browser Read 1.3.68 • Combo Vitalício 1.5.4**. Clique normalmente em um produto. Se a preparação falhar, o aviso mostra o erro no alto da página. Envie o texto exato desse aviso se persistir.
+1. Substitua o pacote da entrada **Combo vitalicio** já instalada por `Combo-Vitalicio-v1.5.5-DNR-Fix-ADSPower.zip`.
+2. Substitua o pacote da entrada **Browser Read Any Site** já instalada por `Browser-Read-v1.3.69-Combo-DNR-Fix-ADSPower.zip`.
+3. Reabra o perfil, valide novamente o acesso e confira no aviso acima dos links: **Browser Read 1.3.69 • Combo Vitalício 1.5.5**.
+4. Clique em um produto. Se houver outro erro, o aviso vermelho no alto da página mostrará a causa; copie o texto exato e, se possível, a versão das duas extensões exibida no mesmo menu.
 
-As credenciais continuam nas opções da extensão; esta correção não adiciona credenciais aos arquivos. A identidade final no AdsPower depende de atualizar as entradas existentes.
+Atualize as duas entradas existentes; criar uma instalação duplicada muda a identidade da extensão e pode impedir a comunicação entre elas. As credenciais permanecem nas opções já existentes e não entram nos ZIPs novos.
 
 ## Executar os testes
 
-`node tests/combo-navigation.cjs` executa 118 verificações da versão corrigida. A execução local de investigação acrescenta sete regressões com os workers originais via `COMBO_BASELINE_DIR`, totalizando 125. Nenhum teste acessa contas ou servidores externos.
+`node tests/combo-navigation.cjs` executa as verificações da versão corrigida. Definir `COMBO_BASELINE_DIR` para o diretório local da versão original acrescenta as regressões do worker antigo. Nenhum teste acessa contas ou servidores externos.

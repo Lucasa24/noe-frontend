@@ -131,7 +131,6 @@ const COMBO_VITALICIO_ACCESS_MESSAGE = "browser-read:set-content-access";
 const COMBO_VITALICIO_EXTENSION_NAMES = ["combo vitalicio", "combo vitalício"];
 const COMBO_READ_PERMISSION_KEY = "comboVitalicioReadPermission";
 const COMBO_AUTH_FLOW_MESSAGE = "combo-vitalicio:auth-flow";
-const COMBO_AUTH_SESSION_ALLOW_RULE_ID = 9350;
 const COMBO_AUTH_HOSTS = new Set([
   "sso.hotmart.com",
   "sso-surrogate.hotmart.com",
@@ -3955,7 +3954,7 @@ function isComboOidcAuthorizeUrl(url) {
 }
 
 function isComboAuthUrl(url) {
-  return new RegExp(COMBO_AUTH_TRANSIT_REGEX).test(String(url || ""));
+  return new RegExp(COMBO_AUTH_TRANSIT_REGEX, "i").test(String(url || ""));
 }
 
 async function isAuthorizedComboCompanionSender(sender) {
@@ -3969,12 +3968,6 @@ async function isAuthorizedComboCompanionSender(sender) {
   } catch (_error) {
     return false;
   }
-}
-
-async function getComboAuthSessionRule() {
-  if (!chrome.declarativeNetRequest?.getSessionRules) return null;
-  const rules = await chrome.declarativeNetRequest.getSessionRules().catch(() => []);
-  return rules.find((rule) => rule.id === COMBO_AUTH_SESSION_ALLOW_RULE_ID) || null;
 }
 
 async function setComboAuthTabAuthorized(tabId, active) {
@@ -4481,12 +4474,14 @@ async function openComboProduct(url, sender, requestedTabId) {
     item.id !== companion.id && COMBO_VITALICIO_EXTENSION_NAMES.includes(normalizeExtensionDisplayName(item.name)));
   if (duplicateCombo.length) throw new Error("Há outro Combo Vitalício ativo neste perfil. Desative a cópia duplicada.");
   await chrome.storage.local.set({ [COMBO_ISOLATION_EXTENSION_ID_KEY]: companion.id });
-  await setComboAuthTabAuthorized(tabId, true);
+  let companionPrepareAttempted = false;
   try {
+    await setComboAuthTabAuthorized(tabId, true);
+    companionPrepareAttempted = true;
     const result = await sendExternalExtensionMessage(companion.id, {
       type: "browser-read:prepare-combo-navigation", tabId, url
     }, 10000);
-    if (result?.ok !== true) throw new Error(result?.error || "Atualize o Combo Vitalício para 1.5.4 e tente novamente.");
+    if (result?.ok !== true) throw new Error(result?.error || "Atualize o Combo Vitalício para 1.5.5 e tente novamente.");
     const current = await ensureCurrentLockState("combo_open_product");
     const tab = await chrome.tabs.get(tabId);
     if (!current.unlocked || current.contentKey !== state.contentKey || current.recipientKey !== state.recipientKey ||
@@ -4494,7 +4489,18 @@ async function openComboProduct(url, sender, requestedTabId) {
     await chrome.tabs.update(tabId, { url });
     return { ok: true };
   } catch (error) {
-    await setComboAuthTabAuthorized(tabId, false);
+    const rollback = [setComboAuthTabAuthorized(tabId, false)];
+    if (companionPrepareAttempted) {
+      rollback.push(sendExternalExtensionMessage(companion.id, {
+        type: "browser-read:cancel-combo-navigation", tabId
+      }, 3000));
+    }
+    const results = await Promise.allSettled(rollback);
+    for (const result of results) {
+      if (result.status === "rejected" || result.value?.ok === false) {
+        console.warn("[Browser Read] Falha ao revogar autorização temporária do Combo.", result.reason || result.value?.error);
+      }
+    }
     throw error;
   }
 }

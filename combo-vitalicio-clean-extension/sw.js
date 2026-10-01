@@ -30,7 +30,6 @@ const RULE_IDS = [
 ];
 const ACCESS_MESSAGE = "browser-read:set-content-access";
 const AUTH_FLOW_MESSAGE = "combo-vitalicio:auth-flow";
-const LOCAL_AUTH_SESSION_RULE_ID = 7490;
 const AUTH_HOSTS = new Set([
   "sso.hotmart.com",
   "sso-surrogate.hotmart.com",
@@ -230,12 +229,6 @@ async function syncBrowserReadAuthFlow(tabId, active) {
   }
 }
 
-async function getLocalAuthRule() {
-  if (!chrome.declarativeNetRequest?.getSessionRules) return null;
-  const rules = await chrome.declarativeNetRequest.getSessionRules().catch(() => []);
-  return rules.find((rule) => rule.id === LOCAL_AUTH_SESSION_RULE_ID) || null;
-}
-
 async function setLocalAuthTab(tabId, active) {
   return comboAuthSessions.set(tabId, active);
 }
@@ -334,7 +327,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const sourceUrl = sender?.tab?.url || sender?.url || "";
       if (!approval.browserReadApproved || !Number.isInteger(senderTabId) ||
           (!isAllowedComboUrl(sourceUrl) && !isComboAuthEntryUrl(sourceUrl) &&
-           !(new RegExp(COMBO_AUTH_TRANSIT_REGEX).test(sourceUrl) && await comboAuthSessions.has(tabId)))) {
+           !(new RegExp(COMBO_AUTH_TRANSIT_REGEX, "i").test(sourceUrl) && await comboAuthSessions.has(tabId)))) {
         return { ok: false, error: "invalid_combo_auth_source" };
       }
       return setAuthFlowForTab(tabId, message.active === true);
@@ -351,6 +344,16 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
   (async () => {
     if (!(await isAuthorizedBrowserReadSender(sender))) {
       return { ok: false, error: "unauthorized_browser_read" };
+    }
+
+    if (message?.type === "browser-read:cancel-combo-navigation") {
+      const data = await chrome.storage.local.get(["browserReadApproved", "browserReadApproval"]);
+      if (!data.browserReadApproved || data.browserReadApproval?.browserReadExtensionId !== sender.id ||
+          !Number.isInteger(message.tabId) || message.tabId < 0) {
+        return { ok: false, error: "invalid_combo_navigation_cancel" };
+      }
+      await setLocalAuthTab(message.tabId, false);
+      return { ok: true };
     }
 
     if (message?.type === "browser-read:prepare-combo-navigation") {
@@ -422,7 +425,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     const authState = (await chrome.storage.local.get(authKey))[authKey];
     if (isAllowedComboUrl(url) && authState?.active && !authState?.submittedSecret) return;
     if ((changeInfo.status === "complete" && !current.pendingUrl && isAllowedComboUrl(url)) ||
-        (!isAllowedComboUrl(url) && !new RegExp(COMBO_AUTH_TRANSIT_REGEX).test(url))) {
+        (!isAllowedComboUrl(url) && !new RegExp(COMBO_AUTH_TRANSIT_REGEX, "i").test(url))) {
       await setAuthFlowForTab(tabId, false);
     }
   })().catch(() => {});

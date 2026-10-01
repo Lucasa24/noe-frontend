@@ -6,8 +6,8 @@ function showStatus(message, error = false) {
 chrome.runtime.sendMessage({ type: 'combo:get-versions' }).then(result => {
   if (!result?.ok) throw Error('Não foi possível consultar as extensões.');
   const versions = `Browser Read ${result.browserRead} • Combo Vitalício ${result.combo}`;
-  showStatus(versions + (result.combo === '1.5.4' ? ' — selecione um produto.' :
-    ' — atualize o Combo Vitalício para 1.5.4.'), result.combo !== '1.5.4');
+  showStatus(versions + (result.combo === '1.5.5' ? ' — selecione um produto.' :
+    ' — atualize o Combo Vitalício para 1.5.5.'), result.combo !== '1.5.5');
 }).catch(error => showStatus(error.message, true));
 
 document.addEventListener('click', async event => {

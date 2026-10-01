@@ -16,7 +16,7 @@ function create(which, baseline=false) {
   const manifest=JSON.parse(fs.readFileSync(path.join(dir,'manifest.json')));
   const event=n=>({addListener(fn){(events[n] ||= []).push(fn);}});
   const storage=data=>({async get(k){ if(typeof k==='string')return {[k]:data[k]}; if(Array.isArray(k))return Object.fromEntries(k.map(x=>[x,data[x]])); return {...data}; },async set(x){Object.assign(data,x);},async remove(k){ for(const x of [].concat(k))delete data[x];}});
-  const rules=map=>async ({removeRuleIds=[],addRules=[]})=>{for(const id of removeRuleIds)map.delete(id);for(const r of addRules){new RegExp(r.condition.regexFilter);map.set(r.id,r);}};
+  const rules=map=>async ({removeRuleIds=[],addRules=[]})=>{for(const id of removeRuleIds)map.delete(id);for(const r of addRules){if(r.condition.regexFilter)new RegExp(r.condition.regexFilter);map.set(r.id,r);}};
   const chrome={
     runtime:{id:which==='browser'?B:C,getURL:p=>`chrome-extension://${which==='browser'?B:C}/${p}`,getManifest:()=>manifest,onMessage:event('internal'),onMessageExternal:event('external'),onInstalled:event('installed'),onStartup:event('startup'),sendMessage:async()=>({ok:false})},
     storage:{local:storage(local),session:storage(memory),onChanged:event('storage')},
@@ -37,8 +37,16 @@ function create(which, baseline=false) {
   async function external(message,sender){return new Promise((resolve,reject)=>{let handled=false;for(const fn of events.external||[])if(fn(message,sender,resolve)===true)handled=true;if(!handled)resolve(undefined);setTimeout(()=>reject(Error('message timeout')),2000).unref();});}
   return {context,run,chrome,events,dynamic,session,local,memory,alarms,tabs,updates,manifest,external};
 }
+function urlFilterMatches(filter,url){
+  const start=filter.startsWith('|'),end=filter.endsWith('|');
+  if(start)filter=filter.slice(1);
+  if(end)filter=filter.slice(0,-1);
+  const escaped=[...filter].map(char=>char==='*'?'.*':char==='^'?'(?:[^A-Za-z0-9_.%\-]|$)':char.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('');
+  return new RegExp((start?'^':'')+escaped+(end?'$':''),'i').test(url);
+}
 function action(ext,url,tabId){
-  const candidates=[...ext.dynamic.values(),...ext.session.values()].filter(r=>!r.condition.tabIds||r.condition.tabIds.includes(tabId)).filter(r=>new RegExp(r.condition.regexFilter,r.condition.isUrlFilterCaseSensitive?'':'i').test(url));
+  const candidates=[...ext.dynamic.values(),...ext.session.values()].filter(r=>!r.condition.tabIds||r.condition.tabIds.includes(tabId)).filter(r=>r.condition.regexFilter?
+    new RegExp(r.condition.regexFilter,r.condition.isUrlFilterCaseSensitive?'':'i').test(url):urlFilterMatches(r.condition.urlFilter,url));
   candidates.sort((a,b)=>b.priority-a.priority || (a.action.type==='allow'?-1:1));
   return candidates[0]?.action.type||'none';
 }
@@ -70,10 +78,22 @@ function action(ext,url,tabId){
   for(const e of [b,c])e.tabs.set(1,{id:1,url:menu});
   await c.run('enableGate({contentKey:CONTENT_KEY,contentUrl:BASE_URL,browserReadExtensionId:'+JSON.stringify(B)+'})');
   c.dynamic.clear(); // Prior approval remains, but the companion's DNR rules were lost.
+  b.session.set(9350,{id:9350,priority:300,action:{type:'allow'},condition:{regexFilter:'^https://sso\\.hotmart\\.com/',tabIds:[1]}});
+  c.session.set(7490,{id:7490,priority:300,action:{type:'allow'},condition:{regexFilter:'^https://sso\\.hotmart\\.com/',tabIds:[1]}});
   b.context.sender={id:B,url:menu,tab:{id:1,url:menu}};
   await b.run(`openComboProduct(${JSON.stringify(product)},sender)`);
   ok(messages.filter(type=>type==='browser-read:prepare-combo-navigation').length===1 &&
     !messages.includes('browser-read:set-content-access'),'click prepares once without repeating approval');
+  ok([...b.session.values(),...c.session.values()].every(rule=>!rule.condition.regexFilter),
+    'oversized legacy regex rule is replaced in both extensions');
+  for(const ext of [b,c]){
+    ok(ext.session.size>100,'auth transit uses separate short DNR filters');
+    ok([...ext.session.values()].every(rule=>rule.priority===300 && rule.action.type==='allow' &&
+      rule.condition.resourceTypes.length===1 && rule.condition.resourceTypes[0]==='main_frame' &&
+      rule.condition.tabIds.length===1 && rule.condition.tabIds[0]===1 &&
+      rule.condition.urlFilter.startsWith('|https://')),
+    'auth filters are HTTPS-only main-frame rules for the approved tab');
+  }
   ok(b.updates.at(-1).url===product,'preflight navigates after both acks');
   ok(await b.run(`isAuthorizedComboCompanionSender({id:${JSON.stringify(C)}})`),'normalizer and stored identity accept companion');
   const urls=[...fs.readFileSync(path.join(__dirname,'../browser-read-any-site-extension/combo-links.html'),'utf8').matchAll(/class="card" href="([^"]+)"/g)].map(x=>x[1]);
@@ -83,11 +103,11 @@ function action(ext,url,tabId){
     ok(await b.run(`isAllowedTabAfterUnlock(1,${JSON.stringify(u)},testState)`),'listener allows '+u);
   }}
   ok(await b.run('isComboAuthTabAuthorized(1)'),'product classification does not revoke lease');
-  for(const u of [login,'https://sso.hotmart.com/oidc/authorize?state=test','https://sso-surrogate.hotmart.com/login','https://consumer.hotmart.com/auth/callback','https://hotmart.com/pt-BR/club/light-copy/auth/login?realm=club']){
+  for(const u of [login,'https://sso.hotmart.com/oidc/authorize?state=test','https://sso-surrogate.hotmart.com/login','https://consumer.hotmart.com/auth/callback','https://hotmart.com/pt-BR/club/light-copy/auth/login?realm=club','https://sso.hotmart.com/LOGIN','https://consumer.hotmart.com/Oidc/authorize?state=test']){
     ok(action(b,u,1)==='allow'&&action(c,u,1)==='allow','prepared auth allowed '+u);
     ok(await b.run(`isAllowedTabAfterUnlock(1,${JSON.stringify(u)},testState)`),'auth listener agrees '+u);
   }
-  for(const u of ['https://example.com/','https://hotmart.com/pt-br/club/other/products/1',product+'0',product.replace('https:','http:'),product.replace('hotmart.com','hotmart.com.evil.test'),'https://consumer.hotmart.com/my-products','https://consumer.hotmart.com/course/99']){
+  for(const u of ['https://example.com/','https://hotmart.com/pt-br/club/other/products/1',product+'0',product.replace('https:','http:'),product.replace('hotmart.com','hotmart.com.evil.test'),'https://consumer.hotmart.com/my-products','https://consumer.hotmart.com/course/99','https://sso.hotmart.com/other','https://sso.hotmart.com/login-not-auth','https://sso.hotmart.com/login;evil','https://sso.hotmart.com/login@evil','https://sso.hotmart.com/login+evil','https://sso.hotmart.com/oidc2/authorize','https://hotmart.com/pt-br/clubevil']){
     ok(action(b,u,1)==='block'&&action(c,u,1)==='block','unauthorized page remains blocked '+u);
   }
   ok(action(b,login,2)==='block'&&action(c,login,2)==='block','auth is tab-scoped');
@@ -115,6 +135,18 @@ function action(ext,url,tabId){
   b.context.senderNoTab={id:B,url:menu};
   await b.run(`openComboProduct(${JSON.stringify(product)},senderNoTab,1)`);
   ok(b.updates.at(-1).url===product,'extension-page sender without sender.tab supported');
+  // A failure after the companion's acknowledgement must revoke both leases.
+  b.tabs.set(1,{id:1,url:menu}); c.tabs.set(1,{id:1,url:menu});
+  const originalUpdate=b.chrome.tabs.update;
+  b.chrome.tabs.update=async()=>{throw Error('tab navigation failed');};
+  await assert.rejects(b.run(`openComboProduct(${JSON.stringify(product)},sender)`),/tab navigation failed/);checks++;
+  b.chrome.tabs.update=originalUpdate;
+  ok(messages.includes('browser-read:cancel-combo-navigation') &&
+    action(b,login,1)==='block' && action(c,login,1)==='block',
+    'failed navigation revokes browser and companion auth leases');
+  const unauthorizedCancel=await c.external({type:'browser-read:cancel-combo-navigation',tabId:1},
+    {id:'dddddddddddddddddddddddddddddddd'});
+  ok(unauthorizedCancel.ok===false,'foreign extension cannot cancel approved tab');
   // Broken cross-extension sync must be reported as failure, not false success.
   c.chrome.runtime.sendMessage=async()=>({ok:false,error:'denied'});
   const failed=await c.run('setAuthFlowForTab(1,true)');
@@ -127,7 +159,7 @@ function action(ext,url,tabId){
   const ui={
     document:{body:{dataset:{}},querySelector:()=>status,addEventListener:(name,fn)=>{if(name==='click')clickListener=fn;}},
     chrome:{runtime:{sendMessage:async msg=>msg.type==='combo:get-versions'
-      ? {ok:true,browserRead:'1.3.68',combo:'1.5.4'} : {ok:false,error:'DNR ainda bloqueado'}},
+      ? {ok:true,browserRead:'1.3.69',combo:'1.5.5'} : {ok:false,error:'DNR ainda bloqueado'}},
       tabs:{getCurrent:async()=>({id:1})}},Error
   };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../browser-read-any-site-extension/combo-links.js'),'utf8'),ui);
