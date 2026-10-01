@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Preparando conteúdo</title>
+  <style>
+    :root { color-scheme: dark; font-family: Arial, Helvetica, sans-serif; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #05070b; color: #e2e8f0; }
+    main { width: min(560px, calc(100% - 40px)); padding: 28px; border: 1px solid #26344b; border-radius: 16px; background: #101827; box-shadow: 0 18px 50px rgba(0,0,0,.35); }
+    h1 { margin: 0 0 10px; font-size: 22px; color: #f8fafc; }
+    p { margin: 0; line-height: 1.5; color: #94a3b8; }
+    #status { margin-top: 18px; color: #93c5fd; }
+    #status.error { color: #fecaca; }
+    a { display: inline-block; margin-top: 18px; margin-right: 16px; color: #bfdbfe; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Preparando o acesso</h1>
+    <p>A autorização desta aba permanece ativa enquanto a Hotmart carrega o conteúdo e conclui o login.</p>
+    <div id="status" role="status" aria-live="polite">Abrindo o produto…</div>
+    <a id="retry" href="#" hidden>Tentar novamente</a>
+    <a id="cancel" href="#">Fechar esta aba</a>
+  </main>
+  <script src="combo-launch.js"></script>
+</body>
+</html>
