@@ -63,6 +63,13 @@ const COMBO_SCOPED_ALLOW_RULE_IDS = Array.from(
   { length: COMBO_SCOPED_ALLOW_RULE_COUNT },
   (_, index) => COMBO_SCOPED_ALLOW_RULE_ID_START + index
 );
+const COMBO_AUTH_ENTRY_RULE_ID_START = COMBO_SCOPED_ALLOW_RULE_ID_START + COMBO_SCOPED_ALLOW_RULE_COUNT;
+const COMBO_AUTH_ENTRY_RULE_COUNT = 12;
+const COMBO_AUTH_ENTRY_RULE_IDS = Array.from(
+  { length: COMBO_AUTH_ENTRY_RULE_COUNT },
+  (_, index) => COMBO_AUTH_ENTRY_RULE_ID_START + index
+);
+const COMBO_OIDC_AUTHORIZE_RULE_ID = COMBO_AUTH_ENTRY_RULE_ID_START + COMBO_AUTH_ENTRY_RULE_COUNT;
 const ZOOM_SESSION_ALLOW_RULE_ID = 9201;
 const PIXEL_AI_HUB_CASES_RULE_ID = 9251;
 const SCOPED_RULE_IDS = [
@@ -72,7 +79,9 @@ const SCOPED_RULE_IDS = [
   SCOPED_ZOOM_ENTRY_RULE_ID,
   SCOPED_ZOOM_WEB_CLIENT_RULE_ID,
   PIXEL_AI_HUB_CASES_RULE_ID,
-  ...COMBO_SCOPED_ALLOW_RULE_IDS
+  ...COMBO_SCOPED_ALLOW_RULE_IDS,
+  ...COMBO_AUTH_ENTRY_RULE_IDS,
+  COMBO_OIDC_AUTHORIZE_RULE_ID
 ];
 const CLAUDE_BROWSER_READ_EXTENSION_ID = "hbokpkaoocpcecbfgfadoplblcfannke";
 const CLAUDE_CLEAN_EXTENSION_ID = "gphcdebdfhjiomklliooamglagpphnii";
@@ -101,6 +110,20 @@ const COMBO_VITALICIO_ALLOWED_PRODUCT_PATHS = new Set([
   "/pt-br/club/crescimento-10x/products/4530992",
   "/pt-br/club/fluxomatic/products/4159619",
   "/pt-br/club/vendatodosantodianew/products/4956523"
+]);
+const COMBO_VITALICIO_ALLOWED_CLUB_SLUGS = new Set([
+  "light-copy",
+  "seu-produto-pronto",
+  "vendatodosantodianew",
+  "superads",
+  "reuniao-da-mandala",
+  "whatsapp10x",
+  "stories-10x",
+  "conversao-10x",
+  "filosofia-ladeira",
+  "melhores-palestras-da-mentoria-fluxo",
+  "crescimento-10x",
+  "fluxomatic"
 ]);
 const COMBO_VITALICIO_ACCESS_MESSAGE = "browser-read:set-content-access";
 const COMBO_VITALICIO_EXTENSION_NAMES = ["combo vitalicio", "combo vitalício"];
@@ -3479,10 +3502,28 @@ async function configureScopedNetworkRules(state) {
         priority: 100,
         action: { type: "allow" },
         condition: {
-          regexFilter: "^https://hotmart\\.com" + allowedPath + "(?:/|\\?|$)",
+          regexFilter: "^https://hotmart\\.com" + allowedPath.replace("/pt-br/", "/[pP][tT]-[bB][rR]/") + "(?:/|\\?|$)",
           resourceTypes: ["main_frame"]
         }
-      }))
+      })),
+      ...Array.from(COMBO_VITALICIO_ALLOWED_CLUB_SLUGS).map((slug, index) => ({
+        id: COMBO_AUTH_ENTRY_RULE_ID_START + index,
+        priority: 160,
+        action: { type: "allow" },
+        condition: {
+          regexFilter: "^https://hotmart\\.com/[pP][tT]-[bB][rR]/club/" + slug + "/auth/login(?:/|\\?|$)",
+          resourceTypes: ["main_frame"]
+        }
+      })),
+      {
+        id: COMBO_OIDC_AUTHORIZE_RULE_ID,
+        priority: 170,
+        action: { type: "allow" },
+        condition: {
+          regexFilter: "^https://sso\\.hotmart\\.com/oidc/authorize(?:\\?|$)",
+          resourceTypes: ["main_frame"]
+        }
+      }
     ];
 
     await chrome.declarativeNetRequest.updateDynamicRules({
@@ -3495,7 +3536,9 @@ async function configureScopedNetworkRules(state) {
     );
 
     if (!activeRuleIds.has(SCOPED_BLOCK_RULE_ID) ||
-        COMBO_SCOPED_ALLOW_RULE_IDS.some((ruleId) => !activeRuleIds.has(ruleId))) {
+        COMBO_SCOPED_ALLOW_RULE_IDS.some((ruleId) => !activeRuleIds.has(ruleId)) ||
+        COMBO_AUTH_ENTRY_RULE_IDS.some((ruleId) => !activeRuleIds.has(ruleId)) ||
+        !activeRuleIds.has(COMBO_OIDC_AUTHORIZE_RULE_ID)) {
       throw new Error("combo_scoped_network_rules_not_applied");
     }
     return;
@@ -3710,8 +3753,20 @@ function isValidDtcZoomUrl(url, state) {
 async function isAllowedTabAfterUnlock(tabId, url, state) {
   const origin = getUrlOrigin(url);
 
-  if (isComboVitalicioState(state) && isComboAuthUrl(url) && await isComboAuthTabAuthorized(tabId)) {
-    return true;
+  if (isComboVitalicioState(state)) {
+    if (isComboVitalicioUrl(url)) {
+      await setComboAuthTabAuthorized(tabId, false);
+      return true;
+    }
+
+    if (isComboAuthEntryUrl(url) || isComboOidcAuthorizeUrl(url)) {
+      await setComboAuthTabAuthorized(tabId, true);
+      return true;
+    }
+
+    if (isComboAuthUrl(url) && await isComboAuthTabAuthorized(tabId)) {
+      return true;
+    }
   }
 
   if (isAllowedAfterUnlock(url, state)) {
@@ -3852,6 +3907,36 @@ function isValidSelectedAccessState(state) {
 }
 
 
+function isComboAuthEntryUrl(url) {
+  try {
+    const parsed = new URL(String(url || "").trim());
+    if (parsed.protocol !== "https:" || parsed.hostname.toLowerCase() !== "hotmart.com") {
+      return false;
+    }
+
+    const path = parsed.pathname.replace(/\/{2,}/g, "/").replace(/\/+$/, "").toLowerCase();
+    for (const slug of COMBO_VITALICIO_ALLOWED_CLUB_SLUGS) {
+      if (path === "/pt-br/club/" + slug + "/auth/login") {
+        return true;
+      }
+    }
+    return false;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function isComboOidcAuthorizeUrl(url) {
+  try {
+    const parsed = new URL(String(url || "").trim());
+    return parsed.protocol === "https:"
+      && parsed.hostname.toLowerCase() === "sso.hotmart.com"
+      && parsed.pathname === "/oidc/authorize";
+  } catch (_error) {
+    return false;
+  }
+}
+
 function isComboAuthUrl(url) {
   try {
     const parsed = new URL(String(url || "").trim());
@@ -3973,11 +4058,11 @@ function isEduLedUrl(url) {
 function isComboVitalicioUrl(url) {
   try {
     const parsed = new URL(String(url || "").trim());
-    if (parsed.protocol !== "https:" || parsed.hostname !== "hotmart.com") {
+    if (parsed.protocol !== "https:" || parsed.hostname.toLowerCase() !== "hotmart.com") {
       return false;
     }
 
-    const path = parsed.pathname.replace(/\/{2,}/g, "/").replace(/\/+$/, "");
+    const path = parsed.pathname.replace(/\/{2,}/g, "/").replace(/\/+$/, "").toLowerCase();
     for (const allowedPath of COMBO_VITALICIO_ALLOWED_PRODUCT_PATHS) {
       if (path === allowedPath || path.startsWith(allowedPath + "/")) {
         return true;
