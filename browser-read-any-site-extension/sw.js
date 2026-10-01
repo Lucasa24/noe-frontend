@@ -105,6 +105,13 @@ const COMBO_VITALICIO_ALLOWED_PRODUCT_PATHS = new Set([
 const COMBO_VITALICIO_ACCESS_MESSAGE = "browser-read:set-content-access";
 const COMBO_VITALICIO_EXTENSION_NAMES = ["combo vitalicio", "combo vitalício"];
 const COMBO_READ_PERMISSION_KEY = "comboVitalicioReadPermission";
+const COMBO_AUTH_FLOW_MESSAGE = "combo-vitalicio:auth-flow";
+const COMBO_AUTH_SESSION_ALLOW_RULE_ID = 9350;
+const COMBO_AUTH_HOSTS = new Set([
+  "sso.hotmart.com",
+  "sso-surrogate.hotmart.com",
+  "consumer.hotmart.com"
+]);
 
 const EDU_LED_CONTENT_KEY = "edu-led-growth";
 const EDU_LED_EXTENSION_ID = "kboehlnbpllkohfhcacjpjpgkbiaebmh";
@@ -190,6 +197,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   void revokeZoomMeetingTab(tabId).catch(() => undefined);
+  void setComboAuthTabAuthorized(tabId, false).catch(() => undefined);
 });
 
 chrome.tabs.onActivated.addListener((activeInfo) => {
@@ -347,11 +355,39 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
-  if (sender?.id !== PIXEL_EXTENSION_ID) {
-    return false;
+  if (message?.type === COMBO_AUTH_FLOW_MESSAGE) {
+    void (async () => {
+      if (!(await isAuthorizedComboCompanionSender(sender))) {
+        return { ok: false, error: "unauthorized_combo_companion" };
+      }
+
+      const state = await ensureCurrentLockState("combo_auth_flow");
+      if (!isComboVitalicioState(state) || state?.unlocked !== true) {
+        return { ok: false, error: "combo_not_active" };
+      }
+
+      const tabId = Number(message?.tabId);
+      if (!Number.isInteger(tabId)) {
+        return { ok: false, error: "tab_id_unavailable" };
+      }
+
+      const tab = await chrome.tabs.get(tabId).catch(() => null);
+      if (!tab) {
+        return { ok: false, error: "tab_not_found" };
+      }
+
+      await setComboAuthTabAuthorized(tabId, message.active === true);
+      return { ok: true, active: message.active === true, tabId };
+    })().then(sendResponse).catch((error) => {
+      sendResponse({
+        ok: false,
+        error: error instanceof Error ? error.message : "combo_auth_flow_failed"
+      });
+    });
+    return true;
   }
 
-  if (message?.type !== PIXEL_GATE_QUERY_MESSAGE) {
+  if (sender?.id !== PIXEL_EXTENSION_ID || message?.type !== PIXEL_GATE_QUERY_MESSAGE) {
     return false;
   }
 
@@ -369,6 +405,7 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
 
   return true;
 });
+
 
 async function bootstrapLock(reason) {
   const config = await getAuthConfig();
@@ -3316,6 +3353,7 @@ async function clearScopedNetworkRules() {
   }
 
   await clearZoomMeetingSessions();
+  await clearComboAuthSessions();
 }
 
 function getAllowedContentOrigins(state) {
@@ -3672,6 +3710,10 @@ function isValidDtcZoomUrl(url, state) {
 async function isAllowedTabAfterUnlock(tabId, url, state) {
   const origin = getUrlOrigin(url);
 
+  if (isComboVitalicioState(state) && isComboAuthUrl(url) && await isComboAuthTabAuthorized(tabId)) {
+    return true;
+  }
+
   if (isAllowedAfterUnlock(url, state)) {
     if (!DTC_ZOOM_SESSION_ORIGINS.has(origin)) {
       await revokeZoomMeetingTab(tabId);
@@ -3807,6 +3849,84 @@ function isValidSelectedAccessState(state) {
     && allowedOrigin
     && getUrlOrigin(allowedUrl) === allowedOrigin
   );
+}
+
+
+function isComboAuthUrl(url) {
+  try {
+    const parsed = new URL(String(url || "").trim());
+    if (parsed.protocol !== "https:") return false;
+
+    const host = parsed.hostname.toLowerCase();
+    if (COMBO_AUTH_HOSTS.has(host)) return true;
+
+    if (host === "hotmart.com") {
+      const path = parsed.pathname.replace(/\/{2,}/g, "/").replace(/\/+$/, "").toLowerCase();
+      return path === "/pt-br/club" || path === "/pt-br/area-de-membros";
+    }
+
+    return false;
+  } catch (_error) {
+    return false;
+  }
+}
+
+async function isAuthorizedComboCompanionSender(sender) {
+  const senderId = String(sender?.id || "").trim();
+  if (!senderId || !chrome.management?.get) return false;
+  try {
+    const info = await chrome.management.get(senderId);
+    const name = normalizeExtensionName(info?.name);
+    return info?.enabled === true && COMBO_VITALICIO_EXTENSION_NAMES.includes(name);
+  } catch (_error) {
+    return false;
+  }
+}
+
+async function getComboAuthSessionRule() {
+  if (!chrome.declarativeNetRequest?.getSessionRules) return null;
+  const rules = await chrome.declarativeNetRequest.getSessionRules().catch(() => []);
+  return rules.find((rule) => rule.id === COMBO_AUTH_SESSION_ALLOW_RULE_ID) || null;
+}
+
+async function setComboAuthTabAuthorized(tabId, active) {
+  if (!Number.isInteger(tabId) || !chrome.declarativeNetRequest?.updateSessionRules) {
+    return false;
+  }
+
+  const existing = await getComboAuthSessionRule();
+  const tabIds = new Set(Array.isArray(existing?.condition?.tabIds) ? existing.condition.tabIds : []);
+  if (active) tabIds.add(tabId);
+  else tabIds.delete(tabId);
+
+  await chrome.declarativeNetRequest.updateSessionRules({
+    removeRuleIds: [COMBO_AUTH_SESSION_ALLOW_RULE_ID],
+    addRules: tabIds.size > 0 ? [{
+      id: COMBO_AUTH_SESSION_ALLOW_RULE_ID,
+      priority: 300,
+      action: { type: "allow" },
+      condition: {
+        regexFilter: "^https://(?:(?:sso\\.hotmart\\.com|sso-surrogate\\.hotmart\\.com|consumer\\.hotmart\\.com)/|hotmart\\.com/[pP][tT]-[bB][rR]/(?:club/?(?:[?#]|$)|area-de-membros(?:[/?#]|$)))",
+        resourceTypes: ["main_frame"],
+        tabIds: [...tabIds]
+      }
+    }] : []
+  });
+
+  return true;
+}
+
+async function isComboAuthTabAuthorized(tabId) {
+  if (!Number.isInteger(tabId)) return false;
+  const rule = await getComboAuthSessionRule();
+  return Array.isArray(rule?.condition?.tabIds) && rule.condition.tabIds.includes(tabId);
+}
+
+async function clearComboAuthSessions() {
+  if (!chrome.declarativeNetRequest?.updateSessionRules) return;
+  await chrome.declarativeNetRequest.updateSessionRules({
+    removeRuleIds: [COMBO_AUTH_SESSION_ALLOW_RULE_ID]
+  }).catch(() => undefined);
 }
 
 function isComboVitalicioState(state) {
