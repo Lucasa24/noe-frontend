@@ -194,18 +194,37 @@ chrome.runtime.onStartup.addListener(() => {
   })();
 });
 
-chrome.tabs.onCreated.addListener((tab) => {
-  const tabUrl = tab.pendingUrl || tab.url || "";
+function isTransientCreatedTabUrl(url) {
+  const value = String(url || "").trim();
+  return /^(?:chrome|edge):\/\/(?:newtab|new-tab-page)\/?(?:[?#].*)?$/i.test(value)
+    || /^(?:about:blank|about:newtab)$/i.test(value);
+}
 
-  void reconcileCompanionIsolationState();
-  void rememberTabSnapshot(tab);
+async function enforceCreatedTabAfterUrlSettles(tabId, attempt = 0) {
+  if (!Number.isInteger(tabId)) return;
+  const current = await chrome.tabs.get(tabId).catch(() => null);
+  if (!current) return;
+  const currentUrl = current.pendingUrl || current.url || "";
 
-  if (!tabUrl) {
-    return;
+  // AdsPower/Chromium can emit tabs.onCreated while tabs.create({url}) still
+  // reports chrome://newtab/ or about:blank. Enforcing scope at that instant
+  // redirected the launch tab to combo-links.html before its navigation state
+  // existed. Re-read the same tab until the real URL is visible; no URL/domain
+  // is granted by this delay.
+  if ((!currentUrl || isTransientCreatedTabUrl(currentUrl)) && attempt < 40) {
+    await new Promise(resolve => setTimeout(resolve, 75));
+    return enforceCreatedTabAfterUrlSettles(tabId, attempt + 1);
   }
 
-  void enforceLockedTab(tab.id, tabUrl).catch(() => undefined);
-  void maybeInjectZoomWebClientAutomation(tab.id, tabUrl).catch(() => undefined);
+  if (!currentUrl) return;
+  await enforceLockedTab(tabId, currentUrl);
+  await maybeInjectZoomWebClientAutomation(tabId, currentUrl);
+}
+
+chrome.tabs.onCreated.addListener((tab) => {
+  void reconcileCompanionIsolationState();
+  void rememberTabSnapshot(tab);
+  void enforceCreatedTabAfterUrlSettles(tab?.id).catch(() => undefined);
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
@@ -4566,6 +4585,22 @@ async function openComboProduct(url, sender, requestedTabId) {
   void prepareComboProductNavigation(targetTab.id, url, navigation).catch(() => undefined);
   return { ok: true, tabId: targetTab.id, reused: false, status: "preparing" };
 }
+async function waitForComboLaunchPage(tabId, timeoutMs = 4000) {
+  const startedAt = Date.now();
+  let lastUrl = "";
+  while (Date.now() - startedAt < timeoutMs) {
+    const tab = await chrome.tabs.get(tabId).catch(() => null);
+    if (!tab) throw new Error("A aba de preparação foi fechada.");
+    lastUrl = tab.pendingUrl || tab.url || "";
+    if (isComboLaunchPageUrl(lastUrl)) return tab;
+    if (lastUrl && !isTransientCreatedTabUrl(lastUrl) && !isComboLinksPageUrl(lastUrl)) {
+      throw new Error("A aba de preparação abriu uma URL inesperada.");
+    }
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  throw new Error("combo-launch.html não ficou pronto a tempo.");
+}
+
 const comboNavigationInFlight = new Set();
 async function prepareComboProductNavigation(tabId, url, seedNavigation = null) {
   if (!Number.isInteger(tabId) || tabId < 0 || !isComboVitalicioUrl(url)) throw new Error("Produto inválido.");
@@ -4584,8 +4619,9 @@ async function prepareComboProductNavigation(tabId, url, seedNavigation = null) 
     const state = await ensureCurrentLockState("combo_open_product");
     if (!state?.unlocked || !isValidSelectedAccessState(state) || !isComboVitalicioState(state) || !await hasRequiredSiteAccess())
       throw new Error("Valide novamente o acesso ao Combo.");
-    const source = await chrome.tabs.get(tabId);
-    if (!isComboLaunchPageUrl(source.pendingUrl || source.url)) throw new Error("A aba de preparação mudou.");
+    await recordComboNavigationEvent(tabId, "waiting_launch_page");
+    await waitForComboLaunchPage(tabId);
+    await recordComboNavigationEvent(tabId, "launch_page_ready");
     const extensions = await chrome.management.getAll();
     const duplicateRead = extensions.filter(item => item.type === "extension" && item.enabled &&
       item.id !== chrome.runtime.id && normalizeExtensionDisplayName(item.name) === "browser read any site");
