@@ -4,7 +4,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 
-const root = path.resolve(__dirname, '..');
+const root = fs.existsSync(path.join(__dirname, 'sw.js')) ? __dirname : path.resolve(__dirname, '..');
 const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
 const auth = fs.readFileSync(path.join(root, 'combo-auth-session.js'), 'utf8');
 
