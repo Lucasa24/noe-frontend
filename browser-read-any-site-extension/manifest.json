@@ -1,14 +1,15 @@
 {
   "manifest_version": 3,
   "name": "Browser Read Any Site",
-  "version": "1.3.66",
-  "description": "Browser Read corrige navegacao dos 14 links Combo Vitalicio, incluindo pt-BR, /auth/login e OIDC por aba.",
+  "version": "1.3.71",
+  "description": "Combo Vitalicio com maquina de estados diagnostica, leases por aba e suporte aos roots autorizados antes do OIDC.",
   "permissions": [
     "scripting",
     "storage",
     "tabs",
     "declarativeNetRequest",
-    "management"
+    "management",
+    "alarms"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -46,7 +47,7 @@
   ],
   "externally_connectable": {
     "ids": [
-      "opebpmbhihaffdfogpeimddbpjhhejpk"
+      "*"
     ]
   }
 }
