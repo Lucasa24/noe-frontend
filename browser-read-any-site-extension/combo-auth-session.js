@@ -3,6 +3,7 @@ const COMBO_TRANSIT_HOSTS = ['sso.hotmart.com', 'sso-surrogate.hotmart.com', 'co
 const COMBO_TRANSIT_ROUTES = ['login', 'logout', 'oidc', 'oauth', 'oauth2', 'auth', 'authorize', 'callback', 'sso'];
 const COMBO_TRANSIT_HOTMART_ROOTS = ['club', 'area-de-membros'];
 const COMBO_TRANSIT_HOTMART_CALLBACK_PATHS = ['oauth2.0/callbackAuthorize'];
+const COMBO_TRANSIT_CALLBACK_HOSTS = ['hotmart.com', ...COMBO_TRANSIT_HOSTS];
 const COMBO_TRANSIT_CLUB_SLUGS = [
   'light-copy','seu-produto-pronto','vendatodosantodianew','superads','reuniao-da-mandala','whatsapp10x',
   'stories-10x','conversao-10x','filosofia-ladeira','melhores-palestras-da-mentoria-fluxo','crescimento-10x','fluxomatic'
@@ -10,7 +11,7 @@ const COMBO_TRANSIT_CLUB_SLUGS = [
 const COMBO_TRANSIT_CLUB_SLUG_PATTERN = COMBO_TRANSIT_CLUB_SLUGS.join('|');
 const COMBO_AUTH_TRANSIT_REGEX =
   '^https://(?:(?:sso\\.hotmart\\.com|sso-surrogate\\.hotmart\\.com|consumer\\.hotmart\\.com)/' +
-  '(?:$|[?#]|(?:login|logout|oidc|oauth|oauth2|auth|authorize|callback|sso)(?:[/?#]|$))|' +
+  '(?:(?:oauth2\\.0/callbackAuthorize)(?:[/?#]|$)|$|[?#]|(?:login|logout|oidc|oauth|oauth2|auth|authorize|callback|sso)(?:[/?#]|$))|' +
   'hotmart\\.com/(?:(?:oauth2\\.0/callbackAuthorize)(?:[/?#]|$)|pt-br/(?:(?:club|area-de-membros)/?(?:[?#]|$)|club/(?:' +
   COMBO_TRANSIT_CLUB_SLUG_PATTERN + ')/?(?:[?#]|$))))';
 const COMBO_AUTH_TRANSIT_URL_FILTERS = [
@@ -19,7 +20,7 @@ const COMBO_AUTH_TRANSIT_URL_FILTERS = [
     ...COMBO_TRANSIT_ROUTES.flatMap(route => { const root=`|https://${host}/${route}`; return [root+'|',root+'/',root+'?',root+'#']; })
   ]),
   ...COMBO_TRANSIT_HOTMART_ROOTS.flatMap(path => { const root=`|https://hotmart.com/pt-br/${path}`; return [root+'|',root+'?',root+'#',root+'/|',root+'/?',root+'/#']; }),
-  ...COMBO_TRANSIT_HOTMART_CALLBACK_PATHS.flatMap(path => { const root=`|https://hotmart.com/${path}`; return [root+'|',root+'?',root+'#',root+'/|',root+'/?',root+'/#']; }),
+  ...COMBO_TRANSIT_CALLBACK_HOSTS.flatMap(host => COMBO_TRANSIT_HOTMART_CALLBACK_PATHS.flatMap(path => { const root=`|https://${host}/${path}`; return [root+'|',root+'?',root+'#',root+'/|',root+'/?',root+'/#']; })),
   ...COMBO_TRANSIT_CLUB_SLUGS.flatMap(slug => { const root=`|https://hotmart.com/pt-br/club/${slug}`; return [root+'|',root+'?',root+'#',root+'/|',root+'/?',root+'/#']; })
 ];
 function createComboAuthSessions(ruleId) {
