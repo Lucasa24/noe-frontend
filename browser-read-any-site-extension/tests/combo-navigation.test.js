@@ -41,6 +41,8 @@ assert(auth.includes('COMBO_TRANSIT_CLUB_SLUGS'));
 assert(auth.includes('isUrlFilterCaseSensitive: false'));
 assert(auth.includes('COMBO_TRANSIT_HOTMART_CALLBACK_PATHS'));
 assert(auth.includes('oauth2.0/callbackAuthorize'));
+assert(auth.includes("COMBO_TRANSIT_CLUB_AUTH_ROUTES = ['auth/login', 'auth/logout']"));
+assert(sw.includes('/auth/(?:login|logout)'));
 
 // Regression for AdsPower/Chromium tabs.create race.
 assert(sw.includes('function isTransientCreatedTabUrl'));
