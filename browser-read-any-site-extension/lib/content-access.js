@@ -5,6 +5,8 @@ const PIXEL_AI_HUB_CONFIG_ID = "aachjpoooepljhlphhaplfijppgbjdfp";
 const COMBO_BROWSER_READ_RUNTIME_ID = "miipjameglmiodjjgghegcidmkiefmlg";
 const LINGUAGEM_SECRETA_BROWSER_READ_RUNTIME_ID = "khjkhgcjikniamfapkalobgapfpogfcm";
 const LINGUAGEM_SECRETA_CONTENT_KEY = "linguagem-secreta-rian-dutra-psicologia-design";
+const RENAUX_BROWSER_READ_RUNTIME_ID = "pecillnjjgjhippgfhankonbmnogohol";
+const RENAUX_CONTENT_KEY = "renaux-estrategistas-mkt360";
 const CONTENT_SELECTOR_EXTENSION_IDS = new Set([
   CONTENT_SELECTOR_CONFIG_ID,
   "nfnpblbakohfcnkngbimljiehklmdcmk",
@@ -12,7 +14,8 @@ const CONTENT_SELECTOR_EXTENSION_IDS = new Set([
   "hbokpkaoocpcecbfgfadoplblcfannke",
   "njnehniaiehecdplafcbkdhhmjjcojfe",
   COMBO_BROWSER_READ_RUNTIME_ID,
-  LINGUAGEM_SECRETA_BROWSER_READ_RUNTIME_ID
+  LINGUAGEM_SECRETA_BROWSER_READ_RUNTIME_ID,
+  RENAUX_BROWSER_READ_RUNTIME_ID
 ]);
 
 const ACCESS_CONTENTS = [
@@ -37,6 +40,7 @@ const ACCESS_CONTENTS = [
   { key: "edu-led-growth", label: "EDU-LED GROWTH", url: "https://hotmart.com/pt-br/club/full-stack-marketing/", allowedRecipientNames: ["Gabriel Solano", "Moisés", "~ Solicitar Ativação com Adm"] },
   { key: "comunidade-autonext-vibestack", label: "COMUNIDADE AUTONEXT & VIBESTACK", allowedRecipientNames: ["Gabriel Solano", "Daniel Lins", "~ Solicitar Ativação com Adm", "Solano", "John"] },
   { key: "linguagem-secreta-rian-dutra-psicologia-design", label: "Linguagem Secreta", url: "https://area.angulor.com/en/club/angulor/products/6716542", allowedRecipientNames: ["Daniel Lins", "Jonatas Gomes", "~ Solicitar Ativação com Adm"] },
+  { key: "renaux-estrategistas-mkt360", label: "Renaux - ESTRATEGISTAS - MKT360", url: "https://hotmart.com/pt-br/club/camila-renaux/", allowedRecipientNames: ["Jonatas", "~ Solicitar Ativação com Adm"] },
   { key: "mkt360-programa-marketing-360-camila-renaux", label: "MKT360 - Programa Marketing 360° - Camila Renaux", url: "https://mentorxlab.com/mkt360-programa-marketing-360-camila-renaux/", allowedRecipientNames: ["Jonatas Gomes"] },
   { key: "formacao-estrategistas-de-marketing-camila-renaux", label: "Formação Estrategistas de Marketing - Camila Renaux", url: "https://mentorxlab.com/formacao-estrategistas-de-marketing-camila-renaux/", allowedRecipientNames: ["Jonatas Gomes"] },
   { key: "dtc-viral-lab", label: "DTC VIRAL LAB", allowedRecipientNames: ["João", "Igor", "Wesley", "Janderson", "adspc7", "~ Solicitar Ativação com Adm"] },
@@ -61,6 +65,10 @@ function getAccessContentsForExtension(extensionId) {
     return ACCESS_CONTENTS.filter((item) => item.key === LINGUAGEM_SECRETA_CONTENT_KEY);
   }
 
+  if (normalizedExtensionId === RENAUX_BROWSER_READ_RUNTIME_ID) {
+    return ACCESS_CONTENTS.filter((item) => item.key === RENAUX_CONTENT_KEY);
+  }
+
   return ACCESS_CONTENTS;
 }
 
@@ -78,6 +86,11 @@ function getContentSelectorConfigId(extensionId, contentKey = "") {
 
   if (normalizedContentKey === "pixel-ai-hub") {
     return PIXEL_AI_HUB_CONFIG_ID;
+  }
+
+  if (normalizedExtensionId === LINGUAGEM_SECRETA_BROWSER_READ_RUNTIME_ID ||
+      normalizedExtensionId === RENAUX_BROWSER_READ_RUNTIME_ID) {
+    return normalizedExtensionId;
   }
 
   return CONTENT_SELECTOR_CONFIG_ID;
