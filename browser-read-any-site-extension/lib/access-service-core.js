@@ -38,7 +38,8 @@ const EXTENSION_DISPLAY_NAMES = {
   miipjameglmiodjjgghegcidmkiefmlg: "Browser Read v1.3.33 — Combo Vitalicio",
   ngjacbpbiegcnfkinikfpdkcplhejael: "Asimov",
   ikijmkigbfcanidmonpfaihfclefllin: "MÉTODO ANDRÔMEDA",
-  aachjpoooepljhlphhaplfijppgbjdfp: "PIXEL AI HUB"
+  aachjpoooepljhlphhaplfijppgbjdfp: "PIXEL AI HUB",
+  khjkhgcjikniamfapkalobgapfpogfcm: "Linguagem Secreta"
 };
 
 function createAccessChallenge({ extensionId, recipientEmail, reason }) {
