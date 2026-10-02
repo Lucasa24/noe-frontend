@@ -11,10 +11,15 @@ const COMBO_TRANSIT_CLUB_SLUGS = [
 ];
 const COMBO_TRANSIT_CLUB_SLUG_PATTERN = COMBO_TRANSIT_CLUB_SLUGS.join('|');
 const COMBO_AUTH_TRANSIT_REGEX =
-  '^https://(?:(?:sso\\.hotmart\\.com|sso-surrogate\\.hotmart\\.com|consumer\\.hotmart\\.com)/' +
-  '(?:(?:oauth2\\.0/callbackAuthorize)(?:[/?#]|$)|$|[?#]|(?:login|logout|oidc|oauth|oauth2|auth|authorize|callback|sso)(?:[/?#]|$))|' +
-  'hotmart\\.com/(?:(?:oauth2\\.0/callbackAuthorize)(?:[/?#]|$)|pt-br/(?:(?:club|area-de-membros)/?(?:[?#]|$)|club/(?:' +
-  COMBO_TRANSIT_CLUB_SLUG_PATTERN + ')(?:/?(?:[?#]|$)|/auth/(?:login|logout)(?:[/?#]|$))))';
+  '^https://(?:' +
+  '(?:sso\\.hotmart\\.com|sso-surrogate\\.hotmart\\.com|consumer\\.hotmart\\.com)/' +
+  '(?:(?:oauth2\\.0/callbackAuthorize)(?:[/?#]|$)|$|[?#]|(?:login|logout|oidc|oauth|oauth2|auth|authorize|callback|sso)(?:[/?#]|$))' +
+  '|hotmart\\.com/oauth2\\.0/callbackAuthorize(?:[/?#]|$)' +
+  '|hotmart\\.com/pt-br/(?:club|area-de-membros)/?(?:[?#]|$)' +
+  '|hotmart\\.com/pt-br/club/(?:' + COMBO_TRANSIT_CLUB_SLUG_PATTERN +
+  ')(?:/?(?:[?#]|$)|/auth/(?:login|logout)(?:[/?#]|$))' +
+  ')';
+
 const COMBO_AUTH_TRANSIT_URL_FILTERS = [
   ...COMBO_TRANSIT_HOSTS.flatMap(host => [
     `|https://${host}/|`, `|https://${host}/?`, `|https://${host}/#`,
