@@ -3,13 +3,16 @@ const { listRecipientsForExtension } = require("./access-service");
 const CONTENT_SELECTOR_CONFIG_ID = "nicnjmokndbjnpjlikgmnfkihkklobce";
 const PIXEL_AI_HUB_CONFIG_ID = "aachjpoooepljhlphhaplfijppgbjdfp";
 const COMBO_BROWSER_READ_RUNTIME_ID = "miipjameglmiodjjgghegcidmkiefmlg";
+const LINGUAGEM_SECRETA_BROWSER_READ_RUNTIME_ID = "khjkhgcjikniamfapkalobgapfpogfcm";
+const LINGUAGEM_SECRETA_CONTENT_KEY = "linguagem-secreta-rian-dutra-psicologia-design";
 const CONTENT_SELECTOR_EXTENSION_IDS = new Set([
   CONTENT_SELECTOR_CONFIG_ID,
   "nfnpblbakohfcnkngbimljiehklmdcmk",
   PIXEL_AI_HUB_CONFIG_ID,
   "hbokpkaoocpcecbfgfadoplblcfannke",
   "njnehniaiehecdplafcbkdhhmjjcojfe",
-  COMBO_BROWSER_READ_RUNTIME_ID
+  COMBO_BROWSER_READ_RUNTIME_ID,
+  LINGUAGEM_SECRETA_BROWSER_READ_RUNTIME_ID
 ]);
 
 const ACCESS_CONTENTS = [
@@ -49,8 +52,16 @@ const COMBO_BROWSER_READ_CONTENT_KEYS = new Set([
 
 function getAccessContentsForExtension(extensionId) {
   const normalizedExtensionId = String(extensionId || "").trim();
-  if (normalizedExtensionId !== COMBO_BROWSER_READ_RUNTIME_ID) return ACCESS_CONTENTS;
-  return ACCESS_CONTENTS.filter((item) => COMBO_BROWSER_READ_CONTENT_KEYS.has(item.key));
+
+  if (normalizedExtensionId === COMBO_BROWSER_READ_RUNTIME_ID) {
+    return ACCESS_CONTENTS.filter((item) => COMBO_BROWSER_READ_CONTENT_KEYS.has(item.key));
+  }
+
+  if (normalizedExtensionId === LINGUAGEM_SECRETA_BROWSER_READ_RUNTIME_ID) {
+    return ACCESS_CONTENTS.filter((item) => item.key === LINGUAGEM_SECRETA_CONTENT_KEY);
+  }
+
+  return ACCESS_CONTENTS;
 }
 
 function isContentSelectorEnabled(extensionId) {
