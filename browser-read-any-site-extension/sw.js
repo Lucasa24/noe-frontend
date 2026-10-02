@@ -3589,7 +3589,7 @@ async function configureScopedNetworkRules(state) {
         priority: 160,
         action: { type: "allow" },
         condition: {
-          urlFilter: "|https://hotmart.com/pt-br/club/" + slug + "/auth/login^",
+          regexFilter: "^https://hotmart\\.com/pt-br/club/" + slug + "/auth/(?:login|logout)(?:[/?#]|$)",
           isUrlFilterCaseSensitive: false,
           resourceTypes: ["main_frame"]
         }
@@ -3993,7 +3993,8 @@ function isComboAuthEntryUrl(url) {
 
     const path = parsed.pathname.replace(/\/{2,}/g, "/").replace(/\/+$/, "").toLowerCase();
     for (const slug of COMBO_VITALICIO_ALLOWED_CLUB_SLUGS) {
-      if (path === "/pt-br/club/" + slug + "/auth/login") {
+      if (path === "/pt-br/club/" + slug + "/auth/login" ||
+          path === "/pt-br/club/" + slug + "/auth/logout") {
         return true;
       }
     }
