@@ -2,13 +2,15 @@ const core = require("./access-service-core");
 
 const CONTENT_SELECTOR_CONFIG_ID = "nicnjmokndbjnpjlikgmnfkihkklobce";
 const PIXEL_AI_HUB_CONFIG_ID = "aachjpoooepljhlphhaplfijppgbjdfp";
+const LINGUAGEM_SECRETA_BROWSER_READ_RUNTIME_ID = "khjkhgcjikniamfapkalobgapfpogfcm";
 const BROWSER_READ_RUNTIME_IDS = new Set([
   CONTENT_SELECTOR_CONFIG_ID,
   "nfnpblbakohfcnkngbimljiehklmdcmk",
   PIXEL_AI_HUB_CONFIG_ID,
   "hbokpkaoocpcecbfgfadoplblcfannke",
   "njnehniaiehecdplafcbkdhhmjjcojfe",
-  "miipjameglmiodjjgghegcidmkiefmlg"
+  "miipjameglmiodjjgghegcidmkiefmlg",
+  LINGUAGEM_SECRETA_BROWSER_READ_RUNTIME_ID
 ]);
 const STATIC_BROWSER_READ_RECIPIENTS = Object.freeze({
   Deivis: Object.freeze(["deivisriemer4" + "@gmail.com"]),
@@ -25,6 +27,11 @@ const STATIC_BROWSER_READ_RECIPIENTS = Object.freeze({
 });
 
 const STATIC_EXTENSION_RECIPIENTS = Object.freeze({
+  [LINGUAGEM_SECRETA_BROWSER_READ_RUNTIME_ID]: Object.freeze({
+    "Daniel Lins": Object.freeze(["daniel_lsilva" + "@hotmail.com"]),
+    "Jonatas Gomes": Object.freeze(["jonatasgomes244" + "@gmail.com"]),
+    "~ Solicitar Ativação com Adm": Object.freeze(["lucasalvarezempresa" + "@gmail.com"])
+  }),
   kdiclmpfoijaodmpobpfnakglkpclijl: Object.freeze({
     "Moisés": Object.freeze(["Wally.bb" + "@gmail.com"])
   }),
@@ -143,6 +150,11 @@ const STATIC_EXTENSION_RECIPIENTS = Object.freeze({
 
 function resolveBrowserReadConfigId(extensionId) {
   const normalizedExtensionId = String(extensionId || "").trim();
+
+  if (normalizedExtensionId === LINGUAGEM_SECRETA_BROWSER_READ_RUNTIME_ID) {
+    return normalizedExtensionId;
+  }
+
   return BROWSER_READ_RUNTIME_IDS.has(normalizedExtensionId)
     ? CONTENT_SELECTOR_CONFIG_ID
     : normalizedExtensionId;
