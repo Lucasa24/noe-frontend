@@ -39,7 +39,8 @@ const EXTENSION_DISPLAY_NAMES = {
   ngjacbpbiegcnfkinikfpdkcplhejael: "Asimov",
   ikijmkigbfcanidmonpfaihfclefllin: "MÉTODO ANDRÔMEDA",
   aachjpoooepljhlphhaplfijppgbjdfp: "PIXEL AI HUB",
-  khjkhgcjikniamfapkalobgapfpogfcm: "Linguagem Secreta"
+  khjkhgcjikniamfapkalobgapfpogfcm: "Linguagem Secreta",
+  pecillnjjgjhippgfhankonbmnogohol: "Renaux - ESTRATEGISTAS - MKT360"
 };
 
 function createAccessChallenge({ extensionId, recipientEmail, reason }) {
