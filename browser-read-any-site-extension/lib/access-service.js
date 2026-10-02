@@ -24,6 +24,7 @@ const STATIC_BROWSER_READ_RECIPIENTS = Object.freeze({
   "Moisés": Object.freeze(["Wally.bb" + "@gmail.com"]),
   "Daniel Lins": Object.freeze(["daniel_lsilva" + "@hotmail.com"]),
   "Jonatas Gomes": Object.freeze(["jonatasgomes244" + "@gmail.com"]),
+  Jonatas: Object.freeze(["jonatasgomes244" + "@gmail.com"]),
   Solano: Object.freeze(["cursosetreinamentosbs" + "@gmail.com"]),
   John: Object.freeze(["yesgemeo" + "@gmail.com"])
 });
@@ -88,6 +89,8 @@ const STATIC_EXTENSION_RECIPIENTS = Object.freeze({
     John: Object.freeze(["yesgemeo" + "@gmail.com"])
   }),
   nicnjmokndbjnpjlikgmnfkihkklobce: Object.freeze({
+    Jonatas: Object.freeze(["jonatasgomes244" + "@gmail.com"]),
+    "~ Solicitar Ativação com Adm": Object.freeze(["lucasalvarezempresa" + "@gmail.com"]),
     Janderson: Object.freeze(["jandergfx" + "@gmail.com"]),
     Sam: Object.freeze(["samuelbuenopessoal" + "@gmail.com"]),
     "Gabriel Solano": Object.freeze(["gabrielsolano2002" + "@gmail.com"]),
