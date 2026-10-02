@@ -39,6 +39,8 @@ assert(sw.includes('urlFilter: "|https://hotmart.com" + allowedPath + "^"'));
 assert(!sw.includes('allowAllRequests'));
 assert(auth.includes('COMBO_TRANSIT_CLUB_SLUGS'));
 assert(auth.includes('isUrlFilterCaseSensitive: false'));
+assert(auth.includes('COMBO_TRANSIT_HOTMART_CALLBACK_PATHS'));
+assert(auth.includes('oauth2.0/callbackAuthorize'));
 
 // Regression for AdsPower/Chromium tabs.create race.
 assert(sw.includes('function isTransientCreatedTabUrl'));
