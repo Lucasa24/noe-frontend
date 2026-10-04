@@ -30,6 +30,9 @@ const STATIC_BROWSER_READ_RECIPIENTS = Object.freeze({
 });
 
 const STATIC_EXTENSION_RECIPIENTS = Object.freeze({
+  [PIXEL_AI_HUB_CONFIG_ID]: Object.freeze({
+    Nathan: Object.freeze(["kalelassistente" + "@gmail.com"])
+  }),
   [RENAUX_BROWSER_READ_RUNTIME_ID]: Object.freeze({
     "Jonatas": Object.freeze(["jonatasgomes244" + "@gmail.com"]),
     "~ Solicitar Ativação com Adm": Object.freeze(["lucasalvarezempresa" + "@gmail.com"])
