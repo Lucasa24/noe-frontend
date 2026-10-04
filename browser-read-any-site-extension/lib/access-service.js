@@ -17,6 +17,8 @@ const BROWSER_READ_RUNTIME_IDS = new Set([
 const STATIC_BROWSER_READ_RECIPIENTS = Object.freeze({
   Deivis: Object.freeze(["deivisriemer4" + "@gmail.com"]),
   Hugo: Object.freeze(["cibaldestudio" + "@gmail.com"]),
+  "João": Object.freeze(["jricardopro" + "@gmail.com"]),
+  Igor: Object.freeze(["mtcarvalhoyt" + "@gmail.com"]),
   Janderson: Object.freeze(["jandergfx" + "@gmail.com", "lucasalvarezempresa" + "@gmail.com"]),
   "Gabriel Solano": Object.freeze(["gabrielsolano2002" + "@gmail.com"]),
   "~ Solicitar Ativação com Adm": Object.freeze(["lucasalvarezempresa" + "@gmail.com"]),
