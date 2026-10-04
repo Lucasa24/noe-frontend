@@ -1201,22 +1201,29 @@
 
     const visibleRecipients = filterRecipients(recipients, recipientQuery);
 
-    list.innerHTML = visibleRecipients.map((item) => `
-      <li class="recipient-item">
-        <button
-          class="recipient-option"
-          type="button"
-          data-content-key="${escapeAttribute(content.key)}"
-          data-recipient-key="${escapeAttribute(item.key)}"
-          aria-label="Enviar código para ${escapeAttribute(item.label)}"
-        >
-          <span class="recipient-copy">
-            <span class="recipient-name">${escapeHtml(item.label)}</span>
-            <span class="recipient-activity">Clique para enviar o código</span>
-          </span>
-        </button>
-      </li>
-    `).join("");
+    list.innerHTML = visibleRecipients.map((item) => {
+      const pendingProfile = getPendingProfile(item.key);
+      const activity = pendingProfile
+        ? `⚠️ Renovação pendente — ${pendingProfile.monthlyPrice} / mês`
+        : "Clique para enviar o código";
+
+      return `
+        <li class="recipient-item">
+          <button
+            class="recipient-option"
+            type="button"
+            data-content-key="${escapeAttribute(content.key)}"
+            data-recipient-key="${escapeAttribute(item.key)}"
+            aria-label="${pendingProfile ? "Ver cobrança de" : "Enviar código para"} ${escapeAttribute(item.label)}"
+          >
+            <span class="recipient-copy">
+              <span class="recipient-name">${escapeHtml(item.label)}</span>
+              <span class="recipient-activity">${escapeHtml(activity)}</span>
+            </span>
+          </button>
+        </li>
+      `;
+    }).join("");
     emptyState.hidden = recipients.length === 0 || visibleRecipients.length > 0;
   }
 
@@ -1274,6 +1281,13 @@
         const recipientKey = recipientButton.getAttribute("data-recipient-key");
 
         if (contentKey && recipientKey) {
+          const pendingProfile = getPendingProfile(recipientKey);
+
+          if (pendingProfile) {
+            showPendingProfile(pendingProfile, recipientKey);
+            return;
+          }
+
           void requestCode(contentKey, recipientKey);
         }
         return;
