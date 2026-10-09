@@ -384,7 +384,36 @@ function resolveExtensionConfigId(extensionId) {
 }
 
 function getExtensionEmailMap() {
-  const rawValue = String(process.env.EXTENSION_EMAIL_MAP || "").trim();
+  const baseMap = parseExtensionEmailMap(process.env.EXTENSION_EMAIL_MAP, "invalid_extension_email_map");
+  const overrides = parseExtensionEmailMap(
+    process.env.EXTENSION_EMAIL_MAP_OVERRIDES,
+    "invalid_extension_email_map_overrides"
+  );
+
+  const merged = { ...baseMap };
+
+  for (const [extensionId, overrideEntry] of Object.entries(overrides)) {
+    const baseEntry = merged[extensionId];
+
+    if (
+      baseEntry &&
+      typeof baseEntry === "object" &&
+      !Array.isArray(baseEntry) &&
+      overrideEntry &&
+      typeof overrideEntry === "object" &&
+      !Array.isArray(overrideEntry)
+    ) {
+      merged[extensionId] = { ...baseEntry, ...overrideEntry };
+    } else {
+      merged[extensionId] = overrideEntry;
+    }
+  }
+
+  return merged;
+}
+
+function parseExtensionEmailMap(value, errorCode) {
+  const rawValue = String(value || "").trim();
 
   if (!rawValue) {
     return {};
@@ -399,7 +428,7 @@ function getExtensionEmailMap() {
 
     return parsed;
   } catch (_error) {
-    throw createError("invalid_extension_email_map", 500);
+    throw createError(errorCode, 500);
   }
 }
 
@@ -417,7 +446,6 @@ function maskEmail(email) {
 
   return `${safeLocalPart}@${domain}`;
 }
-
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
