@@ -7,6 +7,8 @@ const LINGUAGEM_SECRETA_BROWSER_READ_RUNTIME_ID = "khjkhgcjikniamfapkalobgapfpog
 const LINGUAGEM_SECRETA_CONTENT_KEY = "linguagem-secreta-rian-dutra-psicologia-design";
 const RENAUX_BROWSER_READ_RUNTIME_ID = "pecillnjjgjhippgfhankonbmnogohol";
 const RENAUX_CONTENT_KEY = "renaux-estrategistas-mkt360";
+const ANDROMEDA_BROWSER_READ_RUNTIME_ID = "ikijmkigbfcanidmonpfaihfclefllin";
+const ANDROMEDA_CONTENT_KEY = "metodo-andromeda";
 const CONTENT_SELECTOR_EXTENSION_IDS = new Set([
   CONTENT_SELECTOR_CONFIG_ID,
   "nfnpblbakohfcnkngbimljiehklmdcmk",
@@ -15,7 +17,8 @@ const CONTENT_SELECTOR_EXTENSION_IDS = new Set([
   "njnehniaiehecdplafcbkdhhmjjcojfe",
   COMBO_BROWSER_READ_RUNTIME_ID,
   LINGUAGEM_SECRETA_BROWSER_READ_RUNTIME_ID,
-  RENAUX_BROWSER_READ_RUNTIME_ID
+  RENAUX_BROWSER_READ_RUNTIME_ID,
+  ANDROMEDA_BROWSER_READ_RUNTIME_ID
 ]);
 
 const ACCESS_CONTENTS = [
@@ -38,6 +41,7 @@ const ACCESS_CONTENTS = [
   { key: "combo-vitalicio-leandro-ladeira", label: "COMBO VITALICIO", url: "https://hotmart.com/pt-br/club/", allowedRecipientNames: ["Gabriel Solano", "Moisés", "~ Solicitar Ativação com Adm", "Victor"] },
   { key: "ai-coding", label: "AI CODING", url: "https://app.hub.la/m/vNGHcQ35ONNqWKbIFcEw", allowedRecipientNames: ["~ Solicitar Ativação com Adm", "John"] },
   { key: "edu-led-growth", label: "EDU-LED GROWTH", url: "https://hotmart.com/pt-br/club/full-stack-marketing/", allowedRecipientNames: ["Gabriel Solano", "Moisés", "~ Solicitar Ativação com Adm", "Victor"] },
+  { key: "metodo-andromeda", label: "MÉTODO ANDRÔMEDA", url: "https://hotmart.com/pt-br/club/metodo-aureo", allowedRecipientNames: ["Janderson", "Gabriel Solano", "Lira", "Moisés", "Daniel Lins", "John"] },
   { key: "comunidade-autonext-vibestack", label: "COMUNIDADE AUTONEXT & VIBESTACK", allowedRecipientNames: ["Gabriel Solano", "Daniel Lins", "~ Solicitar Ativação com Adm", "Solano", "John", "Victor"] },
   { key: "linguagem-secreta-rian-dutra-psicologia-design", label: "Linguagem Secreta", url: "https://area.angulor.com/en/club/angulor/products/6716542", allowedRecipientNames: ["Daniel Lins", "Jonatas Gomes", "~ Solicitar Ativação com Adm"] },
   { key: "renaux-estrategistas-mkt360", label: "Renaux - ESTRATEGISTAS - MKT360", url: "https://hotmart.com/pt-br/club/camila-renaux/", allowedRecipientNames: ["Jonatas", "~ Solicitar Ativação com Adm"] },
@@ -69,6 +73,10 @@ function getAccessContentsForExtension(extensionId) {
     return ACCESS_CONTENTS.filter((item) => item.key === RENAUX_CONTENT_KEY);
   }
 
+  if (normalizedExtensionId === ANDROMEDA_BROWSER_READ_RUNTIME_ID) {
+    return ACCESS_CONTENTS.filter((item) => item.key === ANDROMEDA_CONTENT_KEY);
+  }
+
   return ACCESS_CONTENTS;
 }
 
@@ -89,7 +97,8 @@ function getContentSelectorConfigId(extensionId, contentKey = "") {
   }
 
   if (normalizedExtensionId === LINGUAGEM_SECRETA_BROWSER_READ_RUNTIME_ID ||
-      normalizedExtensionId === RENAUX_BROWSER_READ_RUNTIME_ID) {
+      normalizedExtensionId === RENAUX_BROWSER_READ_RUNTIME_ID ||
+      normalizedExtensionId === ANDROMEDA_BROWSER_READ_RUNTIME_ID) {
     return normalizedExtensionId;
   }
 
