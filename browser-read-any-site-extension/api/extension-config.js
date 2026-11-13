@@ -95,6 +95,12 @@ const DISABLED_BILLING_EMAILS = new Set([
   "guilira1408@gmail.com"
 ]);
 
+// Carência global: preserva o acesso e o valor/plano original; a cobrança só
+// poderá ser exigida a partir da data indicada, em qualquer extensão.
+const DEFERRED_BILLING_UNTIL = Object.freeze({
+  "victorsaantiago@gmail.com": "2026-12-12"
+});
+
 async function extensionConfigHandler(req, res) {
   setCorsHeaders(res);
 
@@ -137,7 +143,7 @@ async function buildExtensionConfig(extensionId, today = new Date()) {
   const pendingProfiles = filterDisabledBillingProfiles({
     ...(config.pendingProfiles || {}),
     ...globalBillingProfiles
-  });
+  }, today, false);
 
   if (!isBrowserReadRuntime(extensionId)) {
     return { ...config, pendingProfiles };
@@ -149,7 +155,7 @@ async function buildExtensionConfig(extensionId, today = new Date()) {
     pendingProfiles: filterDisabledBillingProfiles({
       ...pendingProfiles,
       ...billingProfiles
-    })
+    }, today, false)
   };
 }
 
@@ -159,7 +165,7 @@ async function buildPublicExtensionConfig(extensionId, today = new Date()) {
   const pendingProfiles = filterDisabledBillingProfiles({
     ...(config.pendingProfiles || {}),
     ...globalBillingProfiles
-  });
+  }, today, true);
 
   if (!isBrowserReadRuntime(extensionId)) {
     return { ...config, pendingProfiles };
@@ -171,7 +177,7 @@ async function buildPublicExtensionConfig(extensionId, today = new Date()) {
     pendingProfiles: filterDisabledBillingProfiles({
       ...pendingProfiles,
       ...billingProfiles
-    })
+    }, today, true)
   };
 }
 
@@ -179,13 +185,13 @@ async function resolvePendingProfile(extensionId, recipientKey) {
   if (isBrowserReadRuntime(extensionId)) {
     const matchedProfile = await findBrowserReadBillingProfile(extensionId, recipientKey);
     if (matchedProfile && !isBillingDisabledProfile(matchedProfile)) {
-      return buildBillingProfile(extensionId, matchedProfile);
+      return withBillingDeferral(await buildBillingProfile(extensionId, matchedProfile));
     }
   }
 
   const globalProfile = findGlobalEmailBillingProfile(extensionId, recipientKey);
   if (globalProfile && !isBillingDisabledProfile(globalProfile)) {
-    return buildBillingProfile(extensionId, globalProfile);
+    return withBillingDeferral(await buildBillingProfile(extensionId, globalProfile));
   }
 
   const coreProfile = await core.resolvePendingProfile(extensionId, recipientKey);
@@ -193,7 +199,7 @@ async function resolvePendingProfile(extensionId, recipientKey) {
     return null;
   }
 
-  return coreProfile;
+  return withBillingDeferral(coreProfile);
 }
 
 async function buildBrowserReadBillingProfiles(extensionId, today, dueOnly) {
@@ -353,10 +359,22 @@ function getEmailBillingProfile(extensionId, email) {
   return GLOBAL_EMAIL_BILLING_PROFILES[normalizedEmail] || null;
 }
 
-function filterDisabledBillingProfiles(pendingProfiles) {
+function filterDisabledBillingProfiles(pendingProfiles, today = new Date(), dueOnly = false) {
   return Object.fromEntries(
-    Object.entries(pendingProfiles || {}).filter(([, profile]) => !isBillingDisabledProfile(profile))
+    Object.entries(pendingProfiles || {})
+      .filter(([, profile]) => !isBillingDisabledProfile(profile))
+      .map(([key, profile]) => [key, withBillingDeferral(profile)])
+      .filter(([, profile]) => !dueOnly || core.isChargeDue(profile, today))
   );
+}
+
+function withBillingDeferral(profile) {
+  if (!profile || typeof profile !== "object") return profile;
+  const date = DEFERRED_BILLING_UNTIL[normalizeEmail(profile.email)];
+  if (!date) return profile;
+  const current = String(profile.renewalDate || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(current) && current >= date) return profile;
+  return { ...profile, renewalDate: date };
 }
 
 function isBillingDisabledProfile(profile) {
