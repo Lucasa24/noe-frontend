@@ -1,6 +1,7 @@
 const { listRecipientsForExtension } = require("./access-service");
 
 const CONTENT_SELECTOR_CONFIG_ID = "nicnjmokndbjnpjlikgmnfkihkklobce";
+const ROTA100K_CONTENT_KEY = "rota-100k-rota-viral";
 const PIXEL_AI_HUB_CONFIG_ID = "aachjpoooepljhlphhaplfijppgbjdfp";
 const COMBO_BROWSER_READ_RUNTIME_ID = "miipjameglmiodjjgghegcidmkiefmlg";
 const LINGUAGEM_SECRETA_BROWSER_READ_RUNTIME_ID = "khjkhgcjikniamfapkalobgapfpogfcm";
@@ -45,6 +46,7 @@ const ACCESS_CONTENTS = [
   { key: "comunidade-autonext-vibestack", label: "COMUNIDADE AUTONEXT & VIBESTACK", allowedRecipientNames: ["Gabriel Solano", "Daniel Lins", "~ Solicitar Ativação com Adm", "Solano", "John", "Victor"] },
   { key: "linguagem-secreta-rian-dutra-psicologia-design", label: "Linguagem Secreta", url: "https://area.angulor.com/en/club/angulor/products/6716542", allowedRecipientNames: ["Daniel Lins", "Jonatas Gomes", "~ Solicitar Ativação com Adm"] },
   { key: "renaux-estrategistas-mkt360", label: "Renaux - ESTRATEGISTAS - MKT360", url: "https://hotmart.com/pt-br/club/camila-renaux/", allowedRecipientNames: ["Jonatas", "~ Solicitar Ativação com Adm"] },
+  { key: ROTA100K_CONTENT_KEY, label: "Rota 100k - rota viral", url: "https://members.kiwify.com/?club=ab57227e-651a-494f-ab24-d6805544ea28", allowedRecipientNames: ["~ Solicitar Ativação com Adm"] },
   { key: "mkt360-programa-marketing-360-camila-renaux", label: "MKT360 - Programa Marketing 360° - Camila Renaux", url: "https://mentorxlab.com/mkt360-programa-marketing-360-camila-renaux/", allowedRecipientNames: ["Jonatas Gomes"] },
   { key: "formacao-estrategistas-de-marketing-camila-renaux", label: "Formação Estrategistas de Marketing - Camila Renaux", url: "https://mentorxlab.com/formacao-estrategistas-de-marketing-camila-renaux/", allowedRecipientNames: ["Jonatas Gomes", "Victor"] },
   { key: "dtc-viral-lab", label: "DTC VIRAL LAB", allowedRecipientNames: ["João", "Igor", "Wesley", "Janderson", "adspc7", "~ Solicitar Ativação com Adm", "Victor"] },
@@ -77,7 +79,8 @@ function getAccessContentsForExtension(extensionId) {
     return ACCESS_CONTENTS.filter((item) => item.key === ANDROMEDA_CONTENT_KEY);
   }
 
-  return ACCESS_CONTENTS;
+  // A Rota100K integrada é exclusiva do seletor Cursos DVD principal.
+  return ACCESS_CONTENTS.filter((item) => item.key !== ROTA100K_CONTENT_KEY || normalizedExtensionId === CONTENT_SELECTOR_CONFIG_ID);
 }
 
 function isContentSelectorEnabled(extensionId) {
