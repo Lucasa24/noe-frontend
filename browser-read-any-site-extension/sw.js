@@ -36,6 +36,12 @@ const AUTONEXT_RELOAD_MESSAGE = "browser-read:reload-extension";
 const AUTONEXT_OPEN_PERMISSION_MESSAGE = "browser-read:open-permission-page";
 const AUTONEXT_CONTENT_KEY = "comunidade-autonext-vibestack";
 const PIXEL_AI_HUB_CONTENT_KEY = "pixel-ai-hub";
+const ROTA100K_CONTENT_KEY = "rota-100k-rota-viral";
+const ROTA100K_HUB_URL = "https://members.kiwify.com/?club=ab57227e-651a-494f-ab24-d6805544ea28";
+const ROTA100K_ALLOWED_ORIGINS = Object.freeze([
+  "https://members.kiwify.com",
+  "https://dashboard.kiwify.com"
+]);
 const PIXEL_AI_HUB_PRIMARY_URL = "https://hotmart.com/pt-br/club/pixel-educacao";
 const PIXEL_AI_HUB_URLS = Object.freeze([
   PIXEL_AI_HUB_PRIMARY_URL,
@@ -176,7 +182,8 @@ const CONTENT_URL_FALLBACKS = {
   "combo-vitalicio-leandro-ladeira": COMBO_VITALICIO_BASE_URL,
   "edu-led-growth": EDU_LED_MAIN_URL,
   "dtc-viral-lab": "https://dtcvirallab.com/",
-  "dtc-experience": "https://v2.aionmembers.com/"
+  "dtc-experience": "https://v2.aionmembers.com/",
+  [ROTA100K_CONTENT_KEY]: ROTA100K_HUB_URL
 };
 const ALLOWED_WHILE_LOCKED_ORIGINS = new Set([]);
 
@@ -1095,6 +1102,17 @@ async function verifyAccessCode(code, senderTabId) {
         typeof senderTabId === "number") {
       await chrome.tabs.update(senderTabId, {
         url: EDU_LED_MAIN_URL
+      }).catch(() => undefined);
+    }
+
+    // Rota100K integrada: acesso ao club Kiwify após a validação, sem
+    // depender de uma segunda extensão Clean.
+    if (isContentSelectorExtension() &&
+        restoredState?.unlocked === true &&
+        restoredState?.contentKey === ROTA100K_CONTENT_KEY &&
+        typeof senderTabId === "number") {
+      await chrome.tabs.update(senderTabId, {
+        url: ROTA100K_HUB_URL
       }).catch(() => undefined);
     }
 
@@ -3477,6 +3495,10 @@ function getAllowedContentOrigins(state) {
       ...(primaryOrigin ? [primaryOrigin] : []),
       ...CLAUDE_CODE_HOTMART_AUTH_ORIGINS
     ]));
+  }
+
+  if (contentKey === ROTA100K_CONTENT_KEY) {
+    return [...ROTA100K_ALLOWED_ORIGINS];
   }
 
   return primaryOrigin ? [primaryOrigin] : [];
