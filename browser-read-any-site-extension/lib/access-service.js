@@ -162,7 +162,8 @@ const STATIC_EXTENSION_RECIPIENTS = Object.freeze({
   }),
   papoapfhfciiaaadmmondbdkfhgilbki: Object.freeze({
     Solano: Object.freeze(["cursosetreinamentosbs" + "@gmail.com"]),
-    John: Object.freeze(["yesgemeo" + "@gmail.com"])
+    John: Object.freeze(["yesgemeo" + "@gmail.com"]),
+    "Ana Schneider": Object.freeze(["anaschneider181952" + "@gmail.com"])
   }),
   njnehniaiehecdplafcbkdhhmjjcojfe: Object.freeze({
     Sam: Object.freeze(["samuelbuenopessoal" + "@gmail.com"]),
@@ -171,7 +172,8 @@ const STATIC_EXTENSION_RECIPIENTS = Object.freeze({
     "Moisés": Object.freeze(["Wally.bb" + "@gmail.com"]),
     "Jonatas Gomes": Object.freeze(["jonatasgomes244" + "@gmail.com"]),
     Solano: Object.freeze(["cursosetreinamentosbs" + "@gmail.com"]),
-    John: Object.freeze(["yesgemeo" + "@gmail.com"])
+    John: Object.freeze(["yesgemeo" + "@gmail.com"]),
+    "Ana Schneider": Object.freeze(["anaschneider181952" + "@gmail.com"])
   })
 });
 
