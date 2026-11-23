@@ -390,22 +390,29 @@ function getExtensionEmailMap() {
     "invalid_extension_email_map_overrides"
   );
 
+  // Mapa complementar da Black 2026, sem substituir nem apagar os mapas existentes.
+  const black2026 = parseExtensionEmailMap(
+    process.env.EXTENSION_EMAIL_MAP_BLACK2026,
+    "invalid_extension_email_map_black2026"
+  );
   const merged = { ...baseMap };
 
-  for (const [extensionId, overrideEntry] of Object.entries(overrides)) {
-    const baseEntry = merged[extensionId];
+  for (const addition of [overrides, black2026]) {
+    for (const [extensionId, overrideEntry] of Object.entries(addition)) {
+      const baseEntry = merged[extensionId];
 
-    if (
-      baseEntry &&
-      typeof baseEntry === "object" &&
-      !Array.isArray(baseEntry) &&
-      overrideEntry &&
-      typeof overrideEntry === "object" &&
-      !Array.isArray(overrideEntry)
-    ) {
-      merged[extensionId] = { ...baseEntry, ...overrideEntry };
-    } else {
-      merged[extensionId] = overrideEntry;
+      if (
+        baseEntry &&
+        typeof baseEntry === "object" &&
+        !Array.isArray(baseEntry) &&
+        overrideEntry &&
+        typeof overrideEntry === "object" &&
+        !Array.isArray(overrideEntry)
+      ) {
+        merged[extensionId] = { ...baseEntry, ...overrideEntry };
+      } else {
+        merged[extensionId] = overrideEntry;
+      }
     }
   }
 
