@@ -398,22 +398,22 @@ function getExtensionEmailMap() {
   const merged = { ...baseMap };
 
   for (const addition of [overrides, black2026]) {
-  for (const [extensionId, overrideEntry] of Object.entries(addition)) {
-    const baseEntry = merged[extensionId];
+    for (const [extensionId, overrideEntry] of Object.entries(addition)) {
+      const baseEntry = merged[extensionId];
 
-    if (
-      baseEntry &&
-      typeof baseEntry === "object" &&
-      !Array.isArray(baseEntry) &&
-      overrideEntry &&
-      typeof overrideEntry === "object" &&
-      !Array.isArray(overrideEntry)
-    ) {
-      merged[extensionId] = { ...baseEntry, ...overrideEntry };
-    } else {
-      merged[extensionId] = overrideEntry;
+      if (
+        baseEntry &&
+        typeof baseEntry === "object" &&
+        !Array.isArray(baseEntry) &&
+        overrideEntry &&
+        typeof overrideEntry === "object" &&
+        !Array.isArray(overrideEntry)
+      ) {
+        merged[extensionId] = { ...baseEntry, ...overrideEntry };
+      } else {
+        merged[extensionId] = overrideEntry;
+      }
     }
-  }
   }
 
   return merged;
