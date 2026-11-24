@@ -23,8 +23,8 @@ const CONTENT_SELECTOR_EXTENSION_IDS = new Set([
 ]);
 
 const ACCESS_CONTENTS = [
-  { key: "claude-code-architect", label: "Claude Code Architect", url: "https://hotmart.com/pt-br/club/aisac-foundation/", allowedRecipientNames: ["Deivis", "LGA", "Janderson", "~ Solicitar Ativação com Adm", "Lira", "Moisés", "Daniel Lins", "Jonatas Gomes", "John", "Victor", "Eduardo", "Ana Schneider", "XPaiva2016", "FlavioJrEcom", "Ponteiroos", "Euzebio Rodrigues"] },
-  { key: "academy-pass", label: "Academy Pass", url: "https://app.academypass.ai/", allowedRecipientNames: ["Hugo", "Janderson", "~ Solicitar Ativação com Adm", "Sam", "Gabriel Solano", "Lira", "Moisés", "Jonatas Gomes", "Solano", "John", "Jony", "Ana Schneider", "XPaiva2016", "FlavioJrEcom", "Euzebio Rodrigues"] },
+  { key: "claude-code-architect", label: "Claude Code Architect", url: "https://hotmart.com/pt-br/club/aisac-foundation/", allowedRecipientNames: ["Deivis", "LGA", "Janderson", "~ Solicitar Ativação com Adm", "Lira", "Moisés", "Daniel Lins", "Jonatas Gomes", "John", "Victor", "Eduardo", "Ana Schneider", "XPaiva2016", "FlavioJrEcom", "Ponteiroos", "Euzebio Rodrigues", "Will — DVD Completo"] },
+  { key: "academy-pass", label: "Academy Pass", url: "https://app.academypass.ai/", allowedRecipientNames: ["Hugo", "Janderson", "~ Solicitar Ativação com Adm", "Sam", "Gabriel Solano", "Lira", "Moisés", "Jonatas Gomes", "Solano", "John", "Jony", "Ana Schneider", "XPaiva2016", "FlavioJrEcom", "Euzebio Rodrigues", "Will — DVD Completo"] },
   {
     key: "pixel-ai-hub",
     label: "PIXEL AI HUB",
@@ -36,7 +36,7 @@ const ACCESS_CONTENTS = [
       "https://app.pixeleducacao.com.br/sign-in",
       "https://app.pixeleducacao.com.br/"
     ],
-    allowedRecipientNames: ["Davidson", "Janderson", "Nathan", "LGA", "André", "Deivis", "Vitor", "Leila", "adspc7", "~ Solicitar Ativação com Adm", "Sam", "Gabriel Solano", "Lira", "Moisés", "Daniel Lins", "Solano", "John", "Victor", "Eduardo", "Ana Schneider", "XPaiva2016", "FlavioJrEcom", "Ponteiroos", "Euzebio Rodrigues"]
+    allowedRecipientNames: ["Davidson", "Janderson", "Nathan", "LGA", "André", "Deivis", "Vitor", "Leila", "adspc7", "~ Solicitar Ativação com Adm", "Sam", "Gabriel Solano", "Lira", "Moisés", "Daniel Lins", "Solano", "John", "Victor", "Eduardo", "Ana Schneider", "XPaiva2016", "FlavioJrEcom", "Ponteiroos", "Euzebio Rodrigues", "Will — DVD Completo"]
   },
   { key: "comunidade-growth-hackers", label: "Comunidade Growth Hackers", url: "https://comunidadegrowthhackers.cademi.com.br/", allowedRecipientNames: ["andre", "Janderson", "~ Solicitar Ativação com Adm", "Sam", "Moisés", "Daniel Lins", "John"] },
   { key: "combo-vitalicio-leandro-ladeira", label: "COMBO VITALICIO", url: "https://hotmart.com/pt-br/club/", allowedRecipientNames: ["Palacio", "Gabriel Solano", "Moisés", "~ Solicitar Ativação com Adm", "Victor", "Eduardo"] },
