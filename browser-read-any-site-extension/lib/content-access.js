@@ -23,8 +23,8 @@ const CONTENT_SELECTOR_EXTENSION_IDS = new Set([
 ]);
 
 const ACCESS_CONTENTS = [
-  { key: "claude-code-architect", label: "Claude Code Architect", url: "https://hotmart.com/pt-br/club/aisac-foundation/", allowedRecipientNames: ["Deivis", "LGA", "Janderson", "~ Solicitar Ativação com Adm", "Lira", "Moisés", "Daniel Lins", "Jonatas Gomes", "John", "Victor", "Eduardo", "Ana Schneider", "XPaiva2016", "FlavioJrEcom", "Ponteiroos", "Euzebio Rodrigues", "Will — DVD Completo", "Lohran"] },
-  { key: "academy-pass", label: "Academy Pass", url: "https://app.academypass.ai/", allowedRecipientNames: ["Hugo", "Janderson", "~ Solicitar Ativação com Adm", "Sam", "Gabriel Solano", "Lira", "Moisés", "Jonatas Gomes", "Solano", "John", "Jony", "Ana Schneider", "XPaiva2016", "FlavioJrEcom", "Euzebio Rodrigues", "Will — DVD Completo", "Lohran"] },
+  { key: "claude-code-architect", label: "Claude Code Architect", url: "https://hotmart.com/pt-br/club/aisac-foundation/", allowedRecipientNames: ["Deivis", "LGA", "Janderson", "~ Solicitar Ativação com Adm", "Lira", "Moisés", "Daniel Lins", "Jonatas Gomes", "John", "Victor", "Eduardo", "Ana Schneider", "XPaiva2016", "FlavioJrEcom", "Ponteiroos", "Euzebio Rodrigues", "Will — DVD Completo", "Lohran", "Michel"] },
+  { key: "academy-pass", label: "Academy Pass", url: "https://app.academypass.ai/", allowedRecipientNames: ["Hugo", "Janderson", "~ Solicitar Ativação com Adm", "Sam", "Gabriel Solano", "Lira", "Moisés", "Jonatas Gomes", "Solano", "John", "Jony", "Ana Schneider", "XPaiva2016", "FlavioJrEcom", "Euzebio Rodrigues", "Will — DVD Completo", "Lohran", "Michel"] },
   {
     key: "pixel-ai-hub",
     label: "PIXEL AI HUB",
@@ -44,13 +44,13 @@ const ACCESS_CONTENTS = [
   { key: "edu-led-growth", label: "EDU-LED GROWTH", url: "https://hotmart.com/pt-br/club/full-stack-marketing/", allowedRecipientNames: ["Gabriel Solano", "Moisés", "~ Solicitar Ativação com Adm", "Victor", "Euzebio Rodrigues"] },
   { key: "metodo-andromeda", label: "MÉTODO ANDRÔMEDA", url: "https://hotmart.com/pt-br/club/metodo-aureo", allowedRecipientNames: ["Janderson", "Gabriel Solano", "Lira", "Moisés", "Daniel Lins", "John"] },
   { key: "comunidade-autonext-vibestack", label: "COMUNIDADE AUTONEXT & VIBESTACK", allowedRecipientNames: ["Gabriel Solano", "Daniel Lins", "~ Solicitar Ativação com Adm", "Solano", "John", "Victor"] },
-  { key: "linguagem-secreta-rian-dutra-psicologia-design", label: "Linguagem Secreta", url: "https://area.angulor.com/en/club/angulor/products/6716542", allowedRecipientNames: ["Daniel Lins", "Jonatas Gomes", "~ Solicitar Ativação com Adm", "Euzebio Rodrigues"] },
+  { key: "linguagem-secreta-rian-dutra-psicologia-design", label: "Linguagem Secreta", url: "https://area.angulor.com/en/club/angulor/products/6716542", allowedRecipientNames: ["Daniel Lins", "Jonatas Gomes", "~ Solicitar Ativação com Adm", "Euzebio Rodrigues", "Michel"] },
   { key: "renaux-estrategistas-mkt360", label: "Renaux - ESTRATEGISTAS - MKT360", url: "https://hotmart.com/pt-br/club/camila-renaux/", allowedRecipientNames: ["Jonatas", "~ Solicitar Ativação com Adm"] },
   { key: ROTA100K_CONTENT_KEY, label: "Rota 100k - rota viral", url: "https://members.kiwify.com/?club=ab57227e-651a-494f-ab24-d6805544ea28", allowedRecipientNames: ["~ Solicitar Ativação com Adm", "Davidson"] },
-  { key: "mkt360-programa-marketing-360-camila-renaux", label: "MKT360 - Programa Marketing 360° - Camila Renaux", url: "https://mentorxlab.com/mkt360-programa-marketing-360-camila-renaux/", allowedRecipientNames: ["Jonatas Gomes", "Ana Schneider", "XPaiva2016", "FlavioJrEcom", "Ponteiroos", "Euzebio Rodrigues"] },
+  { key: "mkt360-programa-marketing-360-camila-renaux", label: "MKT360 - Programa Marketing 360° - Camila Renaux", url: "https://mentorxlab.com/mkt360-programa-marketing-360-camila-renaux/", allowedRecipientNames: ["Jonatas Gomes", "Ana Schneider", "XPaiva2016", "FlavioJrEcom", "Ponteiroos", "Euzebio Rodrigues", "Michel"] },
   { key: "formacao-estrategistas-de-marketing-camila-renaux", label: "Formação Estrategistas de Marketing - Camila Renaux", url: "https://mentorxlab.com/formacao-estrategistas-de-marketing-camila-renaux/", allowedRecipientNames: ["Jonatas Gomes", "Victor"] },
   { key: "dtc-viral-lab", label: "DTC VIRAL LAB", allowedRecipientNames: ["João", "Igor", "Wesley", "Janderson", "adspc7", "~ Solicitar Ativação com Adm", "Victor", "Ana Schneider", "Ponteiroos"] },
-  { key: "dtc-experience", label: "DTC EXPERIENCE", allowedRecipientNames: ["João", "Igor", "Wesley", "Janderson", "adspc7", "~ Solicitar Ativação com Adm", "Sam", "Daniel Lins", "Ana Schneider", "FlavioJrEcom", "Lohran"] }
+  { key: "dtc-experience", label: "DTC EXPERIENCE", allowedRecipientNames: ["João", "Igor", "Wesley", "Janderson", "adspc7", "~ Solicitar Ativação com Adm", "Sam", "Daniel Lins", "Ana Schneider", "FlavioJrEcom", "Lohran", "Michel"] }
 ];
 
 const COMBO_BROWSER_READ_CONTENT_KEYS = new Set([
