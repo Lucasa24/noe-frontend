@@ -23,8 +23,8 @@ const CONTENT_SELECTOR_EXTENSION_IDS = new Set([
 ]);
 
 const ACCESS_CONTENTS = [
-  { key: "claude-code-architect", label: "Claude Code Architect", url: "https://hotmart.com/pt-br/club/aisac-foundation/", allowedRecipientNames: ["Deivis", "LGA", "Janderson", "~ Solicitar Ativação com Adm", "Lira", "Moisés", "Daniel Lins", "Jonatas Gomes", "John", "Victor", "Eduardo", "Ana Schneider", "XPaiva2016", "FlavioJrEcom", "Ponteiroos", "Euzebio Rodrigues", "Will — DVD Completo", "Lohran", "Michel", "Lucas Boechat"] },
-  { key: "academy-pass", label: "Academy Pass", url: "https://app.academypass.ai/", allowedRecipientNames: ["Hugo", "Janderson", "~ Solicitar Ativação com Adm", "Sam", "Gabriel Solano", "Lira", "Moisés", "Jonatas Gomes", "Solano", "John", "Jony", "Ana Schneider", "XPaiva2016", "FlavioJrEcom", "Euzebio Rodrigues", "Will — DVD Completo", "Lohran", "Michel", "Ruan Malta"] },
+  { key: "claude-code-architect", label: "Claude Code Architect", url: "https://hotmart.com/pt-br/club/aisac-foundation/", allowedRecipientNames: ["Deivis", "LGA", "Janderson", "~ Solicitar Ativação com Adm", "Lira", "Moisés", "Daniel Lins", "Jonatas Gomes", "John", "Victor", "Eduardo", "Ana Schneider", "XPaiva2016", "FlavioJrEcom", "Ponteiroos", "Euzebio Rodrigues", "Will — DVD Completo", "Lohran", "Michel", "Lucas Boechat", "Anna Cursos Gade"] },
+  { key: "academy-pass", label: "Academy Pass", url: "https://app.academypass.ai/", allowedRecipientNames: ["Hugo", "Janderson", "~ Solicitar Ativação com Adm", "Sam", "Gabriel Solano", "Lira", "Moisés", "Jonatas Gomes", "Solano", "John", "Jony", "Ana Schneider", "XPaiva2016", "FlavioJrEcom", "Euzebio Rodrigues", "Will — DVD Completo", "Lohran", "Michel", "Ruan Malta", "Anna Cursos Gade"] },
   {
     key: "pixel-ai-hub",
     label: "PIXEL AI HUB",
@@ -36,12 +36,12 @@ const ACCESS_CONTENTS = [
       "https://app.pixeleducacao.com.br/sign-in",
       "https://app.pixeleducacao.com.br/"
     ],
-    allowedRecipientNames: ["Davidson", "Janderson", "Nathan", "LGA", "André", "Deivis", "Vitor", "Leila", "adspc7", "~ Solicitar Ativação com Adm", "Sam", "Gabriel Solano", "Lira", "Moisés", "Daniel Lins", "Solano", "John", "Victor", "Eduardo", "Ana Schneider", "XPaiva2016", "FlavioJrEcom", "Ponteiroos", "Euzebio Rodrigues", "Will — DVD Completo", "Lohran"]
+    allowedRecipientNames: ["Davidson", "Janderson", "Nathan", "LGA", "André", "Deivis", "Vitor", "Leila", "adspc7", "~ Solicitar Ativação com Adm", "Sam", "Gabriel Solano", "Lira", "Moisés", "Daniel Lins", "Solano", "John", "Victor", "Eduardo", "Ana Schneider", "XPaiva2016", "FlavioJrEcom", "Ponteiroos", "Euzebio Rodrigues", "Will — DVD Completo", "Lohran", "Anna Cursos Gade"]
   },
   { key: "comunidade-growth-hackers", label: "Comunidade Growth Hackers", url: "https://comunidadegrowthhackers.cademi.com.br/", allowedRecipientNames: ["andre", "Janderson", "~ Solicitar Ativação com Adm", "Sam", "Moisés", "Daniel Lins", "John"] },
   { key: "combo-vitalicio-leandro-ladeira", label: "COMBO VITALICIO", url: "https://hotmart.com/pt-br/club/", allowedRecipientNames: ["Palacio", "Gabriel Solano", "Moisés", "~ Solicitar Ativação com Adm", "Victor", "Eduardo", "Euzebio Rodrigues", "Ponteiroos", "Michel Borguinhon", "Adbox Ideias"] },
   { key: "ai-coding", label: "AI CODING", url: "https://app.hub.la/m/vNGHcQ35ONNqWKbIFcEw", allowedRecipientNames: ["~ Solicitar Ativação com Adm", "John", "FlavioJrEcom", "Ponteiroos", "Euzebio Rodrigues"] },
-  { key: "edu-led-growth", label: "EDU-LED GROWTH", url: "https://hotmart.com/pt-br/club/full-stack-marketing/", allowedRecipientNames: ["Gabriel Solano", "Moisés", "~ Solicitar Ativação com Adm", "Victor", "Euzebio Rodrigues", "Ruan Malta"] },
+  { key: "edu-led-growth", label: "EDU-LED GROWTH", url: "https://hotmart.com/pt-br/club/full-stack-marketing/", allowedRecipientNames: ["Gabriel Solano", "Moisés", "~ Solicitar Ativação com Adm", "Victor", "Euzebio Rodrigues", "Ruan Malta", "Anna Cursos Gade"] },
   { key: "metodo-andromeda", label: "MÉTODO ANDRÔMEDA", url: "https://hotmart.com/pt-br/club/metodo-aureo", allowedRecipientNames: ["Janderson", "Gabriel Solano", "Lira", "Moisés", "Daniel Lins", "John"] },
   { key: "comunidade-autonext-vibestack", label: "COMUNIDADE AUTONEXT & VIBESTACK", allowedRecipientNames: ["Gabriel Solano", "Daniel Lins", "~ Solicitar Ativação com Adm", "Solano", "John", "Victor"] },
   { key: "linguagem-secreta-rian-dutra-psicologia-design", label: "Linguagem Secreta", url: "https://area.angulor.com/en/club/angulor/products/6716542", allowedRecipientNames: ["Daniel Lins", "Jonatas Gomes", "~ Solicitar Ativação com Adm", "Euzebio Rodrigues", "Michel", "Ruan Malta"] },
@@ -50,7 +50,7 @@ const ACCESS_CONTENTS = [
   { key: "mkt360-programa-marketing-360-camila-renaux", label: "MKT360 - Programa Marketing 360° - Camila Renaux", url: "https://mentorxlab.com/mkt360-programa-marketing-360-camila-renaux/", allowedRecipientNames: ["Jonatas Gomes", "Ana Schneider", "XPaiva2016", "FlavioJrEcom", "Ponteiroos", "Euzebio Rodrigues", "Michel"] },
   { key: "formacao-estrategistas-de-marketing-camila-renaux", label: "Formação Estrategistas de Marketing - Camila Renaux", url: "https://mentorxlab.com/formacao-estrategistas-de-marketing-camila-renaux/", allowedRecipientNames: ["Jonatas Gomes", "Victor"] },
   { key: "dtc-viral-lab", label: "DTC VIRAL LAB", allowedRecipientNames: ["João", "Igor", "Wesley", "Janderson", "adspc7", "~ Solicitar Ativação com Adm", "Victor", "Ana Schneider", "Ponteiroos"] },
-  { key: "dtc-experience", label: "DTC EXPERIENCE", allowedRecipientNames: ["João", "Igor", "Wesley", "Janderson", "adspc7", "~ Solicitar Ativação com Adm", "Sam", "Daniel Lins", "Ana Schneider", "FlavioJrEcom", "Lohran", "Michel", "Lucas Boechat", "Ruan Malta"] }
+  { key: "dtc-experience", label: "DTC EXPERIENCE", allowedRecipientNames: ["João", "Igor", "Wesley", "Janderson", "adspc7", "~ Solicitar Ativação com Adm", "Sam", "Daniel Lins", "Ana Schneider", "FlavioJrEcom", "Lohran", "Michel", "Lucas Boechat", "Ruan Malta", "Anna Cursos Gade"] }
 ];
 
 const COMBO_BROWSER_READ_CONTENT_KEYS = new Set([
