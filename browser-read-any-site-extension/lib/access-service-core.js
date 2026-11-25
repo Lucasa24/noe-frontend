@@ -400,9 +400,14 @@ function getExtensionEmailMap() {
     process.env.EXTENSION_EMAIL_MAP_BLACK2026_2,
     "invalid_extension_email_map_black2026_2"
   );
+  // Terceira parte do mapa complementar Black 2026.
+  const black2026Part3 = parseExtensionEmailMap(
+    process.env.EXTENSION_EMAIL_MAP_BLACK2026_3,
+    "invalid_extension_email_map_black2026_3"
+  );
   const merged = { ...baseMap };
 
-  for (const addition of [overrides, black2026, black2026Part2]) {
+  for (const addition of [overrides, black2026, black2026Part2, black2026Part3]) {
     for (const [extensionId, overrideEntry] of Object.entries(addition)) {
       const baseEntry = merged[extensionId];
 
